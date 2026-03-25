@@ -1,0 +1,21 @@
+<style>
+/* --- スタイル定義（見た目） --- */
+body { font-family: "Helvetica Neue", Arial, sans-serif; padding: 15px; font-size: 13px; color: #333; background-color: #fff; }
+.section-title { background: #f1f3f4; padding: 8px 10px; margin: 20px 0 10px 0; border-left: 4px solid #1a73e8; font-weight: bold; color: #5f6368; }
+.field { margin-bottom: 12px; }
+.sub-field { display: flex; gap: 8px; margin-top: 4px; }
+.sub-field > div { flex: 1; }
+label { display: block; margin-bottom: 4px; font-weight: 600; color: #444; }
+input, select, textarea { width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #ced4da; border-radius: 4px; font-size: 13px; }
+.unit-input { position: relative; }
+.unit-input input { padding-right: 40px; }
+.unit-label { position: absolute; right: 10px; top: 8px; color: #888; pointer-events: none; }
+button { width: 100%; padding: 12px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 14px; margin-top: 10px; transition: 0.2s; }
+.btn-primary { background: #1a73e8; color: white; }
+.btn-secondary { background: #5f6368; color: white; }
+.search-box { background: #e8f0fe; padding: 12px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #1a73e8; }
+#overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; }
+#modal-message { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #fff; padding: 25px; border-radius: 8px; text-align: center; width: 80%; }
+.warning-box { display:none; color: #d93025; font-size: 11px; margin-top: 4px; background: #feefee; padding: 6px; border-radius: 4px; border: 1px solid #fad2cf; }
+.cand-name-display { font-size: 12px; line-height: 30px; margin-left: 5px; color: #1a73e8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 140px; }
+</style>
