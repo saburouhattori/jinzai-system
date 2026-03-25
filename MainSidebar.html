@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html>
+<head>
+<base target="_top">
+<?!= include('Sidebar_CSS'); ?>
+</head>
+<body>
+<div id="overlay"><div id="modal-message"><div id="modal-text" style="font-weight:bold; color:#1a73e8; margin-bottom:15px;"></div><button class="btn-primary" onclick="closeModal()" >閉じる</button></div></div>
+
+<input type="hidden" id="targetRow">
+
+<? if (mode === 'EDIT' || mode === 'COMMENT') { ?>
+<div class="search-box">
+<label>管理番号で検索</label>
+<input type="text" id="searchId" placeholder=" 例: 1 または 0001 " oninput="checkCandId(this, 'searchNameDisplay')" onblur="applyFormat(this)">
+<div id="searchNameDisplay" style="font-size:11px; color:#1a73e8; margin-top:4px; height:14px;"></div>
+<button class="btn-secondary" id="searchBtn" onclick="searchData()" >読み込む</button>
+</div>
+<? } ?>
+
+<div id="form-candidate" style="display: <?= (mode === 'NEW' || mode === 'EDIT' || mode === 'COMMENT') ? 'block' : 'none' ?>;">
+
+<? if (mode === 'COMMENT') { ?>
+<div class="field" ><label>名前</label><input type= "text" id="name" readonly style="background:#f8f9fa;"></div>
+<div class="field" ><label>コメント</label><textarea id= "comment" rows="15"></textarea></div>
+<? } else { ?>
+<div class="section-title" >基本情報</div>
+<div class="field" ><label>名前</label><input type= "text" id="name"></div>
+<div class="field" ><label>フリガナ</label><input type= "text" id="furigana"></div>
+<div class="field" ><label>呼び名</label><input type= "text" id="nickname"></div>
+<div class="field" ><label>生年月日</label><input type= "date" id="birthday"></div>
+<div class="field" ><label>性別</label><select id= "gender"><option value="" >未選択</option><option value= " 男性 " >男性</option><option value= " 女性 " >女性</option></select></div>
+<div class="field" ><label>配偶者</label><select id= "spouse"><option value="" >未選択</option><option value= " 無 " >無</option><option value= " 有 " >有</option></select></div>
+<div class="field" ><label>身長</label><div class= "unit-input"><input type="number" id="height"><span class="unit-label">cm</span></div></div>
+<div class="field" ><label>体重</label><div class= "unit-input"><input type="number" id="weight"><span class="unit-label">kg</span></div></div>
+<div class="field" ><label>現住所</label><input type= "text" id="address"></div>
+<div class="field" ><label>出生地</label><input type= "text" id="birthplace"></div>
+<div class="field" ><label>メールアドレス</label><input type= "email" id="email"></div>
+<div class="field" ><label>所属日本語学校</label><select id= "school"><option value="">未選択</option></select></div>
+
+<div class="section-title" >学歴</div>
+<div class="field" ><label>学校名</label><input type= "text" id="eduSchool"></div>
+<div class="field" ><label>学部・学科</label><input type= "text" id="eduDept"></div>
+<div class="field" ><label>状況</label><select id= "eduStatus"><option value="" >未選択</option><option value= " 卒業 " >卒業</option><option value= " 中途退学 " >中途退学</option><option value= " 在学中 " >在学中</option><option value= " 休学中 " >休学中</option></select></div>
+<div class="field" ><label>入学年月</label><input type= "text" id="eduStart" placeholder=" YYYY年MM月 "></div>
+<div class="field" ><label>卒業年月</label><input type= "text" id="eduEnd" placeholder=" YYYY年MM月 "></div>
+<div class="field" ><label>補足</label><textarea id= "eduNote" rows="2"></textarea></div>
+
+<div class="section-title" >職歴</div>
+<div class="field">
+<label>職歴①</label>
+<input type="text" id="expPeriod1" placeholder=" 期間（ 2020 年 4 月から 2024 年 3 月まで） ">
+<input type="text" id="expContent1" style="margin-top:4px;" placeholder=" 内容（スーパーのレジスタッフとして働いた。） ">
+</div>
+<div class="field">
+<label>職歴②</label>
+<input type="text" id="expPeriod2" placeholder=" 期間 ">
+<input type="text" id="expContent2" style="margin-top:4px;" placeholder=" 内容 ">
+</div>
+<div class="field">
+<label>職歴③</label>
+<input type="text" id="expPeriod3" placeholder=" 期間 ">
+<input type="text" id="expContent3" style="margin-top:4px;" placeholder=" 内容 ">
+</div>
+
+<div class="section-title" >特定技能要件</div>
+<div class="field"><label>JLPT</label><div class="sub-field"><select id="jlptLevel"><option value="" >未選択</option><option value= "N1">N1</option><option value="N2">N2</option><option value="N3">N3</option><option value="N4">N4</option></select><input type="text" id="jlptDate" placeholder=" 年月 "></div></div>
+<div class="field"><label>JFT Basic</label><div class="sub-field"><select id="jftLevel"><option value="" >未選択</option><option value= "A2">A2</option></select><input type="text" id="jftDate" placeholder=" 年月 "></div></div>
+<div class="field" ><label>介護技能評価試験</label><div class= "sub-field"><select id="kaigoSkill"><option value="" >未選択</option><option value= " 合格 " >合格</option><option value= " 受験予定 " >受験予定</option></select><input type= "text" id="kaigoSkillDate" placeholder=" 年月 "></div></div>
+<div class="field" ><label>介護日本語評価試験</label><div class= "sub-field"><select id="kaigoLang"><option value="" >未選択</option><option value= " 合格 " >合格</option><option value= " 受験予定 " >受験予定</option></select><input type= "text" id="kaigoLangDate" placeholder=" 年月 "></div></div>
+
+<div class="section-title" >その他</div>
+
+<div class="field">
+  <label>その他の日本語能力試験</label>
+  <div class="sub-field">
+    <select id="otherJapanese">
+      <option value="">未選択</option>
+      <option value="NAT-TEST 5級">NAT-TEST 5級</option>
+      <option value="NAT-TEST 4級">NAT-TEST 4級</option>
+      <option value="NAT-TEST 3級">NAT-TEST 3級</option>
+      <option value="NAT-TEST 2級">NAT-TEST 2級</option>
+      <option value="NAT-TEST 1級">NAT-TEST 1級</option>
+      <option value="J.TEST G級">J.TEST G級</option>
+      <option value="J.TEST F級">J.TEST F級</option>
+      <option value="J.TEST E級">J.TEST E級</option>
+      <option value="J.TEST D級">J.TEST D級</option>
+      <option value="J.TEST C級">J.TEST C級</option>
+      <option value="J.TEST 準B級">J.TEST 準B級</option>
+      <option value="J.TEST B級">J.TEST B級</option>
+      <option value="J.TEST 準A級">J.TEST 準A級</option>
+      <option value="J.TEST A級">J.TEST A級</option>
+      <option value="J.TEST 特A級">J.TEST 特A級</option>
+      <option value="J-cert A1">J-cert A1</option>
+      <option value="J-cert A2.1">J-cert A2.1</option>
+      <option value="J-cert A2.2">J-cert A2.2</option>
+      <option value="J-cert B1">J-cert B1</option>
+      <option value="J-cert B2">J-cert B2</option>
+      <option value="J-cert C1">J-cert C1</option>
+      <option value="J-cert C2">J-cert C2</option>
+    </select>
+    <input type="text" id="otherJapaneseDate" placeholder="年月">
+  </div>
+</div>
+
+<div class="field">
+<label>日本在住の親族の有無</label>
+<select id="relativeSelect" onchange="toggleRelative()">
+<option value=" 無 " >無</option>
+<option value=" 有 " >有</option>
+</select>
+<input type="text" id="relativeDetail" style="display:none; margin-top:4px;" placeholder=" 続柄・お名前など具体的に ">
+</div>
+<div class="field" ><label>コメント</label><textarea id= "comment" rows="3"></textarea></div>
+<div class="field" ><label>写真</label><input type= "file" id="imageFile" accept="image/*"></div>
+<? } ?>
+<button class="btn-primary" id="mainBtn" onclick="submitData()"><?= mode === 'NEW' ? ' 新規登録 ' : ' 更新 ' ?></button>
+</div>
+
+<div id="form-company" style="display: <?= mode === 'COMPANY' ? 'block' : 'none' ?>;">
+<div class="section-title" >事業者登録</div>
+<div class="field">
+<label>事業者名称 *</label>
+<input type="text" id="comp_name" placeholder=" 例：株式会社〇〇 " oninput="liveCheckDuplicate(this.value)">
+<div id="comp_warning" class="warning-box">
+⚠️ 同名の事業者が既にマスタに存在します。別法人の場合はそのまま登録可能です。
+</div>
+</div>
+<div class="field" ><label>ヨミガナ</label><input type= "text" id="comp_yomi"></div>
+<div class="field" ><label>所在地</label><input type= "text" id="comp_address"></div>
+<div class="field"><label>HP URL</label><input type="url" id="comp_url"></div>
+<div class="field" ><label>備考</label><textarea id= "comp_note" rows="4"></textarea></div>
+<button class="btn-primary" id="compBtn" onclick="submitCompany()" >事業者マスタに登録</button>
+</div>
+
+<div id="form-job" style="display: <?= mode === 'JOB' ? 'block' : 'none' ?>;">
+<div class="section-title" >案件登録</div>
+<div class="field">
+  <label>事業者名（文字を入力すると候補が出ます）</label>
+  <input type="text" id="job_company" list="company_list" placeholder="例：株式会社〇〇（新規も可）">
+  <datalist id="company_list"></datalist>
+</div>
+<div class="field" >
+<label>候補者（登録者IDを入力）</label>
+<div id="job_cand_list">
+  <div class="sub-field">
+    <input type="text" class="job-cand-id" placeholder="例: 1" oninput="checkCandId(this, null, true)" onblur="applyFormat(this)">
+    <span class="cand-name-display"></span>
+  </div>
+</div>
+<button class="btn-secondary" onclick="addJobCandRow()" style="margin-top:5px; font-size:11px; padding: 6px;">+ 候補者IDを追加</button>
+</div>
+<button class="btn-primary" id="jobBtn" onclick="submitJob()" >登録</button>
+</div>
+
+<div id="form-delete" style="display: <?= mode === 'DELETE' ? 'block' : 'none' ?>;">
+<div class="section-title" style="border-left-color: #d93025;">登録者削除</div>
+<div class="field">
+<label>削除する登録者ID</label>
+<input type="text" id="delete_id" placeholder=" 例: 1 または 0001 " oninput="checkCandId(this, 'deleteNameDisplay')" onblur="applyFormat(this)">
+<div id="deleteNameDisplay" style="font-size:11px; color:#d93025; margin-top:4px; height:14px;"></div>
+<p style="font-size: 11px; color: #d93025; margin-top: 5px;">※「登録者マスタ」および「候補者写真」から完全に削除されます。</p>
+</div>
+<button class="btn-primary" style="background: #d93025;" onclick="submitDelete()" >完全に削除する</button>
+</div>
+
+<div id="form-hire" style="display: <?= mode === 'HIRE' ? 'block' : 'none' ?>;">
+<div class="section-title" style="border-left-color: #34a853;">採用者一括登録</div>
+<div class="field">
+<label>採用元の案件ID</label>
+<div class="sub-field">
+  <input type="text" id="hire_job_id" placeholder="例: JOB-0001">
+  <button class="btn-secondary" style="margin-top: 0; padding: 8px;" onclick="fetchJobCandidates('hire')">候補者検索</button>
+</div>
+</div>
+<div class="field">
+<label>採用された候補者（複数選択可）</label>
+<div id="hire_cand_list" style="padding: 10px; border: 1px solid #ced4da; border-radius: 4px; background: #f8f9fa;">
+  <div style="font-size: 12px; color: #888;">-- 上の検索ボタンを押してください --</div>
+</div>
+</div>
+<button class="btn-primary" id="hireBtn" style="background: #34a853;" onclick="submitHire()" >採用登録を実行</button>
+<p style="font-size: 11px; color: #555; margin-top: 10px;">※案件管理とマスタシートのステータスが更新されます。</p>
+</div>
+
+<div id="form-list" style="display: <?= mode === 'LIST' ? 'block' : 'none' ?>;">
+<div class="section-title" style="border-left-color: #fbbc04;">簡易リスト作成</div>
+<div class="field" >
+<label>候補者（登録者IDを入力）</label>
+<div id="list_cand_inputs">
+  <div class="sub-field">
+    <input type="text" class="list-cand-id" placeholder="例: 1" oninput="checkCandId(this, null, true)" onblur="applyFormat(this)">
+    <span class="cand-name-display"></span>
+  </div>
+</div>
+<button class="btn-secondary" onclick="addListCandRow()" style="margin-top:5px; font-size:11px; padding: 6px;">+ 候補者IDを追加</button>
+</div>
+<button class="btn-primary" id="listBtn" style="background: #fbbc04; color: #333;" onclick="submitList()" >簡易リストを作成</button>
+<p style="font-size: 11px; color: #555; margin-top: 10px;">※「簡易リスト」シートのB2:L51が毎回リセットされ、指定した候補者が出力されます。</p>
+</div>
+
+<script>
+  const MODE = '<?= mode ?>';
+</script>
+<?!= include('Sidebar_JS'); ?>
+</body>
+</html>
