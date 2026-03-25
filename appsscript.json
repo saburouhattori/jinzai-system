@@ -1,0 +1,22 @@
+{
+  "timeZone": "Asia/Tokyo",
+  "dependencies": {},
+  "exceptionLogging": "STACKDRIVER",
+  "runtimeVersion": "V8",
+  "sheets": {
+    "macros": [
+      {
+        "menuName": "採用者を表示する",
+        "functionName": "myFunction"
+      },
+      {
+        "menuName": "採用企業別の表示",
+        "functionName": "myFunction"
+      }
+    ]
+  },
+  "webapp": {
+    "executeAs": "USER_ACCESSING",
+    "access": "ANYONE"
+  }
+}
