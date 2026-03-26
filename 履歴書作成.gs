@@ -58,29 +58,26 @@ function rirekisyo() {
     rSheet.getRange('D9').setValue(targetData[5]);
   }
   
-  rSheet.getRange('G9').setValue(targetData[6] ? targetData[6] + '歳' : ''); 
-  rSheet.getRange('D10').setValue(targetData[7]);
-  rSheet.getRange('K9').setValue(targetData[8]);
-  rSheet.getRange('K10').setValue(targetData[9] ? targetData[9] + 'cm' : ''); 
-  rSheet.getRange('K11').setValue(targetData[10] ? targetData[10] + 'kg' : ''); 
-  rSheet.getRange('E13').setValue(targetData[11]);
-  rSheet.getRange('K13').setValue(targetData[13]);
-  rSheet.getRange('E14').setValue(targetData[12]);
+  rSheet.getRange('G9').setValue(targetData[6] ? targetData[6] + '歳' : ''); //年齢
+  rSheet.getRange('D10').setValue(targetData[7]);//性別
+  rSheet.getRange('K9').setValue(targetData[8]); //配偶者
+  rSheet.getRange('K10').setValue(targetData[9] ? targetData[9] + 'cm' : ''); //身長
+  rSheet.getRange('K11').setValue(targetData[10] ? targetData[10] + 'kg' : ''); //体重
+  rSheet.getRange('E13').setValue(targetData[11]);//現住所
+  rSheet.getRange('K13').setValue(targetData[13]);//メールアドレス
+  rSheet.getRange('E14').setValue(targetData[12]);//出身地住所
 
   // 学歴
-  rSheet.getRange('B17').setValue(targetData[18]);
-  rSheet.getRange('F17').setValue(targetData[15] ? targetData[15] + '　入学' : ''); 
-  rSheet.getRange('B18').setValue(targetData[19]);
-  rSheet.getRange('F18').setValue(targetData[17]);
-  rSheet.getRange('F20').setValue(targetData[20]);
+  rSheet.getRange('B17').setValue(targetData[18]);//入学年月、＊日にちは入力しないので書式なしテキストにしないとダメ
+  rSheet.getRange('F17').setValue(targetData[15] ? targetData[15] + '　入学' : ''); //学校名
+  rSheet.getRange('B18').setValue(targetData[19]);//卒業または中退等の年月、＊日にちは入力しないので書式なしテキストにしないとダメ
+  rSheet.getRange('F18').setValue(targetData[17]);//学歴状況
+  rSheet.getRange('F20').setValue(targetData[20]);//学歴に関する補足
   
   // 職歴
-  rSheet.getRange('B23').setValue(targetData[21]);
-  rSheet.getRange('G23').setValue(targetData[22]);
-  rSheet.getRange('B24').setValue(targetData[23]);
-  rSheet.getRange('G24').setValue(targetData[24]);
-  rSheet.getRange('B25').setValue(targetData[25]);
-  rSheet.getRange('G25').setValue(targetData[26]);
+  rSheet.getRange('C23').setValue(targetData[21] + '　' + targetData[22]);//職歴①の期間と内容
+  rSheet.getRange('C24').setValue(targetData[23] + '　' + targetData[24]);//職歴②の期間と内容
+  rSheet.getRange('B25').setValue(targetData[25] + '　' + targetData[26]);//職歴③の期間と内容
 
   // 資格・試験
   if (!targetData[27]) {
