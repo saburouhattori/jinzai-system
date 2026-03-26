@@ -4,7 +4,9 @@ const FIELDS = ['name','furigana','nickname','birthday','gender','spouse','heigh
 
 function showMsg(t) { document.getElementById('modal-text').innerText = t; document.getElementById('overlay').style.display = 'block'; }
 function closeModal() { document.getElementById('overlay').style.display = 'none'; }
-function toggleRelative() { document.getElementById('relativeDetail').style.display = (document.getElementById('relativeSelect').value === ' 有 ') ? 'block' : 'none'; }
+
+// 親族の有無の連動（スペースを削除して修正）
+function toggleRelative() { document.getElementById('relativeDetail').style.display = (document.getElementById('relativeSelect').value === '有') ? 'block' : 'none'; }
 
 function formatCandId(val) {
   let str = val.trim().toUpperCase();
@@ -79,34 +81,38 @@ function searchData() {
       
       document.getElementById('targetRow').value = res.row;
       
-      // ▼▼▼ 追加・修正部分 ▼▼▼
-      // カレンダー形式にする項目のリスト
       const monthFields = ['eduStart', 'eduEnd', 'jlptDate', 'jftDate', 'kaigoSkillDate', 'kaigoLangDate', 'otherJapaneseDate'];
       
       FIELDS.forEach(f => { 
         if(document.getElementById(f)) {
           let val = res[f] || '';
           
-          // 前後の余計なスペースを削除して空欄バグを防止
           if (typeof val === 'string') val = val.trim(); 
           
-          // マスタの「YYYY年M月」をカレンダー表示用の「YYYY-MM」に自動変換
           if (monthFields.includes(f) && val) {
-            const match = val.match(/(\d{4})年(\d{1,2})月/);
-            if (match) val = `${match[1]}-${match[2].padStart(2, '0')}`;
+            // "2000年5月" という文字形式の場合
+            let matchJP = val.match(/(\d{4})年(\d{1,2})月/);
+            // "2000-05-01" または "2000/05/01" のような日付形式の場合
+            let matchEN = val.match(/^(\d{4})[-\/](\d{1,2})/);
+
+            if (matchJP) {
+              val = `${matchJP[1]}-${matchJP[2].padStart(2, '0')}`;
+            } else if (matchEN) {
+              val = `${matchEN[1]}-${matchEN[2].padStart(2, '0')}`;
+            }
           }
           
           document.getElementById(f).value = val;
         } 
       });
-      // ▲▲▲ 追加・修正部分 ここまで ▲▲▲
       
-      if(res.relative && res.relative !== "日本に家族や親戚はいません。") {
-        document.getElementById('relativeSelect').value = ' 有 ';
+      // 親族の有無のスペースバグ修正
+      if(res.relative && res.relative !== "日本に家族や親戚はいません。" && res.relative !== " 日本に家族や親戚はいません。 ") {
+        document.getElementById('relativeSelect').value = '有';
         document.getElementById('relativeDetail').value = res.relative;
         document.getElementById('relativeDetail').style.display = 'block';
       } else {
-        document.getElementById('relativeSelect').value = ' 無 ';
+        document.getElementById('relativeSelect').value = '無';
         document.getElementById('relativeDetail').style.display = 'none';
       }
     })
@@ -126,7 +132,8 @@ function submitData() {
 
   const relSelect = document.getElementById('relativeSelect');
   const relDetail = document.getElementById('relativeDetail');
-  d.relative = (relSelect.value === ' 有 ') ? relDetail.value : " 日本に家族や親戚はいません。 ";
+  // 送信時もスペースなしの「有」で判定
+  d.relative = (relSelect.value === '有') ? relDetail.value : "日本に家族や親戚はいません。";
 
   const fileInput = document.getElementById('imageFile');
   const file = fileInput ? fileInput.files[0] : null;
@@ -138,7 +145,7 @@ function submitData() {
     
     if (res.indexOf('エラー') === -1) {
       FIELDS.forEach(f => { if(document.getElementById(f)) document.getElementById(f).value = ''; });
-      if (document.getElementById('relativeSelect')) document.getElementById('relativeSelect').value = ' 無 ';
+      if (document.getElementById('relativeSelect')) document.getElementById('relativeSelect').value = '無';
       if (document.getElementById('relativeDetail')) {
         document.getElementById('relativeDetail').value = '';
         document.getElementById('relativeDetail').style.display = 'none';
