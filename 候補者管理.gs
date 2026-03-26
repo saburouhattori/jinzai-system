@@ -5,7 +5,6 @@ function searchByAdminId(adminId) {
   const sheet = SpreadsheetApp.openById(MASTER_SS_ID).getSheetByName('登録者マスタ');
   if (!sheet) return null;
   const data = sheet.getDataRange().getValues();
-  
   const formatDate = (val) => (val instanceof Date) ? Utilities.formatDate(val, "JST", "yyyy-MM-dd") : val;
 
   for (let i = 1; i < data.length; i++) {
@@ -15,7 +14,8 @@ function searchByAdminId(adminId) {
         name: data[i][1], furigana: data[i][3], nickname: data[i][4], birthday: formatDate(data[i][5]),
         age: data[i][6], gender: data[i][7], spouse: data[i][8], height: data[i][9], weight: data[i][10], 
         address: data[i][11], birthplace: data[i][12], email: data[i][13], school: data[i][14], eduSchool: data[i][15], 
-        eduDept: data[i][16], eduStatus: data[i][17], eduStart: data[i][18], eduEnd: data[i][19], eduNote: data[i][20],
+        eduDept: data[i][16], eduStatus: data[i][17], 
+        eduStart: data[i][18], eduEnd: data[i][19], eduNote: data[i][20],
         expPeriod1: data[i][21], expContent1: data[i][22], expPeriod2: data[i][23], expContent2: data[i][24], expPeriod3: data[i][25], expContent3: data[i][26],
         jlptLevel: data[i][27], jlptDate: data[i][28], jftLevel: data[i][29], jftDate: data[i][30], kaigoSkill: data[i][31], kaigoSkillDate: data[i][32],
         kaigoLang: data[i][33], kaigoLangDate: data[i][34], otherExam: data[i][35], otherExamDate: data[i][36],
@@ -30,13 +30,17 @@ function searchByAdminId(adminId) {
  * 新規登録：テキストは外部マスタ、画像は自シート「候補者写真」へ
  */
 function addNewRow(formData) {
+  // ★追加：保存前に年月のフォーマットを「YYYY年MM月」に統一する
+  const monthFields = ['eduStart', 'eduEnd', 'jlptDate', 'jftDate', 'kaigoSkillDate', 'kaigoLangDate', 'otherJapaneseDate'];
+  monthFields.forEach(f => { if (formData[f]) formData[f] = normalizeYearMonth(formData[f]); });
+
   const masterSs = SpreadsheetApp.openById(MASTER_SS_ID);
   const masterSheet = masterSs.getSheetByName('登録者マスタ');
   const localSs = SpreadsheetApp.getActiveSpreadsheet();
   const photoSheet = localSs.getSheetByName('候補者写真');
 
   if (!masterSheet || !photoSheet) return 'エラー：シートが見つかりません。';
-  
+
   // ID生成
   const lastRow = masterSheet.getLastRow();
   let nextNumber = 1;
@@ -46,43 +50,43 @@ function addNewRow(formData) {
     if (lastNumMatch) nextNumber = parseInt(lastNumMatch[0], 10) + 1;
   }
   const nextId = "SD-" + nextNumber.toString().padStart(4, '0');
-  
+
   // テキストデータの準備（42列）
   const rowData = new Array(42).fill(""); 
   rowData[0] = nextId; 
   rowData[1] = formData.name; 
   rowData[3] = formData.furigana;
-  rowData[4] = formData.nickname; 
+  rowData[4] = formData.nickname;
   rowData[5] = formData.birthday; 
   rowData[7] = formData.gender;
   rowData[8] = formData.spouse; 
   rowData[9] = formData.height; 
   rowData[10] = formData.weight;
-  rowData[11] = formData.address; 
+  rowData[11] = formData.address;
   rowData[12] = formData.birthplace; 
   rowData[13] = formData.email;
   rowData[14] = formData.school; 
   rowData[15] = formData.eduSchool; 
   rowData[16] = formData.eduDept;
-  rowData[17] = formData.eduStatus; 
+  rowData[17] = formData.eduStatus;
   rowData[18] = formData.eduStart; 
   rowData[19] = formData.eduEnd;
   rowData[20] = formData.eduNote; 
   rowData[21] = formData.expPeriod1; 
   rowData[22] = formData.expContent1;
-  rowData[23] = formData.expPeriod2; 
+  rowData[23] = formData.expPeriod2;
   rowData[24] = formData.expContent2;
   rowData[25] = formData.expPeriod3; 
   rowData[26] = formData.expContent3;
   rowData[27] = formData.jlptLevel; 
   rowData[28] = formData.jlptDate;
-  rowData[29] = formData.jftLevel; 
+  rowData[29] = formData.jftLevel;
   rowData[30] = formData.jftDate; 
   rowData[31] = formData.kaigoSkill;
   rowData[32] = formData.kaigoSkillDate; 
   rowData[33] = formData.kaigoLang; 
   rowData[34] = formData.kaigoLangDate;
-  rowData[35] = formData.otherExam; 
+  rowData[35] = formData.otherExam;
   rowData[36] = formData.otherExamDate; 
   rowData[37] = formData.otherJapanese;
   rowData[38] = formData.otherJapaneseDate; 
@@ -106,7 +110,7 @@ function addNewRow(formData) {
     }
   }
   
-  updateAges(masterSheet.getLastRow()); 
+  updateAges(masterSheet.getLastRow());
   return `登録完了: ${nextId}`;
 }
 
@@ -114,9 +118,13 @@ function addNewRow(formData) {
  * データ更新：テキストはマスタ、画像は自シートを検索して上書き
  */
 function updateRow(formData) {
+  // ★追加：保存前に年月のフォーマットを「YYYY年MM月」に統一する
+  const monthFields = ['eduStart', 'eduEnd', 'jlptDate', 'jftDate', 'kaigoSkillDate', 'kaigoLangDate', 'otherJapaneseDate'];
+  monthFields.forEach(f => { if (formData[f]) formData[f] = normalizeYearMonth(formData[f]); });
+
   const masterSheet = SpreadsheetApp.openById(MASTER_SS_ID).getSheetByName('登録者マスタ');
   const photoSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('候補者写真');
-  
+
   const row = Number(formData.row);
   if (!row) return "エラー：更新対象の行が特定できません。";
   const adminId = masterSheet.getRange(row, 1).getValue();
@@ -128,7 +136,8 @@ function updateRow(formData) {
     expPeriod1: 22, expContent1: 23, expPeriod2: 24, expContent2: 25, expPeriod3: 26, expContent3: 27,
     jlptLevel: 28, jlptDate: 29, jftLevel: 30, jftDate: 31, kaigoSkill: 32, kaigoSkillDate: 33,
     kaigoLang: 34, kaigoLangDate: 35, otherExam: 36, otherExamDate: 37,
-    otherJapanese: 38, otherJapaneseDate: 39, comment: 41, relative: 42
+    otherJapanese: 38, otherJapaneseDate: 39, comment: 41, 
+    relative: 42
   };
 
   for (let key in colMap) {
@@ -197,4 +206,25 @@ function updateAges(targetRow) {
     });
     sheet.getRange(2, 7, ages.length, 1).setValues(ages);
   }
+}
+
+/**
+ * 日付（年月）の表記ゆれを「YYYY年MM月」に強制統一する関数
+ */
+function normalizeYearMonth(val) {
+  if (!val) return "";
+  let str = val.toString().trim();
+  
+  // 1. 全角数字を半角に変換（例：「３」→「3」）
+  str = str.replace(/[０-９]/g, function(s) {
+    return String.fromCharCode(s.charCodeAt(0) - 0xFEE0);
+  });
+  
+  // 2. 年月の数字を抽出して「YYYY年MM月」に組み直す（一桁の月は0で埋める）
+  let match = str.match(/(\d{4})[-\/年](\d{1,2})/);
+  if (match) {
+    return match[1] + "年" + match[2].padStart(2, '0') + "月";
+  }
+  
+  return str; // 変換できない文字列の場合はそのまま返す
 }
