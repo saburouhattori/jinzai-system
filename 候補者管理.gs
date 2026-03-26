@@ -30,7 +30,7 @@ function searchByAdminId(adminId) {
  * 新規登録：テキストは外部マスタ、画像は自シート「候補者写真」へ
  */
 function addNewRow(formData) {
-  // ★追加：保存前に年月のフォーマットを「YYYY年MM月」に統一する
+  // 保存前に年月のフォーマットを「'YYYY年M月」に統一する
   const monthFields = ['eduStart', 'eduEnd', 'jlptDate', 'jftDate', 'kaigoSkillDate', 'kaigoLangDate', 'otherJapaneseDate'];
   monthFields.forEach(f => { if (formData[f]) formData[f] = normalizeYearMonth(formData[f]); });
 
@@ -118,7 +118,7 @@ function addNewRow(formData) {
  * データ更新：テキストはマスタ、画像は自シートを検索して上書き
  */
 function updateRow(formData) {
-  // ★追加：保存前に年月のフォーマットを「YYYY年MM月」に統一する
+  // 保存前に年月のフォーマットを「'YYYY年M月」に統一する
   const monthFields = ['eduStart', 'eduEnd', 'jlptDate', 'jftDate', 'kaigoSkillDate', 'kaigoLangDate', 'otherJapaneseDate'];
   monthFields.forEach(f => { if (formData[f]) formData[f] = normalizeYearMonth(formData[f]); });
 
@@ -209,7 +209,7 @@ function updateAges(targetRow) {
 }
 
 /**
- * 日付（年月）の表記ゆれを「YYYY年MM月」に強制統一する関数
+ * 日付（年月）の表記ゆれを「'YYYY年M月」に強制統一し、日付変換をブロックする関数
  */
 function normalizeYearMonth(val) {
   if (!val) return "";
@@ -220,10 +220,11 @@ function normalizeYearMonth(val) {
     return String.fromCharCode(s.charCodeAt(0) - 0xFEE0);
   });
   
-  // 2. 年月の数字を抽出して「YYYY年MM月」に組み直す（一桁の月は0で埋める）
+  // 2. 年月の数字を抽出して「'YYYY年M月」に組み直す（一桁の月は0を消す）
   let match = str.match(/(\d{4})[-\/年](\d{1,2})/);
   if (match) {
-    return match[1] + "年" + match[2].padStart(2, '0') + "月";
+    // ★ スプレッドシートの自動日付変換を防ぐために、先頭に「'（シングルクォーテーション）」を付与する
+    return "'" + match[1] + "年" + parseInt(match[2], 10) + "月";
   }
   
   return str; // 変換できない文字列の場合はそのまま返す

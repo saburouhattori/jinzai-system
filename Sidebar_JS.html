@@ -86,17 +86,21 @@ function searchData() {
         if(document.getElementById(f)) {
           let val = res[f] || '';
           
-          if (typeof val === 'string') val = val.trim(); 
+          if (typeof val === 'string') {
+            val = val.trim(); 
+            // 万が一シングルクォーテーションが含まれていたら画面表示前に除去
+            if (val.startsWith("'")) val = val.substring(1); 
+          }
           
           if (monthFields.includes(f) && val) {
             let matchJP = val.match(/(\d{4})年(\d{1,2})月/);
             let matchEN = val.match(/^(\d{4})[-\/](\d{1,2})/);
 
-            // 画面に呼び出す際も「2000年05月」の形に綺麗に整える
+            // 画面に呼び出す際も「2000年3月」の形（0埋めなし）に綺麗に整える
             if (matchJP) {
-              val = `${matchJP[1]}年${matchJP[2].padStart(2, '0')}月`;
+              val = `${matchJP[1]}年${parseInt(matchJP[2], 10)}月`;
             } else if (matchEN) {
-              val = `${matchEN[1]}年${matchEN[2].padStart(2, '0')}月`;
+              val = `${matchEN[1]}年${parseInt(matchEN[2], 10)}月`;
             }
           }
           
