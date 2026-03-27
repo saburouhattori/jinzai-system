@@ -11,6 +11,7 @@ function onOpen() {
   ui.createMenu( '人材事業メニュー' )
     .addItem( '【新規】候補者登録' , 'showSidebarNew')
     .addItem( '【修正】データ更新' , 'showSidebarEdit')
+    .addItem( '【追加】採用者情報登録' , 'showSidebarAddInfo')
     .addItem( '【コメント登録】' , 'showSidebarComment')
     .addSeparator()
     .addItem( '【削除】登録者削除' , 'showSidebarDelete')
@@ -31,27 +32,110 @@ function onOpen() {
 }
 
 /**
- * 統合版サイドバーを表示する共通関数
+ * ★ここを変更しました★
+ * 画面中央の大きな「モーダルダイアログ」でフォームを表示する
  */
 function showMainSidebar(mode, title) {
   const html = HtmlService.createTemplateFromFile('MainSidebar');
   html.mode = mode;
   const output = html.evaluate()
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
-    .setTitle(title)
-    .setWidth(300);
+    .setWidth(800)   // ★横幅を800ピクセルに拡大
+    .setHeight(650); // ★高さを650ピクセルに拡大
 
-  SpreadsheetApp.getUi().showSidebar(output);
+  // ★サイドバーではなく、中央のダイアログとして呼び出す
+  SpreadsheetApp.getUi().showModalDialog(output, title);
 }
 
 function showSidebarNew()     { showMainSidebar('NEW',  '【新規】候補者登録' ); }
 function showSidebarEdit()    { showMainSidebar('EDIT',  '【修正】データ更新' ); }
+function showSidebarAddInfo() { showMainSidebar('ADDINFO',  '【追加】採用者情報登録' ); }
 function showSidebarComment() { showMainSidebar('COMMENT',  '【コメント登録】' ); }
 function showSidebarCompany() { showMainSidebar('COMPANY',  '【事業者】マスタ登録' ); }
 function showSidebarJobNew()  { showMainSidebar('JOB',  '【新規】案件登録' ); }
 function showSidebarDelete()  { showMainSidebar('DELETE', '【削除】登録者削除'); }
 function showSidebarHire()    { showMainSidebar('HIRE', '【登録】採用者登録'); }
 function showSidebarList()    { showMainSidebar('LIST', '【作成】簡易リスト出力'); }
+
+/**
+ * =====================================
+ * 採用者の追加情報（在留資格など）をマスタに保存する機能
+ * =====================================
+ */
+function updateAddInfoRow(formData) {
+  try {
+    const masterSheet = SpreadsheetApp.openById(MASTER_SS_ID).getSheetByName('登録者マスタ');
+    const row = Number(formData.row);
+    if (!row) return "エラー：更新対象の行が特定できません。";
+
+    const headers = masterSheet.getRange(1, 1, 1, masterSheet.getMaxColumns()).getValues()[0];
+    
+    const getCol = (keyword) => {
+      const idx = headers.findIndex(h => String(h).replace(/\n/g, '').includes(keyword));
+      return idx !== -1 ? idx + 1 : -1;
+    };
+
+    const getRelCol = (keyword) => {
+      const idx = headers.findIndex(h => String(h).includes('日本在住') && String(h).includes(keyword));
+      return idx !== -1 ? idx + 1 : -1;
+    };
+
+    const colMap = {
+      agent: getCol('所属送り出し機関'),
+      offerDate: getCol('内定日'),
+      birthCity: getCol('出生地（都市名）'),
+      addressDetail: getCol('住所詳細'),
+      passportNum: getCol('パスポート番号'),
+      passportExp: getCol('パスポート有効期限'),
+      job: getCol('職業'),
+      traineeExp: getCol('技能実習の経験の有無'),
+      traineeCert: getCol('技能実習修了書の有無'),
+      crime: getCol('犯罪歴の有無'),
+      applyCount: getCol('在留資格交付申請の回数'),
+      rejectCount: getCol('不許可となった'), 
+      overseasExp: getCol('海外への出入国歴の有無'),
+      travelCount: getCol('出入国の回数'),
+      lastInDate: getCol('直近の入国日'),
+      lastOutDate: getCol('直近の出国日'),
+      relName2: getRelCol('親族の名前'),
+      relRelation2: getRelCol('続柄'),
+      relBirth2: getRelCol('親族の生年月日'),
+      relCountry2: getRelCol('国籍・地域'),
+      relLive2: getRelCol('同居予定'),
+      relWork2: getRelCol('勤務先・通学先'),
+      relCard2: getRelCol('在留カード番号'),
+      memo: headers.findIndex(h => String(h) === '備考' || String(h) === '備考・メモ') !== -1 
+            ? headers.findIndex(h => String(h) === '備考' || String(h) === '備考・メモ') + 1 : -1
+    };
+
+    for (let key in colMap) {
+      if (colMap[key] !== -1 && formData[key] !== undefined) {
+        masterSheet.getRange(row, colMap[key]).setValue(formData[key]);
+      }
+    }
+    
+    return `追加情報の登録が完了しました。`;
+  } catch (e) {
+    return "処理中にエラーが発生しました: " + e.message;
+  }
+}
+
+/**
+ * 送り出し機関マスタから名称リストを取得する（プルダウン用）
+ */
+function getAgentList() {
+  try {
+    const masterSs = SpreadsheetApp.openById(MASTER_SS_ID);
+    const agentSheet = masterSs.getSheetByName('送り出し機関マスタ');
+    if (!agentSheet) return [];
+    
+    const data = agentSheet.getDataRange().getValues();
+    const agents = data.slice(1).map(row => row[1]).filter(name => name !== "");
+    return [...new Set(agents)].sort();
+  } catch(e) {
+    return [];
+  }
+}
 
 /**
  * =====================================
@@ -66,8 +150,6 @@ function showLinkDialog(url, title) {
     SpreadsheetApp.getUi().alert('URLが設定されていません。スクリプトの上部を確認してください。');
     return;
   }
-  
-  // ポップアップブロックを回避するため、クリックできるボタンを表示する
   const html = `
     <div style="text-align: center; font-family: sans-serif; padding: 20px;">
       <p style="font-size: 14px; margin-bottom: 20px; color: #333;">準備ができました。下のボタンを押して開いてください。</p>
@@ -79,10 +161,7 @@ function showLinkDialog(url, title) {
       <p style="font-size: 11px; color: #888; margin-top: 20px;">※クリックするとこの画面は自動で閉じます。</p>
     </div>
   `;
-  
-  const htmlOutput = HtmlService.createHtmlOutput(html)
-    .setWidth(320)
-    .setHeight(180);
+  const htmlOutput = HtmlService.createHtmlOutput(html).setWidth(320).setHeight(180);
   SpreadsheetApp.getUi().showModalDialog(htmlOutput, title + 'の呼び出し');
 }
 
@@ -452,7 +531,6 @@ function safeSearchByAdminId(id) {
     const sheet = masterSs.getSheetByName('登録者マスタ');
     const data = sheet.getDataRange().getValues();
     const headers = data[0];
-    // ★空白（半角・全角・ゼロ幅）を完全除去して大文字で比較（見つからないエラーを防止）
     const cleanId = (str) => String(str).replace(/[\s\uFEFF\xA0\u3000]/g, '').toUpperCase();
     const searchId = cleanId(id);
     
@@ -461,7 +539,6 @@ function safeSearchByAdminId(id) {
         const res = { row: i + 1 };
         const getIdx = (name) => headers.findIndex(h => String(h).replace(/\n/g, '').includes(name));
         
-        // ★重要：全ての取得値を「文字列」に強制変換（Dateオブジェクトによるシリアライズエラーを完全防止）
         const safeGet = (name) => {
           const idx = getIdx(name);
           if (idx !== -1 && data[i][idx] != null && data[i][idx] !== '') {
@@ -469,6 +546,16 @@ function safeSearchByAdminId(id) {
             if (val instanceof Date) {
               return Utilities.formatDate(val, Session.getScriptTimeZone(), 'yyyy-MM-dd');
             }
+            return String(val).trim();
+          }
+          return '';
+        };
+
+        const getRelGet = (name) => {
+          const idx = headers.findIndex(h => String(h).includes('日本在住') && String(h).includes(name));
+          if (idx !== -1 && data[i][idx] != null && data[i][idx] !== '') {
+            const val = data[i][idx];
+            if (val instanceof Date) return Utilities.formatDate(val, Session.getScriptTimeZone(), 'yyyy-MM-dd');
             return String(val).trim();
           }
           return '';
@@ -546,6 +633,33 @@ function safeSearchByAdminId(id) {
         } else {
           res.relative = "日本に家族や親戚はいません。";
         }
+
+        // ★追加：採用後の追加情報
+        res.agent = safeGet('所属送り出し機関');
+        res.offerDate = safeGet('内定日');
+        res.birthCity = safeGet('出生地（都市名）');
+        res.addressDetail = safeGet('住所詳細');
+        res.passportNum = safeGet('パスポート番号');
+        res.passportExp = safeGet('パスポート有効期限');
+        res.job = safeGet('職業');
+        res.traineeExp = safeGet('技能実習の経験の有無');
+        res.traineeCert = safeGet('技能実習修了書の有無');
+        res.crime = safeGet('犯罪歴の有無');
+        res.applyCount = safeGet('在留資格交付申請の回数');
+        res.rejectCount = safeGet('不許可となった'); 
+        res.overseasExp = safeGet('海外への出入国歴の有無');
+        res.travelCount = safeGet('出入国の回数');
+        res.lastInDate = safeGet('直近の入国日');
+        res.lastOutDate = safeGet('直近の出国日');
+        
+        res.relName2 = getRelGet('親族の名前');
+        res.relRelation2 = getRelGet('続柄');
+        res.relBirth2 = getRelGet('親族の生年月日');
+        res.relCountry2 = getRelGet('国籍・地域');
+        res.relLive2 = getRelGet('同居予定');
+        res.relWork2 = getRelGet('勤務先・通学先');
+        res.relCard2 = getRelGet('在留カード番号');
+        res.memo = safeGet('備考');
 
         return res; 
       }
