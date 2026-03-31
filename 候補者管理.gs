@@ -1,16 +1,19 @@
 /**
- * 検索機能：管理番号(SD-xxxx)からデータを取得（ヘッダー名ベース）
+ * 検索機能：管理番号(SD-xxxx)からデータを取得（空白・大文字小文字耐性強化版）
  */
 function safeSearchByAdminId(id) {
   try {
-    const masterSs = SpreadsheetApp.openById(MASTER_SS_ID);
-    const sheet = masterSs.getSheetByName('登録者マスタ');
+    const sheet = getMasterSheet('登録者マスタ');
+    if (!sheet) return null;
     const data = sheet.getDataRange().getValues();
     const col = getMasterColumnMap(sheet);
-    const searchId = String(id).toUpperCase();
+    // 検索するIDを正規化（大文字化＋空白除去）
+    const searchId = String(id).trim().toUpperCase();
     
     for (let i = 1; i < data.length; i++) {
-      if (String(data[i][0]) === searchId) {
+      // シート側のIDも正規化して比較
+      const sheetId = String(data[i][0] || "").trim().toUpperCase();
+      if (sheetId === searchId) {
         const rowData = data[i];
         const res = { row: i + 1 };
         
@@ -22,7 +25,6 @@ function safeSearchByAdminId(id) {
           return String(val || "").trim();
         };
 
-        // UI項目へのマッピング
         res.name = getVal('名前');
         res.furigana = getVal('フリガナ');
         res.nickname = getVal('呼び名');
@@ -60,7 +62,7 @@ function safeSearchByAdminId(id) {
         res.comment = getVal('コメント');
         res.relative = getVal('日本在住の親族について');
         
-        // 追加情報分も一気に読み込む
+        // 追加情報
         res.agent = getVal('所属送り出し機関');
         res.offerDate = getVal('内定日');
         res.birthCity = getVal('出生地（都市名）');
@@ -94,15 +96,14 @@ function safeSearchByAdminId(id) {
 }
 
 /**
- * 新規登録（ヘッダー名ベース）
+ * 新規登録
  */
 function addNewRow(formData) {
   const monthFields = ['eduStart', 'eduEnd', 'jlptDate', 'jftDate', 'kaigoSkillDate', 'kaigoLangDate', 'otherJapaneseDate'];
   monthFields.forEach(f => { if (formData[f]) formData[f] = normalizeYearMonth(formData[f]); });
   if (formData.birthday) formData.birthday = new Date(formData.birthday.replace(/-/g, '/'));
 
-  const masterSs = SpreadsheetApp.openById(MASTER_SS_ID);
-  const masterSheet = masterSs.getSheetByName('登録者マスタ');
+  const masterSheet = getMasterSheet('登録者マスタ');
   const col = getMasterColumnMap(masterSheet);
 
   const lastRow = masterSheet.getLastRow();
@@ -156,14 +157,14 @@ function addNewRow(formData) {
 }
 
 /**
- * データ更新（ヘッダー名ベース）
+ * データ更新
  */
 function updateRow(formData) {
   const monthFields = ['eduStart', 'eduEnd', 'jlptDate', 'jftDate', 'kaigoSkillDate', 'kaigoLangDate', 'otherJapaneseDate'];
   monthFields.forEach(f => { if (formData[f]) formData[f] = normalizeYearMonth(formData[f]); });
   if (formData.birthday) formData.birthday = new Date(formData.birthday.replace(/-/g, '/'));
 
-  const masterSheet = SpreadsheetApp.openById(MASTER_SS_ID).getSheetByName('登録者マスタ');
+  const masterSheet = getMasterSheet('登録者マスタ');
   const col = getMasterColumnMap(masterSheet);
   const row = Number(formData.row);
   if (!row) return "エラー：行が不明です。";
@@ -191,7 +192,6 @@ function updateRow(formData) {
 
   if (col['生年月日']) masterSheet.getRange(row, col['生年月日']).setNumberFormat('yyyy"年"m"月"d"日"');
   
-  // 画像更新
   if (formData.imageFile) {
     try {
       const adminId = masterSheet.getRange(row, 1).getValue();
@@ -201,7 +201,7 @@ function updateRow(formData) {
       const cellImage = SpreadsheetApp.newCellImage().setSourceUrl(dataUri).build();
       let found = false;
       for (let j = 0; j < photoData.length; j++) {
-        if (photoData[j][0] === adminId) { photoSheet.getRange(j + 1, 2).setValue(cellImage); found = true; break; }
+        if (String(photoData[j][0]).trim() === String(adminId).trim()) { photoSheet.getRange(j + 1, 2).setValue(cellImage); found = true; break; }
       }
       if (!found) photoSheet.appendRow([adminId, cellImage]);
     } catch (e) {}
@@ -212,7 +212,7 @@ function updateRow(formData) {
 }
 
 function updateAges(targetRow) {
-  const sheet = SpreadsheetApp.openById(MASTER_SS_ID).getSheetByName('登録者マスタ');
+  const sheet = getMasterSheet('登録者マスタ');
   const col = getMasterColumnMap(sheet);
   if (!col['生年月日'] || !col['満年齢']) return;
   const today = new Date();
@@ -230,4 +230,40 @@ function normalizeYearMonth(val) {
   let str = val.toString().trim().replace(/[０-９]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xFEE0));
   let match = str.match(/(\d{4})[-\/年](\d{1,2})/);
   return match ? "'" + match[1] + "年" + parseInt(match[2], 10) + "月" : str;
+}
+
+function deleteCandidate(id) {
+  if (!id) return "IDが指定されていません。";
+  try {
+    let msg = "";
+    const masterSheet = getMasterSheet('登録者マスタ');
+    const masterData = masterSheet.getDataRange().getValues();
+    let masterDeleted = false;
+    const searchId = String(id).trim().toUpperCase();
+
+    for (let i = masterData.length - 1; i >= 1; i--) {
+      if (String(masterData[i][0]).trim().toUpperCase() === searchId) {
+        masterSheet.deleteRow(i + 1);
+        masterDeleted = true;
+        break; 
+      }
+    }
+    if (masterDeleted) msg += "・マスタから削除しました。\n";
+    else msg += "・マスタに該当IDは見つかりませんでした。\n";
+
+    const photoSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('候補者写真');
+    if (photoSheet) {
+      const photoData = photoSheet.getDataRange().getValues();
+      let photoDeleted = false;
+      for (let i = photoData.length - 1; i >= 1; i--) {
+        if (String(photoData[i][0]).trim().toUpperCase() === searchId) {
+          photoSheet.deleteRow(i + 1);
+          photoDeleted = true;
+          break;
+        }
+      }
+      if (photoDeleted) msg += "・「候補者写真」から削除しました。";
+    }
+    return msg;
+  } catch (e) { return "エラー: " + e.toString(); }
 }

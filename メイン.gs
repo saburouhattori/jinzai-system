@@ -1,11 +1,31 @@
+// 【重要】外部マスタ管理スプレッドシートのID（マスタ移植が完了するまで使用します）
+const MASTER_SS_ID = '1cq4h6yI0on-bm_MlqUlUi6MMXBlFIXyTCZpzcTZlCMw';
+
 // ⬇️ フィルタ表示呼び出し用のURL設定 ⬇️
 const URL_UNADOPTED = "https://docs.google.com/spreadsheets/d/1vwBBwQNvTrZ0jBa1-ZfYmYdEZG6YBwEQeZ8PJ9vkrmQ/edit?gid=1414821006#gid=1414821006&fvid=331083492";
 const URL_ADOPTED   = "https://docs.google.com/spreadsheets/d/1vwBBwQNvTrZ0jBa1-ZfYmYdEZG6YBwEQeZ8PJ9vkrmQ/edit?gid=1414821006#gid=1414821006&fvid=1493453362";
 
 /**
- * 共通：マスタのヘッダー名から列番号を取得（自分のファイル内を見る）
+ * 【共通】マスタのシートを取得する関数（自シートを優先し、なければ外部IDを見に行く）
+ */
+function getMasterSheet(sheetName) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(sheetName);
+  if (!sheet) {
+    try {
+      sheet = SpreadsheetApp.openById(MASTER_SS_ID).getSheetByName(sheetName);
+    } catch(e) {
+      console.error(sheetName + " が見つかりません: " + e.message);
+    }
+  }
+  return sheet;
+}
+
+/**
+ * 【共通】マスタのヘッダー名から列番号を取得
  */
 function getMasterColumnMap(sheet) {
+  if (!sheet) return {};
   const lastCol = sheet.getLastColumn();
   if (lastCol === 0) return {};
   const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
@@ -42,9 +62,6 @@ function onOpen() {
     .addToUi();
 }
 
-/**
- * Webアプリ（iframe）を使わず、直接安定して画面を表示する
- */
 function showMainSidebar(mode, title) {
   const html = HtmlService.createTemplateFromFile('MainSidebar');
   html.mode = mode;
@@ -52,7 +69,6 @@ function showMainSidebar(mode, title) {
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
     .setWidth(800)
     .setHeight(650);
-
   SpreadsheetApp.getUi().showModelessDialog(output, title);
 }
 
@@ -66,11 +82,9 @@ function showSidebarDelete()  { showMainSidebar('DELETE', '【削除】登録者
 function showSidebarHire()    { showMainSidebar('HIRE', '【登録】採用者登録'); }
 function showSidebarList()    { showMainSidebar('LIST', '【作成】簡易リスト出力'); }
 
-// --- データの読み書きはすべて「自分自身のファイル」に対して行う ---
-
 function updateAddInfoRow(formData) {
   try {
-    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('登録者マスタ');
+    const sheet = getMasterSheet('登録者マスタ');
     if (!sheet) return "エラー：登録者マスタが見つかりません。";
     const col = getMasterColumnMap(sheet);
     const row = Number(formData.row);
@@ -94,24 +108,21 @@ function updateAddInfoRow(formData) {
 }
 
 function getAgentList() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName('送り出し機関マスタ');
-  if (!sheet) return [];
-  return [...new Set(sheet.getDataRange().getValues().slice(1).map(row => row[1]).filter(n => n))].sort();
+  const sheet = getMasterSheet('送り出し機関マスタ');
+  return sheet ? [...new Set(sheet.getDataRange().getValues().slice(1).map(row => row[1]).filter(n => n))].sort() : [];
 }
 
 function getSchoolList() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName('日本語学校マスタ');
-  if (!sheet) return [];
-  return [...new Set(sheet.getDataRange().getValues().slice(1).map(row => row[1]).filter(n => n))].sort();
+  const sheet = getMasterSheet('日本語学校マスタ');
+  return sheet ? [...new Set(sheet.getDataRange().getValues().slice(1).map(row => row[1]).filter(n => n))].sort() : [];
 }
 
 function getCandidateDict() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName('登録者マスタ');
+  const sheet = getMasterSheet('登録者マスタ');
   if (!sheet) return {};
-  const data = sheet.getRange(2, 1, Math.max(1, sheet.getLastRow()-1), 2).getValues();
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return {};
+  const data = sheet.getRange(2, 1, lastRow - 1, 2).getValues();
   const dict = {};
   data.forEach(row => { if (row[0]) dict[String(row[0]).trim()] = String(row[1]); });
   return dict;
