@@ -1,6 +1,6 @@
 <script>
 let candidateDict = {};
-let jobDict = {}; // ★追加：案件辞書
+let jobDict = {};
 
 window.onload = function() {
   google.script.run.withSuccessHandler(function(dict) {
@@ -48,7 +48,6 @@ window.onload = function() {
     }).getAgentList();
   }
 
-  // ★今回追加：採用者一括登録時の案件ID辞書取得
   if (MODE === 'HIRE') {
     google.script.run.withSuccessHandler(function(dict) {
       jobDict = dict;
@@ -89,7 +88,6 @@ function checkCandId(inputElem, displayId, isMultiple = false) {
   }
 }
 
-// ★今回追加：案件IDの自動フォーマット機能
 function formatJobId(rawId) {
   let numStr = rawId.replace(/[^0-9]/g, '');
   if (numStr.length > 0) {
@@ -98,14 +96,12 @@ function formatJobId(rawId) {
   return rawId;
 }
 
-// ★今回追加：案件IDのフォーマット適用
 function applyJobFormat(inputElem) {
   if (inputElem.value.trim() !== '') {
     inputElem.value = formatJobId(inputElem.value);
   }
 }
 
-// ★今回追加：案件IDのリアルタイムチェックと事業者名表示
 function checkJobId(inputElem, displayId) {
   let rawVal = inputElem.value.trim();
   let displayElem = document.getElementById(displayId);
@@ -397,6 +393,7 @@ function addJobCandRow() {
   container.appendChild(div);
 }
 
+// ★修正：案件登録時に新しいデータもまとめて送る
 function submitJob() {
   let company = document.getElementById('job_company').value.trim();
   if (!company) {
@@ -408,7 +405,7 @@ function submitJob() {
   let candidates = [];
   candInputs.forEach(input => {
     let val = input.value.trim();
-    if (val) candidates.push(val);
+    if (val) candidates.push(formatId(val));
   });
   
   if (candidates.length === 0) {
@@ -416,15 +413,28 @@ function submitJob() {
     return;
   }
   
+  // 新しい入力項目の取得
+  let formData = {
+    company: company,
+    candidates: candidates,
+    interviewDate: document.getElementById('job_interviewDate').value,
+    relatedFile: document.getElementById('job_relatedFile').value,
+    memo: document.getElementById('job_memo').value
+  };
+  
   document.getElementById('jobBtn').disabled = true;
   showModal('案件を登録中...', true);
   
   google.script.run.withSuccessHandler(function(msg) {
     document.getElementById('jobBtn').disabled = false;
     showModal(msg);
+    // 送信後のクリア処理
     document.getElementById('job_company').value = '';
+    document.getElementById('job_interviewDate').value = '';
+    document.getElementById('job_relatedFile').value = '';
+    document.getElementById('job_memo').value = '';
     document.getElementById('job_cand_list').innerHTML = '<div class="sub-field"><input type="text" class="job-cand-id" placeholder="例: 1" oninput="checkCandId(this, null, true)" onblur="applyFormat(this)"><span class="cand-name-display"></span></div>';
-  }).addJob(company, candidates);
+  }).addJob(formData);
 }
 
 function submitDelete() {
@@ -453,7 +463,6 @@ function fetchJobCandidates(mode) {
     showModal('案件IDを入力してください。');
     return;
   }
-  // ★追加：検索実行時にもフォーマットを適用する
   let jobId = formatJobId(rawId);
   document.getElementById(mode + '_job_id').value = jobId;
   
@@ -468,7 +477,6 @@ function fetchJobCandidates(mode) {
     
     let html = '';
     candidates.forEach(c => {
-      // ★修正：Flexboxを使用して、チェックボックスと名前をピシッと1列に揃える
       html += `<label style="display:flex; align-items:center; margin-bottom:8px; font-size:14px; cursor:pointer;">
                  <input type="checkbox" class="${mode}-cand-checkbox" value="${c.id}" style="margin:0 8px 0 0; width:16px; height:16px; flex-shrink:0;">
                  <span style="line-height:1.2;">${c.display}</span>

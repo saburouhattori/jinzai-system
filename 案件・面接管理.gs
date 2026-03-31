@@ -64,19 +64,38 @@ function getJobCandidates(jobId) {
   return [];
 }
 
-function addJob(company, candIds) {
+// ★修正：新しい項目を受け取ってシートに保存
+function addJob(formData) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('案件管理');
   const lastRow = sheet.getLastRow();
   let nextId = "JOB-0001";
+  
   if (lastRow >= 2) {
     const lastId = String(sheet.getRange(lastRow, 1).getValue());
-    const nextNum = (parseInt(lastId.match(/\d+/)[0], 10) + 1);
-    nextId = "JOB-" + nextNum.toString().padStart(4, '0');
+    const match = lastId.match(/\d+/);
+    if (match) {
+      const nextNum = parseInt(match[0], 10) + 1;
+      nextId = "JOB-" + nextNum.toString().padStart(4, '0');
+    }
   }
+  
   const candDict = getCandidateDict();
-  const candList = candIds.map(id => id + "-" + (candDict[id] || "不明")).join('\n');
+  const candList = formData.candidates.map(id => id + "-" + (candDict[id] || "不明")).join('\n');
   const dateStr = Utilities.formatDate(new Date(), "JST", "yyyy/MM/dd");
-  sheet.appendRow([nextId, "面接待ち", dateStr, company, candList]);
+  
+  // A:案件ID, B:ステータス, C:案件登録日, D:事業者名, E:候補者名, F:面接日, G:採用者氏名, H:関連ファイル, I:備考・メモ
+  sheet.appendRow([
+    nextId, 
+    "面接待ち", 
+    dateStr, 
+    formData.company, 
+    candList, 
+    formData.interviewDate, 
+    "", 
+    formData.relatedFile, 
+    formData.memo
+  ]);
+  
   return `案件登録完了: ${nextId}`;
 }
 

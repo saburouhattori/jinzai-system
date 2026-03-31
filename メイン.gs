@@ -37,8 +37,13 @@ function getMasterColumnMap(sheet) {
   return map;
 }
 
+/**
+ * メニューの作成（案件・採用登録を独立）
+ */
 function onOpen() {
   const ui = SpreadsheetApp.getUi();
+  
+  // 1つ目のメニュー：候補者・事業者マスタ管理
   ui.createMenu( '人材事業メニュー' )
     .addItem( '【新規】候補者登録' , 'showSidebarNew')
     .addItem( '【修正】データ更新' , 'showSidebarEdit')
@@ -52,13 +57,16 @@ function onOpen() {
     .addItem( '【作成】履歴書出力' , 'rirekisyo')
     .addItem( '【作成】簡易リスト出力' , 'showSidebarList') 
     .addSeparator()
-    .addItem( '【新規】案件登録' , 'showSidebarJobNew')
-    .addItem( '【登録】採用者登録' , 'showSidebarHire') 
-    .addSeparator()
     .addSubMenu(ui.createMenu('【表示】リスト絞り込み')
       .addItem('未採用者リストを開く', 'openFilterUnadopted')
       .addItem('採用者リストを開く', 'openFilterAdopted')
     )
+    .addToUi();
+
+  // 2つ目のメニュー：案件・採用管理（★今回独立させた部分）
+  ui.createMenu( '案件・採用管理' )
+    .addItem( '【新規】案件登録' , 'showSidebarJobNew')
+    .addItem( '【登録】採用者登録' , 'showSidebarHire') 
     .addToUi();
 }
 
