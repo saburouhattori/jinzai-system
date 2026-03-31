@@ -1,0 +1,113 @@
+// =========================================
+// システム全体の設定値・共通関数・UI
+// =========================================
+
+// 【重要】外部マスタ管理スプレッドシートのID（マスタ移植が完了するまで使用します）
+const MASTER_SS_ID = '1cq4h6yI0on-bm_MlqUlUi6MMXBlFIXyTCZpzcTZlCMw';
+
+// フィルタ表示呼び出し用のURL設定
+const URL_UNADOPTED = "https://docs.google.com/spreadsheets/d/1vwBBwQNvTrZ0jBa1-ZfYmYdEZG6YBwEQeZ8PJ9vkrmQ/edit?gid=1414821006#gid=1414821006&fvid=331083492";
+const URL_ADOPTED   = "https://docs.google.com/spreadsheets/d/1vwBBwQNvTrZ0jBa1-ZfYmYdEZG6YBwEQeZ8PJ9vkrmQ/edit?gid=1414821006#gid=1414821006&fvid=1493453362";
+
+/**
+ * マスタのシートを取得する関数（自シートを優先し、なければ外部IDを見に行く）
+ */
+function getMasterSheet(sheetName) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName(sheetName);
+  if (!sheet) {
+    try {
+      sheet = SpreadsheetApp.openById(MASTER_SS_ID).getSheetByName(sheetName);
+    } catch(e) {
+      console.error(sheetName + " が見つかりません: " + e.message);
+    }
+  }
+  return sheet;
+}
+
+/**
+ * マスタのヘッダー名から列番号を取得
+ */
+function getMasterColumnMap(sheet) {
+  if (!sheet) return {};
+  const lastCol = sheet.getLastColumn();
+  if (lastCol === 0) return {};
+  const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  const map = {};
+  headers.forEach((h, i) => {
+    const cleanHeader = String(h).replace(/\n/g, '').replace(/\s/g, '').trim();
+    if (cleanHeader) map[cleanHeader] = i + 1;
+  });
+  return map;
+}
+
+/**
+ * HTMLファイル読み込み用
+ */
+function include(filename) {
+  return HtmlService.createHtmlOutputFromFile(filename).getContent();
+}
+
+// =========================================
+// メニューとUIの表示処理
+// =========================================
+
+function onOpen() {
+  const ui = SpreadsheetApp.getUi();
+  
+  // 1つ目のメニュー：候補者・事業者マスタ管理
+  ui.createMenu( '人材事業メニュー' )
+    .addItem( '【新規】候補者登録' , 'showSidebarNew')
+    .addItem( '【修正】データ更新' , 'showSidebarEdit')
+    .addItem( '【追加】採用者情報登録' , 'showSidebarAddInfo')
+    .addItem( '【コメント登録】' , 'showSidebarComment')
+    .addSeparator()
+    .addItem( '【削除】登録者削除' , 'showSidebarDelete')
+    .addSeparator()
+    .addItem( '【事業者】マスタ登録' , 'showSidebarCompany')
+    .addSeparator()
+    .addItem( '【作成】履歴書出力' , 'rirekisyo') // ※履歴書作成.gsに存在
+    .addItem( '【作成】簡易リスト出力' , 'showSidebarList') 
+    .addSeparator()
+    .addSubMenu(ui.createMenu('【表示】リスト絞り込み')
+      .addItem('未採用者リストを開く', 'openFilterUnadopted')
+      .addItem('採用者リストを開く', 'openFilterAdopted')
+    )
+    .addToUi();
+
+  // 2つ目のメニュー：案件・採用管理
+  ui.createMenu( '案件・採用管理' )
+    .addItem( '【新規】案件登録' , 'showSidebarJobNew')
+    .addItem( '【登録】採用者登録' , 'showSidebarHire') 
+    .addToUi();
+}
+
+function showMainSidebar(mode, title) {
+  const html = HtmlService.createTemplateFromFile('MainSidebar');
+  html.mode = mode;
+  const output = html.evaluate()
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+    .setWidth(800)
+    .setHeight(650);
+  SpreadsheetApp.getUi().showModelessDialog(output, title);
+}
+
+// 各種サイドバー呼び出し
+function showSidebarNew()     { showMainSidebar('NEW',  '【新規】候補者登録' ); }
+function showSidebarEdit()    { showMainSidebar('EDIT',  '【修正】データ更新' ); }
+function showSidebarAddInfo() { showMainSidebar('ADDINFO',  '【追加】採用者情報登録' ); }
+function showSidebarComment() { showMainSidebar('COMMENT',  '【コメント登録】' ); }
+function showSidebarCompany() { showMainSidebar('COMPANY',  '【事業者】マスタ登録' ); }
+function showSidebarJobNew()  { showMainSidebar('JOB',  '【新規】案件登録' ); }
+function showSidebarDelete()  { showMainSidebar('DELETE', '【削除】登録者削除'); }
+function showSidebarHire()    { showMainSidebar('HIRE', '【登録】採用者登録'); }
+function showSidebarList()    { showMainSidebar('LIST', '【作成】簡易リスト出力'); }
+
+// リンク表示用
+function openFilterUnadopted() { showLinkDialog(URL_UNADOPTED, '未採用者リスト'); }
+function openFilterAdopted()   { showLinkDialog(URL_ADOPTED, '採用者リスト'); }
+function showLinkDialog(url, title) {
+  const html = `<div style="text-align:center;padding:20px;"><a href="${url}" target="_blank" style="padding:12px;background:#1a73e8;color:white;text-decoration:none;border-radius:4px;">${title}を開く</a></div>`;
+  const htmlOutput = HtmlService.createHtmlOutput(html).setWidth(320).setHeight(150);
+  SpreadsheetApp.getUi().showModalDialog(htmlOutput, title);
+}
