@@ -16,6 +16,29 @@
   .form-row .field.flex-2 {
     flex: 2; 
   }
+  /* ドライブ選択用 */
+  .picker-modal {
+    display: none;
+    position: fixed;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 90%; max-width: 500px;
+    background: white; border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+    z-index: 2000; padding: 20px;
+  }
+  .picker-results {
+    max-height: 250px; overflow-y: auto;
+    margin-top: 15px; border: 1px solid #eee;
+    border-radius: 4px;
+  }
+  .picker-item {
+    padding: 10px; border-bottom: 1px solid #eee;
+    cursor: pointer; font-size: 13px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .picker-item:hover { background: #f1f3f4; }
+  
   @media (max-width: 500px) {
     .form-row {
       flex-direction: column;
@@ -29,6 +52,18 @@
 </head>
 <body>
 <div id="overlay"><div id="modal-message"><div id="modal-text" style="font-weight:bold; color:#1a73e8; margin-bottom:15px;"></div><button class="btn-primary" onclick="closeModal()" >閉じる</button></div></div>
+
+<div id="picker-modal" class="picker-modal">
+  <div style="font-weight:bold; margin-bottom:10px;">Googleドライブからファイルを選択</div>
+  <div style="display:flex; gap:5px;">
+    <input type="text" id="picker-query" placeholder="ファイル名を入力..." style="flex:1;">
+    <button class="btn-secondary" onclick="searchDrive()" style="margin:0; padding:5px 10px;">検索</button>
+  </div>
+  <div id="picker-results" class="picker-results"></div>
+  <div style="text-align:right; margin-top:15px;">
+    <button class="btn-secondary" onclick="closePicker()" style="margin:0;">キャンセル</button>
+  </div>
+</div>
 
 <input type="hidden" id="targetRow">
 
@@ -272,11 +307,18 @@
 <div class="form-row">
   <div class="field">
     <label>面接日</label>
-    <input type="date" id="job_interviewDate">
+    <input type="date" id="job_interviewDate" style="max-width: 200px;">
   </div>
-  <div class="field flex-2">
-    <label>関連ファイル（URLなど）</label>
-    <input type="text" id="job_relatedFile" placeholder=" 共有フォルダやファイルのURLなど ">
+</div>
+<div class="form-row">
+  <div class="field">
+    <label>関連ファイル（Googleドライブ）</label>
+    <div style="display:flex; gap:5px; width: 100%;">
+      <input type="text" id="job_relatedFile" placeholder=" ドライブから選択、またはURLを直接入力 " style="flex:1; width: 100%; min-width: 0;" oninput="document.getElementById('job_relatedFileName').value=''">
+      <input type="hidden" id="job_relatedFileName">
+      <button class="btn-secondary" onclick="openDrivePicker()" style="width:auto; flex-shrink:0; margin:0; padding:8px 12px; font-size:12px;">ドライブから選択</button>
+      <button class="btn-secondary" onclick="clearDriveFile()" style="width:auto; flex-shrink:0; margin:0; padding:8px 12px; font-size:12px; background:#e0e0e0; color:#333; border:none;">クリア</button>
+    </div>
   </div>
 </div>
 <div class="field">

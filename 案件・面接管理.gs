@@ -64,7 +64,9 @@ function getJobCandidates(jobId) {
   return [];
 }
 
-// ★修正：新しい項目を受け取ってシートに保存
+/**
+ * 案件登録（スマートチップ変換処理付き）
+ */
 function addJob(formData) {
   const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('案件管理');
   const lastRow = sheet.getLastRow();
@@ -83,10 +85,10 @@ function addJob(formData) {
   const candList = formData.candidates.map(id => id + "-" + (candDict[id] || "不明")).join('\n');
   const dateStr = Utilities.formatDate(new Date(), "JST", "yyyy/MM/dd");
   
-  // A:案件ID, B:ステータス, C:案件登録日, D:事業者名, E:候補者名, F:面接日, G:採用者氏名, H:関連ファイル, I:備考・メモ
+  // 一旦テキストとして書き込む
   sheet.appendRow([
     nextId, 
-    "面接待ち", 
+    "未着手", 
     dateStr, 
     formData.company, 
     candList, 
@@ -96,7 +98,84 @@ function addJob(formData) {
     formData.memo
   ]);
   
+  const newRow = sheet.getLastRow();
+  
+  // URLが存在する場合、Sheets APIを使って「本物のスマートチップ」へ強制変換する
+  if (formData.relatedFile && formData.relatedFile.startsWith("http")) {
+    try {
+      const ss = SpreadsheetApp.getActiveSpreadsheet();
+      const sheetId = sheet.getSheetId();
+      
+      const req = {
+        "updateCells": {
+          "range": {
+            "sheetId": sheetId,
+            "startRowIndex": newRow - 1,
+            "endRowIndex": newRow,
+            "startColumnIndex": 7, // H列（8列目）
+            "endColumnIndex": 8
+          },
+          "rows": [{
+            "values": [{
+              "userEnteredValue": { "stringValue": "@" },
+              "chipRuns": [{
+                "startIndex": 0,
+                "chip": { "richLinkProperties": { "uri": formData.relatedFile } }
+              }]
+            }]
+          }],
+          "fields": "userEnteredValue,chipRuns"
+        }
+      };
+      
+      const res = UrlFetchApp.fetch(`https://sheets.googleapis.com/v4/spreadsheets/${ss.getId()}:batchUpdate`, {
+        method: "post",
+        contentType: "application/json",
+        headers: { Authorization: "Bearer " + ScriptApp.getOAuthToken() },
+        payload: JSON.stringify({ requests: [req] }),
+        muteHttpExceptions: true
+      });
+      
+      if (res.getResponseCode() !== 200) {
+        throw new Error(res.getContentText());
+      }
+    } catch(e) {
+      // APIでのスマートチップ化がブロックされた場合は、従来の青色リンクでフォールバック
+      const displayLabel = formData.relatedFileName ? formData.relatedFileName : "関連ファイル";
+      const richText = SpreadsheetApp.newRichTextValue()
+        .setText(displayLabel)
+        .setLinkUrl(formData.relatedFile)
+        .build();
+      sheet.getRange(newRow, 8).setRichTextValue(richText);
+    }
+  }
+  
   return `案件登録完了: ${nextId}`;
+}
+
+function searchDriveFiles(fileNameQuery) {
+  try {
+    const files = [];
+    let query = 'trashed = false';
+    if (fileNameQuery) {
+      query += ' and title contains "' + fileNameQuery + '"';
+    }
+    
+    const iter = DriveApp.searchFiles(query);
+    let count = 0;
+    while (iter.hasNext() && count < 15) {
+      const file = iter.next();
+      files.push({
+        name: file.getName(),
+        url: file.getUrl(),
+        type: file.getMimeType()
+      });
+      count++;
+    }
+    return files;
+  } catch (e) {
+    return [];
+  }
 }
 
 function generateSimpleList(candIds) {

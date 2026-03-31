@@ -55,6 +55,52 @@ window.onload = function() {
   }
 };
 
+/**
+ * Googleドライブファイル選択用
+ */
+function openDrivePicker() {
+  document.getElementById('picker-modal').style.display = 'block';
+  searchDrive(); 
+}
+
+function closePicker() {
+  document.getElementById('picker-modal').style.display = 'none';
+}
+
+function searchDrive() {
+  const query = document.getElementById('picker-query').value;
+  const resultsDiv = document.getElementById('picker-results');
+  resultsDiv.innerHTML = '<div style="padding:10px;">検索中...</div>';
+  
+  google.script.run.withSuccessHandler(function(files) {
+    if (!files || files.length === 0) {
+      resultsDiv.innerHTML = '<div style="padding:10px;">ファイルが見つかりません。</div>';
+      return;
+    }
+    let html = '';
+    files.forEach(function(f) {
+      const safeName = f.name.replace(/'/g, "\\'").replace(/"/g, "&quot;");
+      html += `<div class="picker-item" onclick="selectDriveFile('${f.url}', '${safeName}')">${f.name}</div>`;
+    });
+    resultsDiv.innerHTML = html;
+  }).searchDriveFiles(query);
+}
+
+function selectDriveFile(url, name) {
+  // 表示用にはURLを、裏側にはファイル名を保存
+  document.getElementById('job_relatedFile').value = url;
+  document.getElementById('job_relatedFileName').value = name;
+  closePicker();
+}
+
+// ★追加：ファイルのクリア機能
+function clearDriveFile() {
+  document.getElementById('job_relatedFile').value = '';
+  if(document.getElementById('job_relatedFileName')) {
+    document.getElementById('job_relatedFileName').value = '';
+  }
+}
+
 function formatId(rawId) {
   let numStr = rawId.replace(/[^0-9]/g, '');
   if (numStr.length > 0) {
@@ -393,7 +439,6 @@ function addJobCandRow() {
   container.appendChild(div);
 }
 
-// ★修正：案件登録時に新しいデータもまとめて送る
 function submitJob() {
   let company = document.getElementById('job_company').value.trim();
   if (!company) {
@@ -413,12 +458,12 @@ function submitJob() {
     return;
   }
   
-  // 新しい入力項目の取得
   let formData = {
     company: company,
     candidates: candidates,
     interviewDate: document.getElementById('job_interviewDate').value,
     relatedFile: document.getElementById('job_relatedFile').value,
+    relatedFileName: document.getElementById('job_relatedFileName') ? document.getElementById('job_relatedFileName').value : "",
     memo: document.getElementById('job_memo').value
   };
   
@@ -428,10 +473,10 @@ function submitJob() {
   google.script.run.withSuccessHandler(function(msg) {
     document.getElementById('jobBtn').disabled = false;
     showModal(msg);
-    // 送信後のクリア処理
     document.getElementById('job_company').value = '';
     document.getElementById('job_interviewDate').value = '';
     document.getElementById('job_relatedFile').value = '';
+    if(document.getElementById('job_relatedFileName')) document.getElementById('job_relatedFileName').value = '';
     document.getElementById('job_memo').value = '';
     document.getElementById('job_cand_list').innerHTML = '<div class="sub-field"><input type="text" class="job-cand-id" placeholder="例: 1" oninput="checkCandId(this, null, true)" onblur="applyFormat(this)"><span class="cand-name-display"></span></div>';
   }).addJob(formData);
