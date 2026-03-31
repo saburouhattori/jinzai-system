@@ -54,7 +54,21 @@ function submitAddInfo() {
   if (!row) { showModal('先に管理番号で検索して、データを読み込んでください。'); return; }
   let formData = { row: row };
   const fields = ['agent', 'offerDate', 'birthCity', 'addressDetail', 'passportNum', 'passportExp', 'job', 'traineeExp', 'traineeCert', 'crime', 'applyCount', 'rejectCount', 'overseasExp', 'travelCount', 'lastInDate', 'lastOutDate', 'relName2', 'relRelation2', 'relBirth2', 'relCountry2', 'relLive2', 'relWork2', 'relCard2', 'memo'];
-  fields.forEach(f => { let el = document.getElementById('add_' + f); if (el) formData[f] = el.value; });
+  
+  fields.forEach(f => { 
+    let el = document.getElementById('add_' + f); 
+    if (el) {
+      // 送信直前にも念のため自動変換をかけて綺麗にする
+      if (f === 'birthCity') {
+        formData[f] = el.value.toUpperCase();
+      } else if (f === 'passportNum') {
+        formData[f] = el.value.replace(/[^a-zA-Z0-9]/g, '');
+      } else {
+        formData[f] = el.value; 
+      }
+    }
+  });
+  
   showModal('保存中...', true);
   google.script.run.withSuccessHandler(function(msg) { showModal(msg); }).updateAddInfoRow(formData);
 }

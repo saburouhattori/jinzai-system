@@ -102,14 +102,23 @@ function addNewRow(formData) {
   masterSheet.appendRow(rowValues);
   if (col['生年月日']) masterSheet.getRange(masterSheet.getLastRow(), col['生年月日']).setNumberFormat('yyyy"年"m"月"d"日"');
 
+  // ★修正：画像登録の処理
   if (formData.imageFile) {
     try {
       const photoSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('候補者写真');
       const dataUri = `data:${formData.imageFile.mimeType};base64,${formData.imageFile.contents}`;
       const cellImage = SpreadsheetApp.newCellImage().setSourceUrl(dataUri).build();
-      photoSheet.appendRow([nextId, cellImage]);
-      photoSheet.setRowHeight(photoSheet.getLastRow(), 80);
-    } catch (e) {}
+      
+      // まずIDだけを書き込む
+      photoSheet.appendRow([nextId, ""]);
+      const newPhotoRow = photoSheet.getLastRow();
+      
+      // その後、2列目に画像をセットする
+      photoSheet.getRange(newPhotoRow, 2).setValue(cellImage);
+      photoSheet.setRowHeight(newPhotoRow, 80);
+    } catch (e) {
+      console.error("写真登録エラー:", e);
+    }
   }
   
   updateAges(masterSheet.getLastRow());
@@ -149,6 +158,7 @@ function updateRow(formData) {
 
   if (col['生年月日']) masterSheet.getRange(row, col['生年月日']).setNumberFormat('yyyy"年"m"月"d"日"');
   
+  // ★修正：画像更新の処理
   if (formData.imageFile) {
     try {
       const adminId = masterSheet.getRange(row, 1).getValue();
@@ -156,12 +166,26 @@ function updateRow(formData) {
       const photoData = photoSheet.getDataRange().getValues();
       const dataUri = `data:${formData.imageFile.mimeType};base64,${formData.imageFile.contents}`;
       const cellImage = SpreadsheetApp.newCellImage().setSourceUrl(dataUri).build();
+      
       let found = false;
       for (let j = 0; j < photoData.length; j++) {
-        if (String(photoData[j][0]).trim() === String(adminId).trim()) { photoSheet.getRange(j + 1, 2).setValue(cellImage); found = true; break; }
+        if (String(photoData[j][0]).trim() === String(adminId).trim()) { 
+          // IDが見つかったら、その行の2列目に画像をセット
+          photoSheet.getRange(j + 1, 2).setValue(cellImage); 
+          found = true; 
+          break; 
+        }
       }
-      if (!found) photoSheet.appendRow([adminId, cellImage]);
-    } catch (e) {}
+      if (!found) {
+        // 見つからなかったら新規追加
+        photoSheet.appendRow([adminId, ""]);
+        const newPhotoRow = photoSheet.getLastRow();
+        photoSheet.getRange(newPhotoRow, 2).setValue(cellImage);
+        photoSheet.setRowHeight(newPhotoRow, 80);
+      }
+    } catch (e) {
+      console.error("写真更新エラー:", e);
+    }
   }
   
   updateAges(row); 

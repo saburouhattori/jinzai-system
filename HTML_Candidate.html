@@ -116,17 +116,28 @@
   <div class="form-row">
     <div class="field"><label>所属送り出し機関</label><select id="add_agent"><option value="">未選択</option></select></div>
     <div class="field"><label>内定日</label><input type="date" id="add_offerDate"></div>
-    <div class="field"><label>出生地（都市名）</label><input type="text" id="add_birthCity"></div>
+    <div class="field"><label>出生地（都市名）</label><input type="text" id="add_birthCity" oninput="this.value = this.value.toUpperCase();"></div>
   </div>
   <div class="form-row">
-    <div class="field flex-2"><label>住所詳細</label><input type="text" id="add_addressDetail"></div>
-    <div class="field"><label>パスポート番号</label><input type="text" id="add_passportNum"></div>
+    <div class="field"><label>住所詳細</label><input type="text" id="add_addressDetail" style="width: 100%;"></div>
+  </div>
+  <div class="form-row">
+    <div class="field"><label>パスポート番号</label><input type="text" id="add_passportNum" oninput="this.value = this.value.replace(/[^a-zA-Z0-9]/g, '');"></div>
     <div class="field"><label>パスポート有効期限</label><input type="date" id="add_passportExp"></div>
+    <div class="field flex-2"></div>
   </div>
   
   <div class="section-title">経歴・申請歴</div>
   <div class="form-row">
-    <div class="field"><label>職業</label><input type="text" id="add_job"></div>
+    <div class="field">
+      <label>職業</label>
+      <select id="add_job">
+        <option value="">未選択</option>
+        <option value="会社員">会社員</option>
+        <option value="アルバイト">アルバイト</option>
+        <option value="無職">無職</option>
+      </select>
+    </div>
     <div class="field"><label>技能実習の経験の有無</label><select id="add_traineeExp"><option value="">未選択</option><option value="有">有</option><option value="無">無</option></select></div>
     <div class="field"><label>技能実習修了書の有無</label><select id="add_traineeCert"><option value="">未選択</option><option value="有">有</option><option value="無">無</option></select></div>
     <div class="field"><label>犯罪歴の有無</label><select id="add_crime"><option value="">未選択</option><option value="有">有</option><option value="無">無</option></select></div>
