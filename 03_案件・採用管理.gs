@@ -3,7 +3,7 @@
 // =========================================
 
 /**
- * 補助：指定したセル内の複数のURLをスマートチップに変換する
+ * 補助：指定したセル内の複数のURLを、ドライブの「ファイル名」でリンク化する
  */
 function convertToSmartChips(range, urlText) {
   if (!urlText) {
@@ -19,21 +19,37 @@ function convertToSmartChips(range, urlText) {
   const richTextValue = SpreadsheetApp.newRichTextValue();
   let fullText = "";
   let currentPos = 0;
+  let linkData = [];
   
   urls.forEach((url, i) => {
-    const textPart = "🔗 関連ファイル " + (i + 1);
+    let fileName = url;
+    try {
+      // URLからドライブのファイルIDを抽出して実際のファイル名を取得する
+      let idMatch = url.match(/[-\w]{25,}/);
+      if (idMatch) {
+        fileName = DriveApp.getFileById(idMatch[0]).getName();
+      }
+    } catch(e) {
+      // 権限がない場合や取得に失敗した場合は代替テキスト
+      fileName = "関連ファイル " + (i + 1);
+    }
+    
+    const textPart = fileName;
     const line = (i > 0 ? "\n" : "") + textPart;
     fullText += line;
+    
+    linkData.push({
+      url: url,
+      start: currentPos + (i > 0 ? 1 : 0),
+      end: currentPos + (i > 0 ? 1 : 0) + textPart.length
+    });
+    
+    currentPos = currentPos + (i > 0 ? 1 : 0) + textPart.length;
   });
   
   richTextValue.setText(fullText);
-  
-  urls.forEach((url, i) => {
-    const textPart = "🔗 関連ファイル " + (i + 1);
-    const start = currentPos + (i > 0 ? 1 : 0); // 改行分の+1
-    const end = start + textPart.length;
-    richTextValue.setLinkUrl(start, end, url);
-    currentPos = end;
+  linkData.forEach(ld => {
+    richTextValue.setLinkUrl(ld.start, ld.end, ld.url);
   });
   
   range.setRichTextValue(richTextValue.build());
@@ -50,7 +66,6 @@ function addJob(formData) {
   }
   const nextId = "JOB-" + nextNumber.toString().padStart(4, '0');
 
-  // ★修正1：時間は不要（年月日のみの文字列にする）
   const todayStr = Utilities.formatDate(new Date(), "JST", "yyyy/MM/dd");
 
   const row = [
@@ -59,21 +74,20 @@ function addJob(formData) {
     todayStr,
     formData.company,
     formData.skill,
-    formData.candidates.join('\n'), // ★修正2：JS側で「ID-名前」の形にして送られてきます
+    formData.candidates.join('\n'),
     formData.interviewDate || '',
     '', // 採用者氏名
-    '', // 関連ファイル（スマートチップ化のため、一旦空で追加）
+    '', // 関連ファイル（一旦空で追加）
     formData.memo || ''
   ];
   
   sheet.appendRow(row);
   const newRow = sheet.getLastRow();
   
-  // ★修正3・改善：スマートチップへの変換処理
+  // スマートチップ（ファイル名リンク）への変換処理
   const fileUrls = Array.isArray(formData.relatedFiles) ? formData.relatedFiles.join('\n') : '';
   convertToSmartChips(sheet.getRange(newRow, 9), fileUrls);
   
-  // 念のため、セルの書式を整える
   sheet.getRange(newRow, 3).setNumberFormat('yyyy/MM/dd');
 
   return `案件登録が完了しました: ${nextId}`;
@@ -82,35 +96,52 @@ function addJob(formData) {
 function getJobDetails(jobId) {
   const sheet = getMasterSheet('案件管理');
   const data = sheet.getDataRange().getValues();
+  const searchId = String(jobId).trim().toUpperCase();
+
   for (let i = 1; i < data.length; i++) {
-    if (String(data[i][0]) === jobId) {
+    if (String(data[i][0]).trim().toUpperCase() === searchId) {
       
-      // スマートチップからURLを復元する
+      // セルのリンクからURLを復元する
       let rawUrls = "";
-      const richText = sheet.getRange(i + 1, 9).getRichTextValue();
-      if (richText) {
-        const runs = richText.getRuns();
-        const urlArray = [];
-        runs.forEach(run => {
-          const url = run.getLinkUrl();
-          if (url) urlArray.push(url);
-        });
-        rawUrls = urlArray.join('\n');
-      } else {
+      try {
+        const richText = sheet.getRange(i + 1, 9).getRichTextValue();
+        if (richText) {
+          const runs = richText.getRuns();
+          const urlArray = [];
+          runs.forEach(run => {
+            const url = run.getLinkUrl();
+            if (url) urlArray.push(url);
+          });
+          rawUrls = urlArray.join('\n');
+        }
+      } catch(e) {}
+      
+      if (!rawUrls) {
         rawUrls = String(data[i][8] || "");
+      }
+
+      // 日付データがエラーを起こさないように安全に文字列化する
+      let ivDate = data[i][6];
+      if (ivDate instanceof Date) {
+        ivDate = Utilities.formatDate(ivDate, "JST", "yyyy-MM-dd");
+      }
+
+      let rDate = data[i][2];
+      if (rDate instanceof Date) {
+        rDate = Utilities.formatDate(rDate, "JST", "yyyy-MM-dd");
       }
 
       return {
         row: i + 1,
         id: data[i][0],
         status: data[i][1],
-        date: data[i][2],
+        date: rDate,
         company: data[i][3],
         skill: data[i][4],
         candidates: data[i][5],
-        interviewDate: data[i][6],
+        interviewDate: ivDate,
         hireNames: data[i][7],
-        relatedFile: rawUrls, // 復元したURLをJSに返す
+        relatedFile: rawUrls,
         memo: data[i][9]
       };
     }
@@ -129,7 +160,7 @@ function updateJob(formData) {
   sheet.getRange(row, 7).setValue(formData.interviewDate);
   sheet.getRange(row, 10).setValue(formData.memo);
   
-  // ★修正3・改善：スマートチップへの変換処理
+  // スマートチップ（ファイル名リンク）への変換処理
   const fileUrls = Array.isArray(formData.relatedFiles) ? formData.relatedFiles.join('\n') : '';
   convertToSmartChips(sheet.getRange(row, 9), fileUrls);
   
