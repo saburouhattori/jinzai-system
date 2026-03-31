@@ -8,9 +8,9 @@
 <div class="field" >
 <label>候補者（登録者IDを入力）</label>
 <div id="job_cand_list">
-  <div class="sub-field">
-    <input type="text" class="job-cand-id" placeholder="例: 1" oninput="checkCandId(this, null, true)" onblur="applyFormat(this)">
-    <span class="cand-name-display"></span>
+  <div class="sub-field" style="display:flex; gap:10px; align-items:center; margin-bottom:5px;">
+    <input type="text" class="job-cand-id" placeholder="例: 1" oninput="checkCandId(this)" onblur="applyFormat(this)" style="width: 90px; flex-shrink: 0; padding: 6px; border: 1px solid #ccc; border-radius: 4px;">
+    <span class="cand-name-display" style="flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px; color: #1a73e8; font-weight: bold;"></span>
   </div>
 </div>
 <button class="btn-secondary" onclick="addJobCandRow()" style="margin-top:5px; font-size:11px; padding: 6px;">+ 候補者IDを追加</button>
@@ -43,6 +43,78 @@
 <button class="btn-primary" id="jobBtn" onclick="submitJob()" >登録</button>
 </div>
 
+<div id="form-job-edit" style="display: <?= mode === 'JOB_EDIT' ? 'block' : 'none' ?>;">
+  <div class="search-box" style="max-width: 400px; margin-bottom: 20px;">
+    <label>案件IDで検索</label>
+    <div style="display: flex; gap: 10px;">
+      <input type="text" id="edit_job_searchId" placeholder="例: 1 または 0001" onblur="applyJobFormat(this)" style="flex: 2;">
+      <button class="btn-secondary" onclick="searchJobData()" style="flex: 1; margin-top: 0; padding: 8px;">読み込む</button>
+    </div>
+  </div>
+
+  <div id="job_edit_fields" style="display: none;">
+    <input type="hidden" id="edit_job_row">
+    <input type="hidden" id="edit_job_id">
+
+    <div class="section-title">案件情報の修正</div>
+
+    <div class="form-row">
+      <div class="field">
+        <label>ステータス</label>
+        <select id="edit_job_status">
+          <option value="未着手">未着手</option>
+          <option value="面接待ち">面接待ち</option>
+          <option value="入国準備">入国準備</option>
+          <option value="終了">終了</option>
+          <option value="キャンセル">キャンセル</option>
+        </select>
+      </div>
+      <div class="field flex-2">
+        <label>事業者名</label>
+        <input type="text" id="edit_job_company" list="company_list">
+      </div>
+    </div>
+
+    <div class="field">
+      <label>候補者（登録者IDを入力）</label>
+      <p style="font-size: 11px; color: #555; margin-top: -3px; margin-bottom: 8px;">※候補者を変更する場合は、枠内のIDを書き換えてください。</p>
+      <div id="edit_job_cand_list">
+        </div>
+      <button class="btn-secondary" onclick="addJobEditCandRow()" style="margin-top:5px; font-size:11px; padding: 6px;">+ 候補者IDを追加</button>
+    </div>
+
+    <div class="form-row">
+      <div class="field">
+        <label>面接日</label>
+        <input type="date" id="edit_job_interviewDate" style="max-width: 200px;">
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="field">
+        <label>関連ファイル（Googleドライブ）</label>
+        <input type="text" id="edit_job_relatedFile" style="width: 100%; margin-bottom: 8px; box-sizing: border-box;" oninput="document.getElementById('edit_job_relatedFileName').value=''">
+        <input type="hidden" id="edit_job_relatedFileName">
+        <div style="display:flex; gap:10px;">
+          <button class="btn-secondary" onclick="openDrivePicker()" style="margin:0; padding:10px; font-size:13px; flex:1;">ドライブから選択</button>
+          <button class="btn-secondary" onclick="clearDriveFile()" style="margin:0; padding:10px; font-size:13px; background:#e0e0e0; color:#333; border:none; flex:1;">クリア</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>備考・メモ</label>
+      <textarea id="edit_job_memo" rows="3"></textarea>
+    </div>
+
+    <div style="display: flex; gap: 15px; margin-top: 20px;">
+      <button class="btn-primary" onclick="submitJobEdit()" style="flex: 2;">更新を保存</button>
+      <button class="btn-primary" onclick="submitJobDelete()" style="flex: 1; background: #d93025;">案件を削除</button>
+    </div>
+  </div>
+</div>
+
+
 <div id="form-hire" style="display: <?= mode === 'HIRE' ? 'block' : 'none' ?>;">
 <div class="section-title" style="border-left-color: #34a853;">採用者一括登録</div>
 <div class="field">
@@ -70,9 +142,9 @@
 <div class="field" >
 <label>候補者（登録者IDを入力）</label>
 <div id="list_cand_inputs">
-  <div class="sub-field">
-    <input type="text" class="list-cand-id" placeholder="例: 1" oninput="checkCandId(this, null, true)" onblur="applyFormat(this)">
-    <span class="cand-name-display"></span>
+  <div class="sub-field" style="display:flex; gap:10px; align-items:center; margin-bottom:5px;">
+    <input type="text" class="list-cand-id" placeholder="例: 1" oninput="checkCandId(this)" onblur="applyFormat(this)" style="width: 90px; flex-shrink: 0; padding: 6px; border: 1px solid #ccc; border-radius: 4px;">
+    <span class="cand-name-display" style="flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px; color: #1a73e8; font-weight: bold;"></span>
   </div>
 </div>
 <button class="btn-secondary" onclick="addListCandRow()" style="margin-top:5px; font-size:11px; padding: 6px;">+ 候補者IDを追加</button>

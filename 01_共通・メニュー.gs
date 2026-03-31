@@ -2,32 +2,20 @@
 // システム全体の設定値・共通関数・UI
 // =========================================
 
-// 【重要】外部マスタ管理スプレッドシートのID（マスタ移植が完了するまで使用します）
 const MASTER_SS_ID = '1cq4h6yI0on-bm_MlqUlUi6MMXBlFIXyTCZpzcTZlCMw';
-
-// フィルタ表示呼び出し用のURL設定
 const URL_UNADOPTED = "https://docs.google.com/spreadsheets/d/1vwBBwQNvTrZ0jBa1-ZfYmYdEZG6YBwEQeZ8PJ9vkrmQ/edit?gid=1414821006#gid=1414821006&fvid=331083492";
 const URL_ADOPTED   = "https://docs.google.com/spreadsheets/d/1vwBBwQNvTrZ0jBa1-ZfYmYdEZG6YBwEQeZ8PJ9vkrmQ/edit?gid=1414821006#gid=1414821006&fvid=1493453362";
 
-/**
- * マスタのシートを取得する関数（自シートを優先し、なければ外部IDを見に行く）
- */
 function getMasterSheet(sheetName) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = ss.getSheetByName(sheetName);
   if (!sheet) {
-    try {
-      sheet = SpreadsheetApp.openById(MASTER_SS_ID).getSheetByName(sheetName);
-    } catch(e) {
-      console.error(sheetName + " が見つかりません: " + e.message);
-    }
+    try { sheet = SpreadsheetApp.openById(MASTER_SS_ID).getSheetByName(sheetName); } 
+    catch(e) { console.error(sheetName + " が見つかりません: " + e.message); }
   }
   return sheet;
 }
 
-/**
- * マスタのヘッダー名から列番号を取得
- */
 function getMasterColumnMap(sheet) {
   if (!sheet) return {};
   const lastCol = sheet.getLastColumn();
@@ -41,23 +29,15 @@ function getMasterColumnMap(sheet) {
   return map;
 }
 
-/**
- * ★修正：HTMLファイル読み込み用（分割したファイル内のプログラムを正しく実行させる）
- */
 function include(filename, mode) {
   const template = HtmlService.createTemplateFromFile(filename);
-  template.mode = mode; // mode変数を分割先にも引き継ぐ
+  template.mode = mode; 
   return template.evaluate().getContent();
 }
-
-// =========================================
-// メニューとUIの表示処理
-// =========================================
 
 function onOpen() {
   const ui = SpreadsheetApp.getUi();
   
-  // 1つ目のメニュー：候補者・事業者マスタ管理
   ui.createMenu( '人材事業メニュー' )
     .addItem( '【新規】候補者登録' , 'showSidebarNew')
     .addItem( '【修正】データ更新' , 'showSidebarEdit')
@@ -77,9 +57,9 @@ function onOpen() {
     )
     .addToUi();
 
-  // 2つ目のメニュー：案件・採用管理
   ui.createMenu( '案件・採用管理' )
     .addItem( '【新規】案件登録' , 'showSidebarJobNew')
+    .addItem( '【修正】案件更新/削除' , 'showSidebarJobEdit') // ★今回追加
     .addItem( '【登録】採用者登録' , 'showSidebarHire') 
     .addToUi();
 }
@@ -94,18 +74,17 @@ function showMainSidebar(mode, title) {
   SpreadsheetApp.getUi().showModelessDialog(output, title);
 }
 
-// 各種サイドバー呼び出し
 function showSidebarNew()     { showMainSidebar('NEW',  '【新規】候補者登録' ); }
 function showSidebarEdit()    { showMainSidebar('EDIT',  '【修正】データ更新' ); }
 function showSidebarAddInfo() { showMainSidebar('ADDINFO',  '【追加】採用者情報登録' ); }
 function showSidebarComment() { showMainSidebar('COMMENT',  '【コメント登録】' ); }
 function showSidebarCompany() { showMainSidebar('COMPANY',  '【事業者】マスタ登録' ); }
 function showSidebarJobNew()  { showMainSidebar('JOB',  '【新規】案件登録' ); }
+function showSidebarJobEdit() { showMainSidebar('JOB_EDIT', '【修正】案件更新/削除' ); } // ★今回追加
 function showSidebarDelete()  { showMainSidebar('DELETE', '【削除】登録者削除'); }
 function showSidebarHire()    { showMainSidebar('HIRE', '【登録】採用者登録'); }
 function showSidebarList()    { showMainSidebar('LIST', '【作成】簡易リスト出力'); }
 
-// リンク表示用
 function openFilterUnadopted() { showLinkDialog(URL_UNADOPTED, '未採用者リスト'); }
 function openFilterAdopted()   { showLinkDialog(URL_ADOPTED, '採用者リスト'); }
 function showLinkDialog(url, title) {

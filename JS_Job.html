@@ -1,4 +1,5 @@
 <script>
+// --- 事業者登録 ---
 function submitCompany() {
   let name = document.getElementById('comp_name').value.trim();
   if (!name) { showModal('事業者名称は必須です。'); return; }
@@ -17,9 +18,15 @@ function liveCheckDuplicate(name) {
   google.script.run.withSuccessHandler(function(isDup) { warningBox.style.display = isDup ? 'block' : 'none'; }).checkCompanyDuplicate(name);
 }
 
+// --- 案件登録（新規） ---
 function addJobCandRow() {
-  let container = document.getElementById('job_cand_list'); let div = document.createElement('div'); div.className = 'sub-field';
-  div.innerHTML = '<input type="text" class="job-cand-id" placeholder="例: 1" oninput="checkCandId(this, null, true)" onblur="applyFormat(this)"><span class="cand-name-display"></span>';
+  let container = document.getElementById('job_cand_list'); 
+  let div = document.createElement('div'); div.className = 'sub-field';
+  div.style.display = 'flex'; div.style.gap = '10px'; div.style.alignItems = 'center'; div.style.marginBottom = '5px';
+  // ★修正：削除ボタンを極小サイズに変更
+  div.innerHTML = `<input type="text" class="job-cand-id" placeholder="例: 1" oninput="checkCandId(this)" onblur="applyFormat(this)" style="width: 90px; flex-shrink: 0; padding: 6px; border: 1px solid #ccc; border-radius: 4px;">
+                   <span class="cand-name-display" style="flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px; color: #1a73e8; font-weight: bold;"></span>
+                   <button type="button" onclick="this.parentElement.remove()" style="margin: 0; padding: 4px 10px; font-size: 11px; color: #d93025; background: #fff; border: 1px solid #d93025; border-radius: 4px; cursor: pointer; flex-shrink: 0;">削除</button>`;
   container.appendChild(div);
 }
 
@@ -43,10 +50,124 @@ function submitJob() {
     document.getElementById('job_company').value = ''; document.getElementById('job_interviewDate').value = '';
     document.getElementById('job_relatedFile').value = ''; if(document.getElementById('job_relatedFileName')) document.getElementById('job_relatedFileName').value = '';
     document.getElementById('job_memo').value = '';
-    document.getElementById('job_cand_list').innerHTML = '<div class="sub-field"><input type="text" class="job-cand-id" placeholder="例: 1" oninput="checkCandId(this, null, true)" onblur="applyFormat(this)"><span class="cand-name-display"></span></div>';
+    document.getElementById('job_cand_list').innerHTML = `<div class="sub-field" style="display:flex; gap:10px; align-items:center; margin-bottom:5px;">
+      <input type="text" class="job-cand-id" placeholder="例: 1" oninput="checkCandId(this)" onblur="applyFormat(this)" style="width: 90px; flex-shrink: 0; padding: 6px; border: 1px solid #ccc; border-radius: 4px;">
+      <span class="cand-name-display" style="flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px; color: #1a73e8; font-weight: bold;"></span>
+    </div>`;
   }).addJob(formData);
 }
 
+// --- 案件情報の修正・削除 ---
+function searchJobData() {
+  let rawId = document.getElementById('edit_job_searchId').value.trim();
+  if (!rawId) { showModal('案件IDを入力してください。'); return; }
+  let jobId = formatJobId(rawId);
+  document.getElementById('edit_job_searchId').value = jobId;
+
+  showModal('検索中...', true);
+  google.script.run.withSuccessHandler(function(data) {
+    closeModal();
+    if (data) {
+      document.getElementById('job_edit_fields').style.display = 'block';
+      document.getElementById('edit_job_row').value = data.row;
+      document.getElementById('edit_job_id').value = data.id;
+      document.getElementById('edit_job_status').value = data.status || "未着手";
+      document.getElementById('edit_job_company').value = data.company || "";
+      document.getElementById('edit_job_interviewDate').value = data.interviewDate || "";
+      document.getElementById('edit_job_relatedFile').value = data.relatedFile || "";
+      document.getElementById('edit_job_relatedFileName').value = ""; 
+      document.getElementById('edit_job_memo').value = data.memo || "";
+
+      let candContainer = document.getElementById('edit_job_cand_list');
+      candContainer.innerHTML = '';
+      if (data.candidates) {
+        let cands = data.candidates.split(/\r?\n/);
+        cands.forEach(c => {
+           // ★修正：IDだけでなく、保存されている名前も一緒に抽出して表示させる
+           let idMatch = c.match(/^([a-zA-Z]+-\d+)/);
+           let candId = idMatch ? idMatch[1] : c.split('-')[0].trim();
+           let candName = idMatch ? c.substring(candId.length).replace(/^-/, '').trim() : "";
+           
+           if(candId) { addJobEditCandRow(candId, candName); }
+        });
+      }
+      if(candContainer.innerHTML === '') addJobEditCandRow('');
+
+    } else {
+      showModal('該当する案件が見つかりません。');
+      document.getElementById('job_edit_fields').style.display = 'none';
+    }
+  }).getJobDetails(jobId);
+}
+
+// ★修正：名前を引数で受け取り、削除ボタンをスリム化
+function addJobEditCandRow(val = '', nameVal = '') {
+  let container = document.getElementById('edit_job_cand_list');
+  let div = document.createElement('div');
+  div.className = 'sub-field';
+  div.style.display = 'flex'; div.style.gap = '10px'; div.style.alignItems = 'center'; div.style.marginBottom = '5px';
+  
+  div.innerHTML = `<input type="text" class="edit-job-cand-id" placeholder="例: 1" value="${val}" oninput="checkCandId(this)" onblur="applyFormat(this)" style="width: 90px; flex-shrink: 0; padding: 6px; border: 1px solid #ccc; border-radius: 4px;">
+                   <span class="cand-name-display" style="flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px; color: #1a73e8; font-weight: bold;">${nameVal}</span>
+                   <button type="button" onclick="this.parentElement.remove()" style="margin: 0; padding: 4px 10px; font-size: 11px; color: #d93025; background: #fff; border: 1px solid #d93025; border-radius: 4px; cursor: pointer; flex-shrink: 0;">削除</button>`;
+  container.appendChild(div);
+  
+  // 名前が空の場合は、入力されたIDをもとに辞書から検索させる
+  if(val && !nameVal) {
+    let inputElem = div.querySelector('.edit-job-cand-id');
+    checkCandId(inputElem);
+  }
+}
+
+function submitJobEdit() {
+  let row = document.getElementById('edit_job_row').value;
+  if (!row) return;
+
+  let company = document.getElementById('edit_job_company').value.trim();
+  let candInputs = document.querySelectorAll('.edit-job-cand-id');
+  let candidates = [];
+  candInputs.forEach(input => {
+    let val = input.value.trim();
+    if (val) candidates.push(formatId(val));
+  });
+
+  if (candidates.length === 0) { showModal('候補者を少なくとも1名入力してください。'); return; }
+
+  let formData = {
+    row: row,
+    id: document.getElementById('edit_job_id').value,
+    status: document.getElementById('edit_job_status').value,
+    company: company,
+    candidates: candidates,
+    interviewDate: document.getElementById('edit_job_interviewDate').value,
+    relatedFile: document.getElementById('edit_job_relatedFile').value,
+    relatedFileName: document.getElementById('edit_job_relatedFileName') ? document.getElementById('edit_job_relatedFileName').value : "",
+    memo: document.getElementById('edit_job_memo').value
+  };
+
+  showModal('更新中...', true);
+  google.script.run.withSuccessHandler(function(msg) {
+    showModal(msg);
+  }).updateJob(formData);
+}
+
+function submitJobDelete() {
+  let jobId = document.getElementById('edit_job_id').value;
+  if (!jobId) return;
+
+  if (!confirm(`案件 ${jobId} を完全に削除します。よろしいですか？\n※この操作は取り消せません。`)) {
+    return;
+  }
+
+  showModal('削除中...', true);
+  google.script.run.withSuccessHandler(function(msg) {
+    showModal(msg);
+    document.getElementById('job_edit_fields').style.display = 'none';
+    document.getElementById('edit_job_searchId').value = '';
+  }).deleteJobRow(jobId);
+}
+
+// --- 採用登録 ---
 function fetchJobCandidates(mode) {
   let rawId = document.getElementById(mode + '_job_id').value.trim();
   if (!rawId) { showModal('案件IDを入力してください。'); return; }
@@ -85,9 +206,14 @@ function submitHire() {
   }).registerHire(jobId, hiredIds);
 }
 
+// --- 簡易リスト作成 ---
 function addListCandRow() {
-  let container = document.getElementById('list_cand_inputs'); let div = document.createElement('div'); div.className = 'sub-field';
-  div.innerHTML = '<input type="text" class="list-cand-id" placeholder="例: 1" oninput="checkCandId(this, null, true)" onblur="applyFormat(this)"><span class="cand-name-display"></span>';
+  let container = document.getElementById('list_cand_inputs'); 
+  let div = document.createElement('div'); div.className = 'sub-field';
+  div.style.display = 'flex'; div.style.gap = '10px'; div.style.alignItems = 'center'; div.style.marginBottom = '5px';
+  div.innerHTML = `<input type="text" class="list-cand-id" placeholder="例: 1" oninput="checkCandId(this)" onblur="applyFormat(this)" style="width: 90px; flex-shrink: 0; padding: 6px; border: 1px solid #ccc; border-radius: 4px;">
+                   <span class="cand-name-display" style="flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px; color: #1a73e8; font-weight: bold;"></span>
+                   <button type="button" onclick="this.parentElement.remove()" style="margin: 0; padding: 4px 10px; font-size: 11px; color: #d93025; background: #fff; border: 1px solid #d93025; border-radius: 4px; cursor: pointer; flex-shrink: 0;">削除</button>`;
   container.appendChild(div);
 }
 
