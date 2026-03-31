@@ -1,6 +1,7 @@
 <script>
 let candidateDict = {};
 let jobDict = {};
+let currentFileInput = null; // ★追加：現在フォーカスしているファイル入力欄を記憶
 
 window.onload = function() {
   google.script.run.withSuccessHandler(function(dict) { candidateDict = dict; }).getCandidateDict();
@@ -31,18 +32,19 @@ window.onload = function() {
   }
 };
 
-function openDrivePicker() { document.getElementById('picker-modal').style.display = 'block'; searchDrive(); }
+// ★修正：押されたボタンの隣にある入力欄を記憶してモーダルを開く
+function openDrivePicker(btnElement) { 
+  if (btnElement) {
+    currentFileInput = btnElement.parentElement.querySelector('input[type="text"]');
+  }
+  document.getElementById('picker-modal').style.display = 'block'; 
+  searchDrive(); 
+}
+
 function closePicker() { document.getElementById('picker-modal').style.display = 'none'; }
 
-// ★修正：編集画面と新規登録画面のどちらから呼ばれたかで入力先を変える
 function clearDriveFile() { 
-  if (MODE === 'JOB_EDIT') {
-    document.getElementById('edit_job_relatedFile').value = ''; 
-    if(document.getElementById('edit_job_relatedFileName')) document.getElementById('edit_job_relatedFileName').value = ''; 
-  } else {
-    document.getElementById('job_relatedFile').value = ''; 
-    if(document.getElementById('job_relatedFileName')) document.getElementById('job_relatedFileName').value = ''; 
-  }
+  if (currentFileInput) currentFileInput.value = '';
 }
 
 function searchDrive() {
@@ -60,14 +62,10 @@ function searchDrive() {
   }).searchDriveFiles(query);
 }
 
-// ★修正：編集画面と新規登録画面のどちらから呼ばれたかで入力先を変える
+// ★修正：記憶した入力欄にURLをセットする
 function selectDriveFile(url, name) {
-  if (MODE === 'JOB_EDIT') {
-    document.getElementById('edit_job_relatedFile').value = url;
-    document.getElementById('edit_job_relatedFileName').value = name;
-  } else {
-    document.getElementById('job_relatedFile').value = url;
-    document.getElementById('job_relatedFileName').value = name;
+  if (currentFileInput) {
+    currentFileInput.value = url;
   }
   closePicker();
 }

@@ -26,15 +26,16 @@ function createCandRowHTML(className, val = '', nameVal = '') {
   </div>`;
 }
 
-// ★改善：関連ファイルの入力行を生成する関数
+// ★修正：関連ファイルの入力行に「検索ボタン」を追加
 function addJobFileRow(prefix, urlVal = '') {
   const containerId = prefix + '_file_list';
   const container = document.getElementById(containerId);
   const className = prefix + '-file-input';
   
   const html = `<div style="display: flex; gap: 10px; align-items: center; margin-bottom: 8px;">
-    <input type="text" class="${className}" placeholder=" URLを直接入力 " value="${urlVal}" style="flex: 1; padding: 6px; box-sizing: border-box; height: 30px; margin: 0;">
-    <button type="button" class="btn-delete-small" onclick="this.parentElement.remove()">削除</button>
+    <input type="text" class="${className}" placeholder=" URLを直接入力、または検索 " value="${urlVal}" style="flex: 1; padding: 6px; box-sizing: border-box; height: 30px; margin: 0;">
+    <button type="button" class="btn-secondary" onclick="openDrivePicker(this)" style="margin: 0; padding: 4px 10px; font-size: 11px; height: 30px; width: auto; flex-shrink: 0;">ドライブ検索</button>
+    <button type="button" class="btn-delete-small" onclick="this.parentElement.remove()" style="height: 30px;">削除</button>
   </div>`;
   container.insertAdjacentHTML('beforeend', html);
 }
@@ -56,7 +57,6 @@ function submitJob() {
     let nameEl = div.querySelector('span.cand-name-display');
     if (inputEl && inputEl.value.trim()) {
       let idStr = formatId(inputEl.value.trim());
-      // ★修正2：IDと名前を結合して保存
       let nameStr = nameEl ? nameEl.innerText.trim() : "";
       if (nameStr && nameStr !== "該当なし" && nameStr !== "読込中...") {
         candidates.push(`${idStr}-${nameStr}`);
@@ -67,7 +67,6 @@ function submitJob() {
   });
   if (candidates.length === 0) { showModal('候補者を少なくとも1名入力してください。'); return; }
   
-  // ★改善：複数ファイルURLの取得
   let fileInputs = document.querySelectorAll('.job-file-input');
   let relatedFiles = [];
   fileInputs.forEach(input => {
@@ -129,7 +128,6 @@ function searchJobData() {
       }
       if(candContainer.innerHTML === '') addJobEditCandRow('');
       
-      // ★改善：複数ファイルの復元
       let fileContainer = document.getElementById('edit_job_file_list');
       fileContainer.innerHTML = '';
       if (data.relatedFile) {
