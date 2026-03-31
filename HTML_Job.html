@@ -6,6 +6,16 @@
   <datalist id="company_list"></datalist>
 </div>
 
+<div class="field">
+  <label>技能分野</label>
+  <select id="job_skill">
+    <option value="">未選択</option>
+    <option value="介護">介護</option>
+    <option value="外食業">外食業</option>
+    <option value="飲食料品製造業">飲食料品製造業</option>
+  </select>
+</div>
+
 <div class="field" >
   <label>候補者（登録者IDを入力）</label>
   <p style="font-size: 11px; color: #555; margin-top: -3px; margin-bottom: 8px;">※候補者を変更する場合は、枠内のIDを直接書き換えてください。名前は自動で表示されます。</p>
@@ -74,6 +84,16 @@
     </div>
 
     <div class="field">
+      <label>技能分野</label>
+      <select id="edit_job_skill">
+        <option value="">未選択</option>
+        <option value="介護">介護</option>
+        <option value="外食業">外食業</option>
+        <option value="飲食料品製造業">飲食料品製造業</option>
+      </select>
+    </div>
+
+    <div class="field">
       <label>候補者（登録者IDを入力）</label>
       <p style="font-size: 11px; color: #555; margin-top: -3px; margin-bottom: 8px;">※候補者を変更する場合は、枠内のIDを直接書き換えてください。名前は自動で表示されます。</p>
       <div id="edit_job_cand_list">
@@ -119,7 +139,7 @@
   <label>採用元の案件ID</label>
   <div style="display: flex; gap: 10px;">
     <input type="text" id="hire_job_id" placeholder="例: 1 または 0001" oninput="checkJobId(this, 'hireJobDisplay')" onblur="applyJobFormat(this)" style="flex: 2;">
-    <button class="btn-secondary" style="flex: 1; margin-top: 0; padding: 8px;">候補者検索</button>
+    <button class="btn-secondary" style="flex: 1; margin-top: 0; padding: 8px;" onclick="fetchJobCandidates('hire')">候補者検索</button>
   </div>
   <div id="hireJobDisplay" style="font-size:11px; color:#34a853; margin-top:4px; height:14px;"></div>
 </div>

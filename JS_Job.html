@@ -18,7 +18,6 @@ function liveCheckDuplicate(name) {
   google.script.run.withSuccessHandler(function(isDup) { warningBox.style.display = isDup ? 'block' : 'none'; }).checkCompanyDuplicate(name);
 }
 
-// ★修正：CSSと競合しないシンプルなHTML構造に変更
 function createCandRowHTML(className, val = '', nameVal = '') {
   return `<div style="display: flex; gap: 10px; align-items: center; margin-bottom: 8px;">
     <input type="text" class="${className}" placeholder="例: 1" value="${val}" oninput="checkCandId(this)" onblur="applyFormat(this)" style="width: 100px; flex-shrink: 0; padding: 6px; box-sizing: border-box; height: 30px; margin: 0;">
@@ -40,7 +39,10 @@ function submitJob() {
   if (candidates.length === 0) { showModal('候補者を少なくとも1名入力してください。'); return; }
   
   let formData = {
-    company: company, candidates: candidates, interviewDate: document.getElementById('job_interviewDate').value,
+    company: company,
+    skill: document.getElementById('job_skill').value, // ★追加
+    candidates: candidates,
+    interviewDate: document.getElementById('job_interviewDate').value,
     relatedFile: document.getElementById('job_relatedFile').value,
     relatedFileName: document.getElementById('job_relatedFileName') ? document.getElementById('job_relatedFileName').value : "",
     memo: document.getElementById('job_memo').value
@@ -49,7 +51,9 @@ function submitJob() {
   document.getElementById('jobBtn').disabled = true; showModal('案件を登録中...', true);
   google.script.run.withSuccessHandler(function(msg) {
     document.getElementById('jobBtn').disabled = false; showModal(msg);
-    document.getElementById('job_company').value = ''; document.getElementById('job_interviewDate').value = '';
+    document.getElementById('job_company').value = ''; 
+    document.getElementById('job_skill').value = ''; // ★追加
+    document.getElementById('job_interviewDate').value = '';
     document.getElementById('job_relatedFile').value = ''; if(document.getElementById('job_relatedFileName')) document.getElementById('job_relatedFileName').value = '';
     document.getElementById('job_memo').value = '';
     document.getElementById('job_cand_list').innerHTML = createCandRowHTML('job-cand-id');
@@ -72,6 +76,7 @@ function searchJobData() {
       document.getElementById('edit_job_id').value = data.id;
       document.getElementById('edit_job_status').value = data.status || "未着手";
       document.getElementById('edit_job_company').value = data.company || "";
+      document.getElementById('edit_job_skill').value = data.skill || ""; // ★追加
       document.getElementById('edit_job_interviewDate').value = data.interviewDate || "";
       document.getElementById('edit_job_relatedFile').value = data.relatedFile || "";
       document.getElementById('edit_job_relatedFileName').value = ""; 
@@ -124,6 +129,7 @@ function submitJobEdit() {
     id: document.getElementById('edit_job_id').value,
     status: document.getElementById('edit_job_status').value,
     company: company,
+    skill: document.getElementById('edit_job_skill').value, // ★追加
     candidates: candidates,
     interviewDate: document.getElementById('edit_job_interviewDate').value,
     relatedFile: document.getElementById('edit_job_relatedFile').value,
