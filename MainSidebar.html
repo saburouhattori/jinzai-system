@@ -2,7 +2,7 @@
 <html>
 <head>
 <base target="_top">
-<?!= include('Sidebar_CSS'); ?>
+<?!= include('Sidebar_CSS', mode); ?>
 <style>
   .form-row { display: flex; gap: 15px; margin-bottom: 12px; }
   .form-row .field { flex: 1; margin-bottom: 0; }
@@ -42,17 +42,17 @@
 </div>
 <? } ?>
 
-<?!= include('HTML_Candidate'); ?>
-<?!= include('HTML_Company'); ?>
-<?!= include('HTML_Job'); ?>
+<?!= include('HTML_Candidate', mode); ?>
+<?!= include('HTML_Company', mode); ?>
+<?!= include('HTML_Job', mode); ?>
 
 <script>
   const MODE = '<?= mode ?>';
 </script>
 
-<?!= include('JS_Common'); ?>
-<?!= include('JS_Candidate'); ?>
-<?!= include('JS_Job'); ?>
+<?!= include('JS_Common', mode); ?>
+<?!= include('JS_Candidate', mode); ?>
+<?!= include('JS_Job', mode); ?>
 
 </body>
 </html>

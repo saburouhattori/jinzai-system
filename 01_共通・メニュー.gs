@@ -42,10 +42,12 @@ function getMasterColumnMap(sheet) {
 }
 
 /**
- * HTMLファイル読み込み用
+ * ★修正：HTMLファイル読み込み用（分割したファイル内のプログラムを正しく実行させる）
  */
-function include(filename) {
-  return HtmlService.createHtmlOutputFromFile(filename).getContent();
+function include(filename, mode) {
+  const template = HtmlService.createTemplateFromFile(filename);
+  template.mode = mode; // mode変数を分割先にも引き継ぐ
+  return template.evaluate().getContent();
 }
 
 // =========================================
@@ -66,7 +68,7 @@ function onOpen() {
     .addSeparator()
     .addItem( '【事業者】マスタ登録' , 'showSidebarCompany')
     .addSeparator()
-    .addItem( '【作成】履歴書出力' , 'rirekisyo') // ※履歴書作成.gsに存在
+    .addItem( '【作成】履歴書出力' , 'rirekisyo') 
     .addItem( '【作成】簡易リスト出力' , 'showSidebarList') 
     .addSeparator()
     .addSubMenu(ui.createMenu('【表示】リスト絞り込み')
