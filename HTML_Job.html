@@ -5,15 +5,13 @@
   <input type="text" id="job_company" list="company_list" placeholder="例：株式会社〇〇（新規も可）">
   <datalist id="company_list"></datalist>
 </div>
+
 <div class="field" >
-<label>候補者（登録者IDを入力）</label>
-<div id="job_cand_list">
-  <div class="sub-field" style="display:flex; gap:10px; align-items:center; margin-bottom:5px;">
-    <input type="text" class="job-cand-id" placeholder="例: 1" oninput="checkCandId(this)" onblur="applyFormat(this)" style="width: 90px; flex-shrink: 0; padding: 6px; border: 1px solid #ccc; border-radius: 4px;">
-    <span class="cand-name-display" style="flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px; color: #1a73e8; font-weight: bold;"></span>
-  </div>
-</div>
-<button class="btn-secondary" onclick="addJobCandRow()" style="margin-top:5px; font-size:11px; padding: 6px;">+ 候補者IDを追加</button>
+  <label>候補者（登録者IDを入力）</label>
+  <p style="font-size: 11px; color: #555; margin-top: -3px; margin-bottom: 8px;">※候補者を変更する場合は、枠内のIDを直接書き換えてください。名前は自動で表示されます。</p>
+  <div id="job_cand_list">
+    </div>
+  <button class="btn-secondary" onclick="addJobCandRow()" style="margin-top:5px; font-size:11px; padding: 6px; width: auto;">+ 候補者IDを追加</button>
 </div>
 
 <div class="form-row">
@@ -77,10 +75,10 @@
 
     <div class="field">
       <label>候補者（登録者IDを入力）</label>
-      <p style="font-size: 11px; color: #555; margin-top: -3px; margin-bottom: 8px;">※候補者を変更する場合は、枠内のIDを書き換えてください。</p>
+      <p style="font-size: 11px; color: #555; margin-top: -3px; margin-bottom: 8px;">※候補者を変更する場合は、枠内のIDを直接書き換えてください。名前は自動で表示されます。</p>
       <div id="edit_job_cand_list">
         </div>
-      <button class="btn-secondary" onclick="addJobEditCandRow()" style="margin-top:5px; font-size:11px; padding: 6px;">+ 候補者IDを追加</button>
+      <button class="btn-secondary" onclick="addJobEditCandRow()" style="margin-top:5px; font-size:11px; padding: 6px; width: auto;">+ 候補者IDを追加</button>
     </div>
 
     <div class="form-row">
@@ -121,7 +119,7 @@
   <label>採用元の案件ID</label>
   <div style="display: flex; gap: 10px;">
     <input type="text" id="hire_job_id" placeholder="例: 1 または 0001" oninput="checkJobId(this, 'hireJobDisplay')" onblur="applyJobFormat(this)" style="flex: 2;">
-    <button class="btn-secondary" style="flex: 1; margin-top: 0; padding: 8px;" onclick="fetchJobCandidates('hire')">候補者検索</button>
+    <button class="btn-secondary" style="flex: 1; margin-top: 0; padding: 8px;">候補者検索</button>
   </div>
   <div id="hireJobDisplay" style="font-size:11px; color:#34a853; margin-top:4px; height:14px;"></div>
 </div>
@@ -141,14 +139,18 @@
 <div class="section-title" style="border-left-color: #fbbc04;">簡易リスト作成</div>
 <div class="field" >
 <label>候補者（登録者IDを入力）</label>
+<p style="font-size: 11px; color: #555; margin-top: -3px; margin-bottom: 8px;">※候補者を変更する場合は、枠内のIDを直接書き換えてください。名前は自動で表示されます。</p>
 <div id="list_cand_inputs">
-  <div class="sub-field" style="display:flex; gap:10px; align-items:center; margin-bottom:5px;">
-    <input type="text" class="list-cand-id" placeholder="例: 1" oninput="checkCandId(this)" onblur="applyFormat(this)" style="width: 90px; flex-shrink: 0; padding: 6px; border: 1px solid #ccc; border-radius: 4px;">
-    <span class="cand-name-display" style="flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px; color: #1a73e8; font-weight: bold;"></span>
   </div>
-</div>
-<button class="btn-secondary" onclick="addListCandRow()" style="margin-top:5px; font-size:11px; padding: 6px;">+ 候補者IDを追加</button>
+<button class="btn-secondary" onclick="addListCandRow()" style="margin-top:5px; font-size:11px; padding: 6px; width: auto;">+ 候補者IDを追加</button>
 </div>
 <button class="btn-primary" id="listBtn" style="background: #fbbc04; color: #333;" onclick="submitList()" >簡易リストを作成</button>
 <p style="font-size: 11px; color: #555; margin-top: 10px;">※「簡易リスト」シートのB2:L51が毎回リセットされ、指定した候補者が出力されます。</p>
 </div>
+
+<script>
+  window.addEventListener('DOMContentLoaded', () => {
+    if (MODE === 'JOB') addJobCandRow();
+    if (MODE === 'LIST') addListCandRow();
+  });
+</script>

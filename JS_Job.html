@@ -18,16 +18,18 @@ function liveCheckDuplicate(name) {
   google.script.run.withSuccessHandler(function(isDup) { warningBox.style.display = isDup ? 'block' : 'none'; }).checkCompanyDuplicate(name);
 }
 
+// ★修正：CSSと競合しないシンプルなHTML構造に変更
+function createCandRowHTML(className, val = '', nameVal = '') {
+  return `<div style="display: flex; gap: 10px; align-items: center; margin-bottom: 8px;">
+    <input type="text" class="${className}" placeholder="例: 1" value="${val}" oninput="checkCandId(this)" onblur="applyFormat(this)" style="width: 100px; flex-shrink: 0; padding: 6px; box-sizing: border-box; height: 30px; margin: 0;">
+    <span class="cand-name-display" style="flex: 1;">${nameVal}</span>
+    <button type="button" class="btn-delete-small" onclick="this.parentElement.remove()">削除</button>
+  </div>`;
+}
+
 // --- 案件登録（新規） ---
 function addJobCandRow() {
-  let container = document.getElementById('job_cand_list'); 
-  let div = document.createElement('div'); div.className = 'sub-field';
-  div.style.display = 'flex'; div.style.gap = '10px'; div.style.alignItems = 'center'; div.style.marginBottom = '5px';
-  // ★修正：削除ボタンを極小サイズに変更
-  div.innerHTML = `<input type="text" class="job-cand-id" placeholder="例: 1" oninput="checkCandId(this)" onblur="applyFormat(this)" style="width: 90px; flex-shrink: 0; padding: 6px; border: 1px solid #ccc; border-radius: 4px;">
-                   <span class="cand-name-display" style="flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px; color: #1a73e8; font-weight: bold;"></span>
-                   <button type="button" onclick="this.parentElement.remove()" style="margin: 0; padding: 4px 10px; font-size: 11px; color: #d93025; background: #fff; border: 1px solid #d93025; border-radius: 4px; cursor: pointer; flex-shrink: 0;">削除</button>`;
-  container.appendChild(div);
+  document.getElementById('job_cand_list').insertAdjacentHTML('beforeend', createCandRowHTML('job-cand-id'));
 }
 
 function submitJob() {
@@ -50,10 +52,7 @@ function submitJob() {
     document.getElementById('job_company').value = ''; document.getElementById('job_interviewDate').value = '';
     document.getElementById('job_relatedFile').value = ''; if(document.getElementById('job_relatedFileName')) document.getElementById('job_relatedFileName').value = '';
     document.getElementById('job_memo').value = '';
-    document.getElementById('job_cand_list').innerHTML = `<div class="sub-field" style="display:flex; gap:10px; align-items:center; margin-bottom:5px;">
-      <input type="text" class="job-cand-id" placeholder="例: 1" oninput="checkCandId(this)" onblur="applyFormat(this)" style="width: 90px; flex-shrink: 0; padding: 6px; border: 1px solid #ccc; border-radius: 4px;">
-      <span class="cand-name-display" style="flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px; color: #1a73e8; font-weight: bold;"></span>
-    </div>`;
+    document.getElementById('job_cand_list').innerHTML = createCandRowHTML('job-cand-id');
   }).addJob(formData);
 }
 
@@ -83,11 +82,9 @@ function searchJobData() {
       if (data.candidates) {
         let cands = data.candidates.split(/\r?\n/);
         cands.forEach(c => {
-           // ★修正：IDだけでなく、保存されている名前も一緒に抽出して表示させる
            let idMatch = c.match(/^([a-zA-Z]+-\d+)/);
            let candId = idMatch ? idMatch[1] : c.split('-')[0].trim();
            let candName = idMatch ? c.substring(candId.length).replace(/^-/, '').trim() : "";
-           
            if(candId) { addJobEditCandRow(candId, candName); }
         });
       }
@@ -100,22 +97,11 @@ function searchJobData() {
   }).getJobDetails(jobId);
 }
 
-// ★修正：名前を引数で受け取り、削除ボタンをスリム化
 function addJobEditCandRow(val = '', nameVal = '') {
-  let container = document.getElementById('edit_job_cand_list');
-  let div = document.createElement('div');
-  div.className = 'sub-field';
-  div.style.display = 'flex'; div.style.gap = '10px'; div.style.alignItems = 'center'; div.style.marginBottom = '5px';
-  
-  div.innerHTML = `<input type="text" class="edit-job-cand-id" placeholder="例: 1" value="${val}" oninput="checkCandId(this)" onblur="applyFormat(this)" style="width: 90px; flex-shrink: 0; padding: 6px; border: 1px solid #ccc; border-radius: 4px;">
-                   <span class="cand-name-display" style="flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px; color: #1a73e8; font-weight: bold;">${nameVal}</span>
-                   <button type="button" onclick="this.parentElement.remove()" style="margin: 0; padding: 4px 10px; font-size: 11px; color: #d93025; background: #fff; border: 1px solid #d93025; border-radius: 4px; cursor: pointer; flex-shrink: 0;">削除</button>`;
-  container.appendChild(div);
-  
-  // 名前が空の場合は、入力されたIDをもとに辞書から検索させる
+  document.getElementById('edit_job_cand_list').insertAdjacentHTML('beforeend', createCandRowHTML('edit-job-cand-id', val, nameVal));
   if(val && !nameVal) {
-    let inputElem = div.querySelector('.edit-job-cand-id');
-    checkCandId(inputElem);
+    let inputs = document.querySelectorAll('.edit-job-cand-id');
+    checkCandId(inputs[inputs.length - 1]);
   }
 }
 
@@ -208,13 +194,7 @@ function submitHire() {
 
 // --- 簡易リスト作成 ---
 function addListCandRow() {
-  let container = document.getElementById('list_cand_inputs'); 
-  let div = document.createElement('div'); div.className = 'sub-field';
-  div.style.display = 'flex'; div.style.gap = '10px'; div.style.alignItems = 'center'; div.style.marginBottom = '5px';
-  div.innerHTML = `<input type="text" class="list-cand-id" placeholder="例: 1" oninput="checkCandId(this)" onblur="applyFormat(this)" style="width: 90px; flex-shrink: 0; padding: 6px; border: 1px solid #ccc; border-radius: 4px;">
-                   <span class="cand-name-display" style="flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px; color: #1a73e8; font-weight: bold;"></span>
-                   <button type="button" onclick="this.parentElement.remove()" style="margin: 0; padding: 4px 10px; font-size: 11px; color: #d93025; background: #fff; border: 1px solid #d93025; border-radius: 4px; cursor: pointer; flex-shrink: 0;">削除</button>`;
-  container.appendChild(div);
+  document.getElementById('list_cand_inputs').insertAdjacentHTML('beforeend', createCandRowHTML('list-cand-id'));
 }
 
 function submitList() {

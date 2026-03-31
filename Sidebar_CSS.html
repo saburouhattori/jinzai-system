@@ -10,12 +10,20 @@ input, select, textarea { width: 100%; padding: 8px; box-sizing: border-box; bor
 .unit-input { position: relative; }
 .unit-input input { padding-right: 40px; }
 .unit-label { position: absolute; right: 10px; top: 8px; color: #888; pointer-events: none; }
-button { width: 100%; padding: 12px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 14px; margin-top: 10px; transition: 0.2s; }
-.btn-primary { background: #1a73e8; color: white; }
-.btn-secondary { background: #5f6368; color: white; }
+
+/* ★修正：button全体への強制的な横幅100%を解除し、必要なボタンだけ広げるように変更 */
+button { padding: 12px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 14px; margin-top: 10px; transition: 0.2s; }
+.btn-primary { width: 100%; background: #1a73e8; color: white; }
+.btn-secondary { width: 100%; background: #5f6368; color: white; }
+
 .search-box { background: #e8f0fe; padding: 12px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #1a73e8; }
 #overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; }
 #modal-message { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #fff; padding: 25px; border-radius: 8px; text-align: center; width: 80%; }
 .warning-box { display:none; color: #d93025; font-size: 11px; margin-top: 4px; background: #feefee; padding: 6px; border-radius: 4px; border: 1px solid #fad2cf; }
-.cand-name-display { font-size: 12px; line-height: 30px; margin-left: 5px; color: #1a73e8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 140px; }
+
+/* ★修正：width: 140px の制限を解除し、flexで伸びるように変更 */
+.cand-name-display { font-size: 13px; line-height: 30px; margin-left: 5px; color: #1a73e8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: bold; }
+
+/* ★追加：極小削除ボタン専用のクラス */
+.btn-delete-small { width: 50px !important; min-width: 50px !important; margin: 0 !important; padding: 4px 0 !important; font-size: 11px !important; color: #d93025 !important; background: #fff !important; border: 1px solid #d93025 !important; border-radius: 4px !important; cursor: pointer !important; height: 30px !important; line-height: 20px !important; }
 </style>
