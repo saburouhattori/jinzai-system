@@ -1,44 +1,7 @@
 <script>
 let candidateDict = {};
 let jobDict = {};
-let currentFileInput = null; 
-
-// ★画面が読み込まれた時に、正しい画面だけを表示する
-window.addEventListener('DOMContentLoaded', () => {
-  const forms = [
-    'form-new', 'form-edit', 'form-addinfo', 'form-comment', 
-    'form-company', 'form-job', 'form-job-edit', 'form-delete', 
-    'form-hire', 'form-list'
-  ];
-  
-  // 全部一旦隠す
-  forms.forEach(id => {
-    let el = document.getElementById(id);
-    if(el) el.style.display = 'none';
-  });
-
-  // MODEに合わせて必要なものだけ表示
-  if (MODE === 'NEW') { document.getElementById('form-new').style.display = 'block'; }
-  if (MODE === 'EDIT') { document.getElementById('form-edit').style.display = 'block'; }
-  if (MODE === 'ADDINFO') { document.getElementById('form-addinfo').style.display = 'block'; }
-  if (MODE === 'COMMENT') { document.getElementById('form-comment').style.display = 'block'; }
-  if (MODE === 'DELETE') { document.getElementById('form-delete').style.display = 'block'; }
-  
-  if (MODE === 'COMPANY') { 
-    document.getElementById('form-company').style.display = 'block'; 
-    // ★案件登録から渡された「名前」があればセットする
-    if (typeof PREFILL_NAME !== 'undefined' && PREFILL_NAME) {
-      let compNameEl = document.getElementById('comp_name');
-      if (compNameEl) compNameEl.value = PREFILL_NAME;
-    }
-  }
-  
-  if (MODE === 'JOB') { document.getElementById('form-job').style.display = 'block'; }
-  if (MODE === 'JOB_EDIT') { document.getElementById('form-job-edit').style.display = 'block'; }
-  if (MODE === 'HIRE') { document.getElementById('form-hire').style.display = 'block'; }
-  if (MODE === 'LIST') { document.getElementById('form-list').style.display = 'block'; }
-});
-
+let currentFileInput = null; // ★追加：現在フォーカスしているファイル入力欄を記憶
 
 window.onload = function() {
   google.script.run.withSuccessHandler(function(dict) { candidateDict = dict; }).getCandidateDict();
@@ -69,6 +32,7 @@ window.onload = function() {
   }
 };
 
+// ★修正：押されたボタンの隣にある入力欄を記憶してモーダルを開く
 function openDrivePicker(btnElement) { 
   if (btnElement) {
     currentFileInput = btnElement.parentElement.querySelector('input[type="text"]');
@@ -98,6 +62,7 @@ function searchDrive() {
   }).searchDriveFiles(query);
 }
 
+// ★修正：記憶した入力欄にURLをセットする
 function selectDriveFile(url, name) {
   if (currentFileInput) {
     currentFileInput.value = url;

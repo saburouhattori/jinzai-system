@@ -122,6 +122,7 @@
   </div>
 </div>
 
+
 <div id="form-hire" style="display: <?= mode === 'HIRE' ? 'block' : 'none' ?>;">
 <div class="section-title" style="border-left-color: #34a853;">採用者一括登録</div>
 <div class="field">
@@ -156,3 +157,13 @@
 <button class="btn-primary" id="listBtn" style="background: #fbbc04; color: #333;" onclick="submitList()" >簡易リストを作成</button>
 <p style="font-size: 11px; color: #555; margin-top: 10px;">※「簡易リスト」シートのB2:L51が毎回リセットされ、指定した候補者が出力されます。</p>
 </div>
+
+<script>
+  window.addEventListener('DOMContentLoaded', () => {
+    if (MODE === 'JOB') {
+      addJobCandRow();
+      addJobFileRow('job');
+    }
+    if (MODE === 'LIST') addListCandRow();
+  });
+</script>

@@ -1,47 +1,79 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <base target="_top">
-    <?!= include('Sidebar_CSS', mode); ?>
-    <script>
-      // サーバー側から渡された変数をJSグローバル変数として保持
-      const MODE = '<?= mode ?>';
-      const PREFILL_NAME = '<?= prefillName ?>';
-    </script>
-  </head>
-  <body>
-    <div class="container">
-      <?!= include('HTML_Candidate', mode); ?>
-      <?!= include('HTML_Company', mode, prefillName); ?>
-      <?!= include('HTML_Job', mode); ?>
-      
-      <div id="overlay" class="overlay">
-        <div id="modal-message">
-          <p id="modal-text"></p>
-          <button onclick="closeModal()">閉じる</button>
-        </div>
-      </div>
-      
-      <div id="picker-modal" class="overlay" style="display:none;">
-        <div style="background:white; padding:20px; border-radius:8px; width:400px; max-width:90%;">
-          <h3 style="margin-top:0;">Googleドライブから選択</h3>
-          <div style="display:flex; gap:10px; margin-bottom:10px;">
-            <input type="text" id="picker-query" placeholder="ファイル名で検索" style="flex:1;">
-            <button class="btn-secondary" onclick="searchDrive()" style="padding:6px 12px; margin:0;">検索</button>
-          </div>
-          <div id="picker-results" style="max-height:300px; overflow-y:auto; border:1px solid #ddd;">
-            <div style="padding:10px; color:#666;">検索ボタンを押してください</div>
-          </div>
-          <div style="text-align:right; margin-top:15px;">
-            <button class="btn-secondary" onclick="closePicker()" style="background:#f1f3f4; color:#333; margin:0;">キャンセル</button>
-          </div>
-        </div>
-      </div>
-      
-    </div>
-    
-    <?!= include('JS_Common', mode); ?>
-    <?!= include('JS_Candidate', mode); ?>
-    <?!= include('JS_Job', mode); ?>
-  </body>
+<head>
+<base target="_top">
+<?!= include('Sidebar_CSS', mode); ?>
+<style>
+  .form-row { display: flex; gap: 15px; margin-bottom: 12px; }
+  .form-row .field { flex: 1; margin-bottom: 0; }
+  .form-row .field.flex-2 { flex: 2; }
+  
+  /* ドライブ選択用モーダル */
+  .picker-modal { 
+    display: none; position: fixed; top: 50%; left: 50%; 
+    transform: translate(-50%, -50%); 
+    width: 90%; max-width: 600px; 
+    background: white; border-radius: 8px; 
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3); z-index: 2000; padding: 25px; 
+  }
+  
+  /* 検索結果リスト */
+  .picker-results { 
+    max-height: 300px; 
+    overflow-y: auto; margin-top: 15px; border: 1px solid #eee; border-radius: 4px; 
+  }
+  .picker-item { 
+    padding: 12px; border-bottom: 1px solid #eee; cursor: pointer; font-size: 14px; 
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; 
+  }
+  .picker-item:hover { background: #f1f3f4; }
+  
+  @media (max-width: 500px) { .form-row { flex-direction: column; gap: 0; } .form-row .field { margin-bottom: 12px; } }
+</style>
+</head>
+<body>
+<div id="overlay"><div id="modal-message"><div id="modal-text" style="font-weight:bold; color:#1a73e8; margin-bottom:15px;"></div><button class="btn-primary" onclick="closeModal()" >閉じる</button></div></div>
+
+<div id="picker-modal" class="picker-modal">
+  <div style="font-weight:bold; font-size:16px; margin-bottom:15px;">Googleドライブからファイルを選択</div>
+  
+  <div style="margin-bottom: 10px;">
+    <input type="text" id="picker-query" placeholder="ファイル名の一部を入力してください..." style="width: 100%; padding: 12px; font-size: 16px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px;">
+  </div>
+  <div>
+    <button class="btn-primary" onclick="searchDrive()" style="width: 100%; padding: 12px; font-size: 16px; margin: 0; background: #1a73e8;">検索を実行</button>
+  </div>
+  
+  <div id="picker-results" class="picker-results"></div>
+  <div style="text-align:right; margin-top:15px;">
+    <button class="btn-secondary" onclick="closePicker()" style="margin:0; padding:8px 20px;">キャンセル</button>
+  </div>
+</div>
+
+<input type="hidden" id="targetRow">
+
+<? if (mode === 'EDIT' || mode === 'COMMENT') { ?>
+<div class="search-box" style="max-width: 400px; margin-bottom: 20px;">
+  <label>管理番号で検索</label>
+  <div style="display: flex; gap: 10px;">
+    <input type="text" id="searchId" placeholder=" 例: 1 または 0001 " oninput="checkCandId(this, 'searchNameDisplay')" onblur="applyFormat(this)" style="flex: 2;">
+    <button class="btn-secondary" id="searchBtn" onclick="searchData()" style="flex: 1; margin-top: 0; padding: 8px;">読み込む</button>
+  </div>
+  <div id="searchNameDisplay" style="font-size:11px; color:#1a73e8; margin-top:4px; height:14px;"></div>
+</div>
+<? } ?>
+
+<?!= include('HTML_Candidate', mode); ?>
+<?!= include('HTML_Company', mode); ?>
+<?!= include('HTML_Job', mode); ?>
+
+<script>
+  const MODE = '<?= mode ?>';
+</script>
+
+<?!= include('JS_Common', mode); ?>
+<?!= include('JS_Candidate', mode); ?>
+<?!= include('JS_Job', mode); ?>
+
+</body>
 </html>

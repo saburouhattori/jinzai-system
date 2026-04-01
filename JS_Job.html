@@ -1,3 +1,51 @@
+<script>
+// --- 事業者登録 ---
+function submitCompany() {
+  let name = document.getElementById('comp_name').value.trim();
+  if (!name) { showModal('事業者名称は必須です。'); return; }
+  let formData = { name: name, yomi: document.getElementById('comp_yomi').value, address: document.getElementById('comp_address').value, url: document.getElementById('comp_url').value, note: document.getElementById('comp_note').value };
+  document.getElementById('compBtn').disabled = true; showModal('登録中...', true);
+  google.script.run.withSuccessHandler(function(msg) {
+    document.getElementById('compBtn').disabled = false; showModal(msg);
+    document.querySelectorAll('#form-company input, #form-company textarea').forEach(el => el.value = '');
+    document.getElementById('comp_warning').style.display = 'none';
+  }).addCompany(formData);
+}
+
+function liveCheckDuplicate(name) {
+  let warningBox = document.getElementById('comp_warning');
+  if (!name.trim()) { warningBox.style.display = 'none'; return; }
+  google.script.run.withSuccessHandler(function(isDup) { warningBox.style.display = isDup ? 'block' : 'none'; }).checkCompanyDuplicate(name);
+}
+
+function createCandRowHTML(className, val = '', nameVal = '') {
+  return `<div style="display: flex; gap: 10px; align-items: center; margin-bottom: 8px;">
+    <input type="text" class="${className}" placeholder="例: 1" value="${val}" oninput="checkCandId(this)" onblur="applyFormat(this)" style="width: 100px; flex-shrink: 0; padding: 6px; box-sizing: border-box; height: 30px; margin: 0;">
+    <span class="cand-name-display" style="flex: 1;">${nameVal}</span>
+    <button type="button" class="btn-delete-small" onclick="this.parentElement.remove()">削除</button>
+  </div>`;
+}
+
+// ★修正：関連ファイルの入力行に「検索ボタン」を追加
+function addJobFileRow(prefix, urlVal = '') {
+  const containerId = prefix + '_file_list';
+  const container = document.getElementById(containerId);
+  const className = prefix + '-file-input';
+  
+  const html = `<div style="display: flex; gap: 10px; align-items: center; margin-bottom: 8px;">
+    <input type="text" class="${className}" placeholder=" URLを直接入力、または検索 " value="${urlVal}" style="flex: 1; padding: 6px; box-sizing: border-box; height: 30px; margin: 0;">
+    <button type="button" class="btn-secondary" onclick="openDrivePicker(this)" style="margin: 0; padding: 4px 10px; font-size: 11px; height: 30px; width: auto; flex-shrink: 0;">ドライブ検索</button>
+    <button type="button" class="btn-delete-small" onclick="this.parentElement.remove()" style="height: 30px;">削除</button>
+  </div>`;
+  container.insertAdjacentHTML('beforeend', html);
+}
+
+
+// --- 案件登録（新規） ---
+function addJobCandRow() {
+  document.getElementById('job_cand_list').insertAdjacentHTML('beforeend', createCandRowHTML('job-cand-id'));
+}
+
 function submitJob() {
   let company = document.getElementById('job_company').value.trim();
   if (!company) { showModal('事業者名を入力してください。'); return; }
@@ -36,27 +84,188 @@ function submitJob() {
   };
   
   document.getElementById('jobBtn').disabled = true; showModal('案件を登録中...', true);
-  
-  google.script.run.withSuccessHandler(function(result) {
-    document.getElementById('jobBtn').disabled = false;
-    
-    // 入力項目のクリア
+  google.script.run.withSuccessHandler(function(msg) {
+    document.getElementById('jobBtn').disabled = false; showModal(msg);
     document.getElementById('job_company').value = ''; 
     document.getElementById('job_skill').value = '';
     document.getElementById('job_interviewDate').value = '';
     document.getElementById('job_file_list').innerHTML = ''; addJobFileRow('job');
     document.getElementById('job_memo').value = '';
     document.getElementById('job_cand_list').innerHTML = createCandRowHTML('job-cand-id');
-
-    if (result.isNewCompany) {
-      closeModal();
-      // 新規事業者の場合の特別案内
-      if (confirm(result.message + '\n\n新しい事業者『' + result.companyName + '』をマスタに仮登録しました。続けて住所やHPなどの詳細情報を登録しますか？')) {
-        // 事業者マスタ登録画面へ遷移（名前を引き継ぐ）
-        google.script.run.showSidebarCompany(result.companyName);
-      }
-    } else {
-      showModal(result.message);
-    }
   }).addJob(formData);
 }
+
+// --- 案件情報の修正・削除 ---
+function searchJobData() {
+  let rawId = document.getElementById('edit_job_searchId').value.trim();
+  if (!rawId) { showModal('案件IDを入力してください。'); return; }
+  let jobId = formatJobId(rawId);
+  document.getElementById('edit_job_searchId').value = jobId;
+
+  showModal('検索中...', true);
+  google.script.run.withSuccessHandler(function(data) {
+    closeModal();
+    if (data) {
+      document.getElementById('job_edit_fields').style.display = 'block';
+      document.getElementById('edit_job_row').value = data.row;
+      document.getElementById('edit_job_id').value = data.id;
+      document.getElementById('edit_job_status').value = data.status || "未着手";
+      document.getElementById('edit_job_company').value = data.company || "";
+      document.getElementById('edit_job_skill').value = data.skill || "";
+      document.getElementById('edit_job_interviewDate').value = data.interviewDate || "";
+      document.getElementById('edit_job_memo').value = data.memo || "";
+
+      let candContainer = document.getElementById('edit_job_cand_list');
+      candContainer.innerHTML = '';
+      if (data.candidates) {
+        let cands = data.candidates.split(/\r?\n/);
+        cands.forEach(c => {
+           let idMatch = c.match(/^([a-zA-Z]+-\d+)/);
+           let candId = idMatch ? idMatch[1] : c.split('-')[0].trim();
+           let candName = idMatch ? c.substring(candId.length).replace(/^-/, '').trim() : "";
+           if(candId) { addJobEditCandRow(candId, candName); }
+        });
+      }
+      if(candContainer.innerHTML === '') addJobEditCandRow('');
+      
+      let fileContainer = document.getElementById('edit_job_file_list');
+      fileContainer.innerHTML = '';
+      if (data.relatedFile) {
+        let urls = String(data.relatedFile).split(/\r?\n/);
+        urls.forEach(u => {
+          if(u.trim()) addJobFileRow('edit_job', u.trim());
+        });
+      }
+      if(fileContainer.innerHTML === '') addJobFileRow('edit_job');
+
+    } else {
+      showModal('該当する案件が見つかりません。');
+      document.getElementById('job_edit_fields').style.display = 'none';
+    }
+  }).getJobDetails(jobId);
+}
+
+function addJobEditCandRow(val = '', nameVal = '') {
+  document.getElementById('edit_job_cand_list').insertAdjacentHTML('beforeend', createCandRowHTML('edit-job-cand-id', val, nameVal));
+  if(val && !nameVal) {
+    let inputs = document.querySelectorAll('.edit-job-cand-id');
+    checkCandId(inputs[inputs.length - 1]);
+  }
+}
+
+function submitJobEdit() {
+  let row = document.getElementById('edit_job_row').value;
+  if (!row) return;
+
+  let company = document.getElementById('edit_job_company').value.trim();
+  let candInputDivs = document.getElementById('edit_job_cand_list').children; 
+  let candidates = [];
+  Array.from(candInputDivs).forEach(div => { 
+    let inputEl = div.querySelector('input.edit-job-cand-id');
+    let nameEl = div.querySelector('span.cand-name-display');
+    if (inputEl && inputEl.value.trim()) {
+      let idStr = formatId(inputEl.value.trim());
+      let nameStr = nameEl ? nameEl.innerText.trim() : "";
+      if (nameStr && nameStr !== "該当なし" && nameStr !== "読込中...") {
+        candidates.push(`${idStr}-${nameStr}`);
+      } else {
+        candidates.push(idStr);
+      }
+    } 
+  });
+  if (candidates.length === 0) { showModal('候補者を少なくとも1名入力してください。'); return; }
+
+  let fileInputs = document.querySelectorAll('.edit_job-file-input');
+  let relatedFiles = [];
+  fileInputs.forEach(input => {
+    let val = input.value.trim();
+    if(val) relatedFiles.push(val);
+  });
+
+  let formData = {
+    row: row,
+    id: document.getElementById('edit_job_id').value,
+    status: document.getElementById('edit_job_status').value,
+    company: company,
+    skill: document.getElementById('edit_job_skill').value,
+    candidates: candidates,
+    interviewDate: document.getElementById('edit_job_interviewDate').value,
+    relatedFiles: relatedFiles,
+    memo: document.getElementById('edit_job_memo').value
+  };
+
+  showModal('更新中...', true);
+  google.script.run.withSuccessHandler(function(msg) {
+    showModal(msg);
+  }).updateJob(formData);
+}
+
+function submitJobDelete() {
+  let jobId = document.getElementById('edit_job_id').value;
+  if (!jobId) return;
+
+  if (!confirm(`案件 ${jobId} を完全に削除します。よろしいですか？\n※この操作は取り消せません。`)) {
+    return;
+  }
+
+  showModal('削除中...', true);
+  google.script.run.withSuccessHandler(function(msg) {
+    showModal(msg);
+    document.getElementById('job_edit_fields').style.display = 'none';
+    document.getElementById('edit_job_searchId').value = '';
+  }).deleteJobRow(jobId);
+}
+
+// --- 採用登録 ---
+function fetchJobCandidates(mode) {
+  let rawId = document.getElementById(mode + '_job_id').value.trim();
+  if (!rawId) { showModal('案件IDを入力してください。'); return; }
+  let jobId = formatJobId(rawId); document.getElementById(mode + '_job_id').value = jobId;
+  showModal('候補者を取得中...', true);
+  
+  google.script.run.withSuccessHandler(function(candidates) {
+    closeModal(); let container = document.getElementById(mode + '_cand_list');
+    if (!candidates || candidates.length === 0) { container.innerHTML = '<div style="color:#d93025; font-size:12px;">候補者が見つかりません。案件IDを確認してください。</div>'; return; }
+    let html = '';
+    candidates.forEach(c => {
+      html += `<label style="display:flex; align-items:center; margin-bottom:8px; font-size:14px; cursor:pointer;">
+                 <input type="checkbox" class="${mode}-cand-checkbox" value="${c.id}" style="margin:0 8px 0 0; width:16px; height:16px; flex-shrink:0;">
+                 <span style="line-height:1.2;">${c.display}</span>
+               </label>`;
+    });
+    container.innerHTML = html;
+  }).getJobCandidates(jobId);
+}
+
+function submitHire() {
+  let rawId = document.getElementById('hire_job_id').value.trim();
+  if (!rawId) { showModal('案件IDを入力してください。'); return; }
+  let jobId = formatJobId(rawId);
+  let checkboxes = document.querySelectorAll('.hire-cand-checkbox');
+  if (checkboxes.length === 0) { showModal('先に「候補者検索」を行ってください。'); return; }
+  
+  let hiredIds = []; checkboxes.forEach(cb => { if (cb.checked) hiredIds.push(cb.value); });
+  if (!confirm(`選択した ${hiredIds.length} 名を「採用」として登録します。よろしいですか？`)) return;
+  
+  document.getElementById('hireBtn').disabled = true; showModal('採用登録を実行中...', true);
+  google.script.run.withSuccessHandler(function(msg) {
+    document.getElementById('hireBtn').disabled = false; showModal(msg);
+    document.getElementById('hire_job_id').value = ''; document.getElementById('hireJobDisplay').innerText = '';
+    document.getElementById('hire_cand_list').innerHTML = '<div style="font-size: 12px; color: #888;">-- 上の検索ボタンを押してください --</div>';
+  }).registerHire(jobId, hiredIds);
+}
+
+// --- 簡易リスト作成 ---
+function addListCandRow() {
+  document.getElementById('list_cand_inputs').insertAdjacentHTML('beforeend', createCandRowHTML('list-cand-id'));
+}
+
+function submitList() {
+  let candInputs = document.querySelectorAll('.list-cand-id'); let candidates = [];
+  candInputs.forEach(input => { let val = input.value.trim(); if (val) candidates.push(formatId(val)); });
+  if (candidates.length === 0) { showModal('候補者を少なくとも1名入力してください。'); return; }
+  
+  document.getElementById('listBtn').disabled = true; showModal('簡易リストを作成中...', true);
+  google.script.run.withSuccessHandler(function(msg) { document.getElementById('listBtn').disabled = false; showModal(msg); }).generateSimpleList(candidates);
+}
+</script>
