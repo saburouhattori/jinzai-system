@@ -9,7 +9,6 @@ function safeSearchByAdminId(id) {
     const data = sheet.getDataRange().getValues();
     const col = getMasterColumnMap(sheet);
     const searchId = String(id).trim().toUpperCase();
-    
     for (let i = 1; i < data.length; i++) {
       const sheetId = String(data[i][0] || "").trim().toUpperCase();
       if (sheetId === searchId) {
@@ -25,11 +24,14 @@ function safeSearchByAdminId(id) {
         };
 
         // UI項目へのマッピング
-        res.name = getVal('名前'); res.furigana = getVal('フリガナ'); res.nickname = getVal('呼び名'); 
+        res.name = getVal('名前'); res.furigana = getVal('フリガナ');
+        res.nickname = getVal('呼び名'); 
         res.birthday = getVal('生年月日'); res.gender = getVal('性別'); res.spouse = getVal('配偶者'); 
-        res.height = getVal('身長'); res.weight = getVal('体重'); res.address = getVal('現住所'); 
+        res.height = getVal('身長'); res.weight = getVal('体重');
+        res.address = getVal('現住所'); 
         res.birthplace = getVal('住所（出身地）'); res.email = getVal('メールアドレス'); res.school = getVal('所属日本語学校');
-        res.eduSchool = getVal('学歴＞学校名'); res.eduDept = getVal('学歴＞学部・学科・専攻'); res.eduStatus = getVal('学歴＞状況');
+        res.eduSchool = getVal('学歴＞学校名'); res.eduDept = getVal('学歴＞学部・学科・専攻');
+        res.eduStatus = getVal('学歴＞状況');
         res.eduStart = getVal('学歴＞入学年月'); res.eduEnd = getVal('学歴＞卒業/中退年月'); res.eduNote = getVal('学歴＞補足');
         res.expPeriod1 = getVal('職歴①＞期間'); res.expContent1 = getVal('職歴①＞内容');
         res.expPeriod2 = getVal('職歴②＞期間'); res.expContent2 = getVal('職歴②＞内容');
@@ -40,13 +42,13 @@ function safeSearchByAdminId(id) {
         res.kaigoLang = getVal('特定技能要件＞介護日本語評価試験'); res.kaigoLangDate = getVal('特定技能要件＞介護日本語取得年月');
         res.otherJapanese = getVal('その他の日本語能力試験'); res.otherJapaneseDate = getVal('取得年月');
         res.comment = getVal('コメント'); res.relative = getVal('日本在住の親族について');
-        
         // 追加情報
         res.agent = getVal('所属送り出し機関'); res.offerDate = getVal('内定日'); res.birthCity = getVal('出生地（都市名）');
         res.addressDetail = getVal('住所詳細'); res.passportNum = getVal('パスポート番号'); res.passportExp = getVal('パスポート有効期限');
         res.job = getVal('職業'); res.traineeExp = getVal('技能実習の経験の有無'); res.traineeCert = getVal('技能実習修了書の有無');
         res.crime = getVal('犯罪歴の有無'); res.applyCount = getVal('在留資格交付申請の回数'); res.rejectCount = getVal('不許可となった在留資格交付申請の回数');
-        res.overseasExp = getVal('海外への出入国歴の有無'); res.travelCount = getVal('出入国の回数'); res.lastInDate = getVal('直近の入国日'); res.lastOutDate = getVal('直近の出国日');
+        res.overseasExp = getVal('海外への出入国歴の有無'); res.travelCount = getVal('出入国の回数'); res.lastInDate = getVal('直近の入国日');
+        res.lastOutDate = getVal('直近の出国日');
         res.relName2 = getVal('日本在住の親族情報親族の名前'); res.relRelation2 = getVal('日本在住の親族情報続柄'); res.relBirth2 = getVal('日本在住の親族情報親族の生年月日');
         res.relCountry2 = getVal('日本在住の親族情報親族の国籍・地域'); res.relLive2 = getVal('日本在住の親族情報親族との同居予定の有無');
         res.relWork2 = getVal('日本在住の親族情報親族の勤務先・通学先'); res.relCard2 = getVal('日本在住の親族情報親族の在留カード番号'); res.memo = getVal('備考・メモ');
@@ -55,7 +57,8 @@ function safeSearchByAdminId(id) {
       }
     }
     return null;
-  } catch(e) { throw new Error("検索エラー: " + e.message); }
+  } catch(e) { throw new Error("検索エラー: " + e.message);
+  }
 }
 
 function addNewRow(formData) {
@@ -74,8 +77,11 @@ function addNewRow(formData) {
     if (match) nextNumber = parseInt(match[0], 10) + 1;
   }
   const nextId = "SD-" + nextNumber.toString().padStart(4, '0');
-
-  const rowValues = new Array(masterSheet.getMaxColumns()).fill("");
+  
+  // 修正：getMaxColumns()による肥大化防止
+  const safeMaxCol = Math.max(masterSheet.getLastColumn(), ...Object.values(col));
+  const rowValues = new Array(safeMaxCol).fill("");
+  
   const mapping = {
     '登録者ID': nextId, '名前': formData.name, 'フリガナ': formData.furigana, '呼び名': formData.nickname,
     '生年月日': formData.birthday, '性別': formData.gender, '配偶者': formData.spouse, 
@@ -87,13 +93,13 @@ function addNewRow(formData) {
     '職歴②＞期間': formData.expPeriod2, '職歴②＞内容': formData.expContent2,
     '職歴③＞期間': formData.expPeriod3, '職歴③＞内容': formData.expContent3,
     '特定技能要件＞JLPTレベル': formData.jlptLevel, '特定技能要件＞JLPT取得年月': formData.jlptDate,
-    '特定技能要件＞JFTBasicレベル': formData.jftLevel, '特定技能要件＞JFT取得年月': formData.jftDate,
+    '特定技能要件＞JFTBasicレベル': formData.jftLevel, 
+    '特定技能要件＞JFT取得年月': formData.jftDate,
     '特定技能要件＞介護技能評価試験': formData.kaigoSkill, '特定技能要件＞介護技能取得年月': formData.kaigoSkillDate,
     '特定技能要件＞介護日本語評価試験': formData.kaigoLang, '特定技能要件＞介護日本語取得年月': formData.kaigoLangDate,
     'その他の日本語能力試験': formData.otherJapanese, '取得年月': formData.otherJapaneseDate,
     'コメント': formData.comment, '日本在住の親族について': formData.relative, 'ステータス': '未採用'
   };
-
   for (let header in mapping) {
     const h = header.replace(/\s/g, '');
     if (col[h]) rowValues[col[h]-1] = mapping[header];
@@ -103,7 +109,6 @@ function addNewRow(formData) {
   const newRow = masterSheet.getLastRow();
 
   if (col['生年月日']) masterSheet.getRange(newRow, col['生年月日']).setNumberFormat('yyyy"年"m"月"d"日"');
-
   // ★修正：写真は「登録者マスタ」内の「顔写真」列へ直接保存
   if (formData.imageFile && col['顔写真']) {
     try {
@@ -127,7 +132,7 @@ function updateRow(formData) {
   const col = getMasterColumnMap(masterSheet);
   const row = Number(formData.row);
   if (!row) return "エラー：行が不明です。";
-
+  
   const mapping = {
     '名前': formData.name, 'フリガナ': formData.furigana, '呼び名': formData.nickname, '生年月日': formData.birthday,
     '性別': formData.gender, '配偶者': formData.spouse, '身長': formData.height, '体重': formData.weight,
@@ -144,13 +149,21 @@ function updateRow(formData) {
     '取得年月': formData.otherJapaneseDate, 'コメント': formData.comment, '日本在住の親族について': formData.relative
   };
 
+  // 修正：1セルごとの通信を排除し、一括で上書きすることでタイムアウトを解消
+  const safeMaxCol = Math.max(masterSheet.getLastColumn(), ...Object.values(col));
+  const currentRowRange = masterSheet.getRange(row, 1, 1, safeMaxCol);
+  const currentRowData = currentRowRange.getValues()[0];
+
   for (let header in mapping) {
     const h = header.replace(/\s/g, '');
-    if (col[h] && mapping[header] !== undefined) masterSheet.getRange(row, col[h]).setValue(mapping[header]);
+    if (col[h] && mapping[header] !== undefined) {
+      currentRowData[col[h] - 1] = mapping[header];
+    }
   }
+  
+  currentRowRange.setValues([currentRowData]);
 
   if (col['生年月日']) masterSheet.getRange(row, col['生年月日']).setNumberFormat('yyyy"年"m"月"d"日"');
-  
   // ★修正：写真は「登録者マスタ」内の「顔写真」列へ上書き保存
   if (formData.imageFile && col['顔写真']) {
     try {
@@ -182,10 +195,20 @@ function updateAddInfoRow(formData) {
       relLive2: '日本在住の親族情報親族との同居予定の有無', relWork2: '日本在住の親族情報親族の勤務先・通学先',
       relCard2: '日本在住の親族情報親族の在留カード番号', memo: '備考・メモ'
     };
+
+    // 修正：一括上書き処理へ変更し高速化
+    const safeMaxCol = Math.max(sheet.getLastColumn(), ...Object.values(col));
+    const currentRowRange = sheet.getRange(row, 1, 1, safeMaxCol);
+    const currentRowData = currentRowRange.getValues()[0];
+
     for (let key in mapping) {
       const h = mapping[key].replace(/\s/g, '');
-      if (col[h] && formData[key] !== undefined) sheet.getRange(row, col[h]).setValue(formData[key]);
+      if (col[h] && formData[key] !== undefined) {
+        currentRowData[col[h] - 1] = formData[key];
+      }
     }
+    
+    currentRowRange.setValues([currentRowData]);
     return `追加情報の登録が完了しました。`;
   } catch (e) { return "エラー: " + e.message; }
 }
@@ -196,7 +219,6 @@ function deleteCandidate(id) {
     const masterSheet = getMasterSheet('登録者マスタ');
     const masterData = masterSheet.getDataRange().getValues();
     const searchId = String(id).trim().toUpperCase();
-
     for (let i = masterData.length - 1; i >= 1; i--) {
       if (String(masterData[i][0]).trim().toUpperCase() === searchId) {
         masterSheet.deleteRow(i + 1);

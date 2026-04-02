@@ -4,17 +4,20 @@
 
 function getAgentList() {
   const sheet = getMasterSheet('送り出し機関マスタ');
-  return sheet ? [...new Set(sheet.getDataRange().getValues().slice(1).map(row => row[1]).filter(n => n))].sort() : [];
+  return sheet ?
+    [...new Set(sheet.getDataRange().getValues().slice(1).map(row => row[1]).filter(n => n))].sort() : [];
 }
 
 function getSchoolList() {
   const sheet = getMasterSheet('日本語学校マスタ');
-  return sheet ? [...new Set(sheet.getDataRange().getValues().slice(1).map(row => row[1]).filter(n => n))].sort() : [];
+  return sheet ?
+    [...new Set(sheet.getDataRange().getValues().slice(1).map(row => row[1]).filter(n => n))].sort() : [];
 }
 
 function getCompanyList() {
   const sheet = getMasterSheet('事業者マスタ');
-  return sheet ? [...new Set(sheet.getDataRange().getValues().slice(1).map(row => row[1]).filter(n => n))].sort() : [];
+  return sheet ?
+    [...new Set(sheet.getDataRange().getValues().slice(1).map(row => row[1]).filter(n => n))].sort() : [];
 }
 
 function getCandidateDict() {
@@ -59,7 +62,8 @@ function searchDriveFiles(fileNameQuery) {
       count++;
     }
     return files;
-  } catch (e) { return []; }
+  } catch (e) { return [];
+  }
 }
 
 function generateSimpleList(candIds) {
@@ -86,6 +90,7 @@ function generateSimpleList(candIds) {
         } 
       }
       if (rowData) {
+    
         const getVal = (name) => col[name.replace(/\s/g, '')] ? rowData[col[name.replace(/\s/g, '')]-1] : "";
         result.push([
           getVal('名前'), 
@@ -102,13 +107,13 @@ function generateSimpleList(candIds) {
         formulas.push(['=IFERROR(VLOOKUP(L' + (result.length + 1) + ', \'登録者マスタ\'!$A:$C, 3, FALSE), "")']);
       }
     });
-    
     if (result.length) {
       listSheet.getRange(2, 3, result.length, 10).setValues(result);
       listSheet.getRange(2, 2, formulas.length, 1).setFormulas(formulas);
     }
     return `${result.length}名の簡易リストを作成しました。`;
-  } catch(e) { return "エラー: " + e.message; }
+  } catch(e) { return "エラー: " + e.message;
+  }
 }
 
 // ★追加：採用者・未採用者一覧を「静的テキスト」で同期する処理
@@ -120,11 +125,9 @@ function syncListSheets() {
 
     const mData = masterSheet.getDataRange().getValues();
     if (mData.length < 2) return "マスタにデータがありません。";
-
     // お客様指定の列番号（1始まり）をプログラム用のインデックス（0始まり）に変換
     const unadoptedCols = [1, 2, 7, 8, 43, 40].map(c => c - 1);
     const adoptedCols = [45, 48, 1, 2, 4, 5, 6, 7, 8, 9, 14, 28, 30, 15, 46, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70].map(c => c - 1);
-    
     const unadoptedData = [];
     const adoptedData = [];
 
@@ -155,11 +158,11 @@ function syncListSheets() {
       if (!targetSheet) return;
       
       const lastRow = targetSheet.getLastRow();
-      const maxCols = targetSheet.getMaxColumns();
+      const lastCol = targetSheet.getLastColumn(); // 修正：getMaxColumns()による高負荷処理を排除
       
       // 2行目以降の既存データをクリア（テーブルを壊さないように中身のみクリア）
-      if (lastRow > 1) {
-        targetSheet.getRange(2, 1, lastRow - 1, maxCols).clearContent();
+      if (lastRow > 1 && lastCol > 0) {
+        targetSheet.getRange(2, 1, lastRow - 1, lastCol).clearContent();
       }
       
       // 新しいデータをセット
