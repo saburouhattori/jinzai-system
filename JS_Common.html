@@ -1,38 +1,71 @@
 <script>
 let candidateDict = {};
 let jobDict = {};
-let currentFileInput = null; // ★追加：現在フォーカスしているファイル入力欄を記憶
+let currentFileInput = null;
+
+window.addEventListener('DOMContentLoaded', () => {
+  // 1. 各フォーム要素の表示・非表示制御
+  const forms = [
+    'form-candidate-main', 'form-candidate-comment', 
+    'form-addinfo', 'form-delete', 
+    'form-company', 'form-job', 'form-job-edit', 
+    'form-hire', 'form-list'
+  ];
+  forms.forEach(id => {
+    let el = document.getElementById(id);
+    if(el) el.style.display = 'none';
+  });
+
+  const searchSec = document.getElementById('search-section');
+  if(searchSec) searchSec.style.display = 'none';
+
+  if (MODE === 'NEW') { document.getElementById('form-candidate-main').style.display = 'block'; }
+  if (MODE === 'EDIT') { 
+    if(searchSec) searchSec.style.display = 'block'; 
+    document.getElementById('form-candidate-main').style.display = 'block'; 
+  }
+  if (MODE === 'COMMENT') { 
+    if(searchSec) searchSec.style.display = 'block';
+    document.getElementById('form-candidate-comment').style.display = 'block'; 
+  }
+  if (MODE === 'ADDINFO') { 
+    if(searchSec) searchSec.style.display = 'block';
+    document.getElementById('form-addinfo').style.display = 'block'; 
+  }
+  if (MODE === 'DELETE') { document.getElementById('form-delete').style.display = 'block'; }
+  if (MODE === 'COMPANY') { document.getElementById('form-company').style.display = 'block'; }
+  if (MODE === 'JOB') { document.getElementById('form-job').style.display = 'block'; addJobCandRow(); addJobFileRow('job'); }
+  if (MODE === 'JOB_EDIT') { document.getElementById('form-job-edit').style.display = 'block'; }
+  if (MODE === 'HIRE') { document.getElementById('form-hire').style.display = 'block'; }
+  if (MODE === 'LIST') { document.getElementById('form-list').style.display = 'block'; addListCandRow(); }
+
+  if (MODE === 'COMPANY' && typeof PREFILL_NAME !== 'undefined' && PREFILL_NAME) {
+    let compInput = document.getElementById('comp_name');
+    if (compInput) compInput.value = PREFILL_NAME;
+  }
+});
 
 window.onload = function() {
-  google.script.run.withSuccessHandler(function(dict) { candidateDict = dict; }).getCandidateDict();
-
-  if (MODE === 'NEW' || MODE === 'EDIT') {
-    google.script.run.withSuccessHandler(function(schools) {
+  // ★通信を「1回」にまとめてサーバーの負荷を激減させる
+  google.script.run.withSuccessHandler(function(data) {
+    candidateDict = data.candidateDict || {};
+    if (data.jobDict) jobDict = data.jobDict;
+    
+    if (data.schools) {
       let select = document.getElementById('school');
-      if(select) schools.forEach(function(school) { let opt = document.createElement('option'); opt.value = school; opt.text = school; select.appendChild(opt); });
-    }).getSchoolList();
-  }
-
-  if (MODE === 'JOB' || MODE === 'JOB_EDIT') {
-    google.script.run.withSuccessHandler(function(companies) {
+      if(select) data.schools.forEach(function(school) { let opt = document.createElement('option'); opt.value = school; opt.text = school; select.appendChild(opt); });
+    }
+    if (data.companies) {
       let datalist = document.getElementById('company_list');
-      if(datalist) companies.forEach(function(company) { let opt = document.createElement('option'); opt.value = company; datalist.appendChild(opt); });
-    }).getCompanyList();
-  }
-
-  if (MODE === 'ADDINFO') {
-    google.script.run.withSuccessHandler(function(agents) {
+      if(datalist) data.companies.forEach(function(company) { let opt = document.createElement('option'); opt.value = company; datalist.appendChild(opt); });
+    }
+    if (data.agents) {
       let select = document.getElementById('add_agent');
-      if(select) agents.forEach(function(agent) { let opt = document.createElement('option'); opt.value = agent; opt.text = agent; select.appendChild(opt); });
-    }).getAgentList();
-  }
-
-  if (MODE === 'HIRE') {
-    google.script.run.withSuccessHandler(function(dict) { jobDict = dict; }).getJobDict();
-  }
+      if(select) data.agents.forEach(function(agent) { let opt = document.createElement('option'); opt.value = agent; opt.text = agent; select.appendChild(opt); });
+    }
+  }).getInitialData(MODE);
 };
 
-// ★修正：押されたボタンの隣にある入力欄を記憶してモーダルを開く
 function openDrivePicker(btnElement) { 
   if (btnElement) {
     currentFileInput = btnElement.parentElement.querySelector('input[type="text"]');
@@ -62,7 +95,6 @@ function searchDrive() {
   }).searchDriveFiles(query);
 }
 
-// ★修正：記憶した入力欄にURLをセットする
 function selectDriveFile(url, name) {
   if (currentFileInput) {
     currentFileInput.value = url;

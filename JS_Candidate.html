@@ -1,4 +1,12 @@
 <script>
+function searchDataRouting() {
+  if (MODE === 'ADDINFO') {
+    searchDataAddInfo();
+  } else {
+    searchData();
+  }
+}
+
 function searchData() {
   let rawId = document.getElementById('searchId').value.trim();
   if (!rawId) { showModal('管理番号を入力してください。'); return; }
@@ -12,7 +20,8 @@ function searchData() {
     if (data) {
       document.getElementById('targetRow').value = data.row;
       if (MODE === 'COMMENT') {
-        document.getElementById('name').value = data.name; document.getElementById('comment').value = data.comment || "";
+        document.getElementById('comment_name_display').value = data.name; 
+        document.getElementById('comment_text_input').value = data.comment || "";
       } else {
         const fields = ['name','furigana','nickname','birthday','gender','spouse','height','weight',
                         'address','birthplace','email','school','eduSchool','eduDept','eduStatus',
@@ -32,10 +41,10 @@ function searchData() {
 }
 
 function searchDataAddInfo() {
-  let rawId = document.getElementById('searchIdAddInfo').value.trim();
+  let rawId = document.getElementById('searchId').value.trim();
   if (!rawId) { showModal('管理番号を入力してください。'); return; }
   let adminId = formatId(rawId);
-  document.getElementById('searchIdAddInfo').value = adminId;
+  document.getElementById('searchId').value = adminId;
   showModal('検索中...', true);
   
   google.script.run.withSuccessHandler(function(data) {
@@ -58,7 +67,6 @@ function submitAddInfo() {
   fields.forEach(f => { 
     let el = document.getElementById('add_' + f); 
     if (el) {
-      // 送信直前にも念のため自動変換をかけて綺麗にする
       if (f === 'birthCity') {
         formData[f] = el.value.toUpperCase();
       } else if (f === 'passportNum') {
@@ -78,7 +86,8 @@ function submitData() {
   if (MODE === 'COMMENT') {
     let row = document.getElementById('targetRow').value;
     if (!row) { showModal('先に管理番号で検索してください。'); return; }
-    formData.row = row; formData.comment = document.getElementById('comment').value;
+    formData.row = row; 
+    formData.comment = document.getElementById('comment_text_input').value;
   } else {
     const fields = ['name','furigana','nickname','birthday','gender','spouse','height','weight','address','birthplace','email','school','eduSchool','eduDept','eduStatus','eduStart','eduEnd','eduNote','expPeriod1','expContent1','expPeriod2','expContent2','expPeriod3','expContent3','jlptLevel','jlptDate','jftLevel','jftDate','kaigoSkill','kaigoSkillDate','kaigoLang','kaigoLangDate','otherExam','otherExamDate','otherJapanese','otherJapaneseDate','comment'];
     fields.forEach(f => { let el = document.getElementById(f); if(el) formData[f] = el.value; });
