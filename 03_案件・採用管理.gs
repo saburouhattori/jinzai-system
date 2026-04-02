@@ -25,7 +25,6 @@ function convertToSmartChips(sheet, row, col, urlText) {
   urls.forEach((url, i) => {
     let fileName = url;
     try {
-      // URLからファイルIDを抽出
       let fileId = "";
       const idMatch = url.match(/\/d\/([-\w]{25,})/);
       if (idMatch) {
@@ -36,7 +35,6 @@ function convertToSmartChips(sheet, row, col, urlText) {
       }
 
       if (fileId) {
-        // 取得に時間がかかる場合を考慮し、失敗時はURLをそのまま使用
         fileName = DriveApp.getFileById(fileId).getName();
       }
     } catch(ex) {
@@ -69,7 +67,6 @@ function addJob(formData) {
   const sheet = ss.getSheetByName('案件管理');
   if (!sheet) throw new Error("「案件管理」シートが見つかりません。");
 
-  // --- 新規事業者の自動マスタ登録 ---
   const companyName = String(formData.company || "").trim();
   if (companyName) {
     const compSheet = ss.getSheetByName('事業者マスタ');
@@ -92,7 +89,6 @@ function addJob(formData) {
     }
   }
 
-  // --- 案件IDの採番（効率化：getLastRowを使用） ---
   const lastRow = sheet.getLastRow();
   let lastIdNum = 0;
   if (lastRow > 1) {
@@ -107,34 +103,30 @@ function addJob(formData) {
     }
   }
 
-  // 挿入位置の決定
   const targetRow = lastRow + 1;
   const nextId = "JOB-" + (lastIdNum + 1).toString().padStart(4, '0');
   const todayStr = Utilities.formatDate(new Date(), "JST", "yyyy/MM/dd");
   
-  // 安全な値の構築
   const candidatesArr = Array.isArray(formData.candidates) ? formData.candidates : [];
   const fileUrlsArr = Array.isArray(formData.relatedFiles) ? formData.relatedFiles : [];
   const fileUrlsText = fileUrlsArr.join('\n');
 
-  // 11列分（K列：備考・メモまで）
   const rowData = [
-    nextId,                           // 1: A列 案件ID
-    '未着手',                          // 2: B列 ステータス
-    todayStr,                         // 3: C列 案件登録日
-    companyName,                      // 4: D列 事業者名
-    formData.skill || '',             // 5: E列 技能分野
-    candidatesArr.join('\n'),         // 6: F列 候補者名
-    formData.interviewDate || '',     // 7: G列 面接日
-    '',                               // 8: H列 採用者氏名
-    '',                               // 9: I列 求人票
-    '',                               // 10: J列 関連ファイル
-    formData.memo || ''               // 11: K列 備考・メモ
+    nextId,                           
+    '未着手',                          
+    todayStr,                         
+    companyName,                      
+    formData.skill || '',             
+    candidatesArr.join('\n'),         
+    formData.interviewDate || '',     
+    '',                               
+    '',                               
+    '',                               
+    formData.memo || ''               
   ];
 
   sheet.getRange(targetRow, 1, 1, rowData.length).setValues([rowData]);
   
-  // 関連ファイルをJ列（10列目）にスマートチップ形式で書き込み
   if (fileUrlsText) {
     convertToSmartChips(sheet, targetRow, 10, fileUrlsText);
   }
@@ -161,7 +153,6 @@ function getJobDetails(jobId) {
     if (String(data[i][0]).trim().toUpperCase() === searchId) {
       let rawUrls = "";
       try {
-        // J列（10列目）のリンク情報を抽出
         const richText = sheet.getRange(i + 1, 10).getRichTextValue();
         if (richText) {
           const runs = richText.getRuns();
@@ -178,7 +169,6 @@ function getJobDetails(jobId) {
       
       if (!rawUrls) rawUrls = String(data[i][9] || ""); 
 
-      // 日付の安全な文字列変換
       let ivDate = data[i][6];
       if (ivDate instanceof Date) ivDate = Utilities.formatDate(ivDate, "JST", "yyyy-MM-dd");
       let rDate = data[i][2];
@@ -214,7 +204,6 @@ function updateJob(formData) {
   const fileUrlsArr = Array.isArray(formData.relatedFiles) ? formData.relatedFiles : [];
   const fileUrlsText = fileUrlsArr.join('\n');
   
-  // 更新処理（1セルずつsetValueするより、範囲指定で更新する方が効率的ですが、既存構造を尊重し要所を修正）
   sheet.getRange(row, 2).setValue(formData.status || '未着手');
   sheet.getRange(row, 4).setValue(formData.company || '');
   sheet.getRange(row, 5).setValue(formData.skill || '');
@@ -222,7 +211,6 @@ function updateJob(formData) {
   sheet.getRange(row, 7).setValue(formData.interviewDate || '');
   sheet.getRange(row, 11).setValue(formData.memo || '');
   
-  // 関連ファイル（J列: 10列目）を更新
   convertToSmartChips(sheet, row, 10, fileUrlsText);
   
   return "案件情報を更新しました。";
@@ -252,11 +240,10 @@ function getJobCandidates(jobId) {
   const details = getJobDetails(jobId);
   if (!details || !details.candidates) return [];
 
-  const candDict = getCandidateDict(); // 05_マスタ連携・その他.gs に定義されている想定
+  const candDict = getCandidateDict(); 
   const ids = details.candidates.split(/\r?\n/).filter(id => id.trim());
 
   return ids.map(id => {
-    // ID形式 "SD-0001-名前" から "SD-0001" 部分を抽出
     const cleanId = id.split('-').slice(0, 2).join('-').trim();
     return { 
       id: cleanId, 
@@ -295,7 +282,6 @@ function registerHire(jobId, hiredIds) {
   hiredIds.forEach(id => {
     const name = candDict[id] || id;
     hiredNames.push(name);
-    // 登録者マスタの更新
     for (let j = 1; j < mData.length; j++) {
       if (String(mData[j][0]).trim() === String(id).trim()) {
         if (mCol['ステータス']) mSheet.getRange(j + 1, mCol['ステータス']).setValue('採用');

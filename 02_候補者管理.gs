@@ -41,7 +41,6 @@ function safeSearchByAdminId(id) {
         res.kaigoSkill = getVal('特定技能要件＞介護技能評価試験'); res.kaigoSkillDate = getVal('特定技能要件＞介護技能取得年月');
         res.kaigoLang = getVal('特定技能要件＞介護日本語評価試験'); res.kaigoLangDate = getVal('特定技能要件＞介護日本語取得年月');
         res.otherJapanese = getVal('その他の日本語能力試験'); res.otherJapaneseDate = getVal('取得年月');
-        // ★修正：読み込み先を「修正前コメント」に変更
         res.comment = getVal('修正前コメント'); 
         res.relative = getVal('日本在住の親族について');
         // 追加情報
@@ -99,7 +98,6 @@ function addNewRow(formData) {
     '特定技能要件＞介護技能評価試験': formData.kaigoSkill, '特定技能要件＞介護技能取得年月': formData.kaigoSkillDate,
     '特定技能要件＞介護日本語評価試験': formData.kaigoLang, '特定技能要件＞介護日本語取得年月': formData.kaigoLangDate,
     'その他の日本語能力試験': formData.otherJapanese, '取得年月': formData.otherJapaneseDate,
-    // ★修正：保存先キーを「修正前コメント」に変更
     '修正前コメント': formData.comment, 
     '日本在住の親族について': formData.relative, 'ステータス': '未採用'
   };
@@ -150,12 +148,11 @@ function updateRow(formData) {
     '特定技能要件＞介護技能取得年月': formData.kaigoSkillDate, '特定技能要件＞介護日本語評価試験': formData.kaigoLang,
     '特定技能要件＞介護日本語取得年月': formData.kaigoLangDate, 'その他の日本語能力試験': formData.otherJapanese,
     '取得年月': formData.otherJapaneseDate, 
-    // ★修正：保存先キーを「修正前コメント」に変更
     '修正前コメント': formData.comment, 
     '日本在住の親族について': formData.relative
   };
 
-  const photoIdx = col['顔写真'] ? col['顔写真'] - 1 : -1; // インデックス (0始まり)
+  const photoIdx = col['顔写真'] ? col['顔写真'] - 1 : -1;
   const safeMaxCol = Math.max(masterSheet.getLastColumn(), ...Object.values(col));
   const currentRowRange = masterSheet.getRange(row, 1, 1, safeMaxCol);
   const currentRowData = currentRowRange.getValues()[0];
@@ -167,7 +164,6 @@ function updateRow(formData) {
     }
   }
   
-  // 顔写真列（画像オブジェクト）を避けて一括更新
   if (photoIdx !== -1 && photoIdx < safeMaxCol) {
     if (photoIdx > 0) {
       masterSheet.getRange(row, 1, 1, photoIdx).setValues([currentRowData.slice(0, photoIdx)]);

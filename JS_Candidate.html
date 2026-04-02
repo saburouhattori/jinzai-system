@@ -67,7 +67,11 @@ function submitAddInfo() {
   });
   
   showModal('保存中...', true);
-  google.script.run.withSuccessHandler(function(msg) { showModal(msg); }).updateAddInfoRow(formData);
+  google.script.run.withSuccessHandler(function(msg) { 
+    showModal(msg); 
+    // ★バックグラウンドでリスト同期を実行
+    google.script.run.syncListSheets();
+  }).updateAddInfoRow(formData);
 }
 
 function submitData() {
@@ -107,6 +111,8 @@ function onSuccess(msg) {
     let fileInput = document.getElementById('imageFile'); if (fileInput) fileInput.value = '';
     document.getElementById('relativeDetail').style.display = 'none';
   }
+  // ★バックグラウンドでリスト同期を実行
+  google.script.run.syncListSheets();
 }
 
 function submitDelete() {
@@ -116,7 +122,11 @@ function submitDelete() {
   if (!confirm(adminId + " のデータを完全に削除します。よろしいですか？")) return;
   showModal('削除中...', true);
   google.script.run.withSuccessHandler(function(msg) {
-    showModal(msg); document.getElementById('delete_id').value = ''; document.getElementById('deleteNameDisplay').innerText = '';
+    showModal(msg); 
+    document.getElementById('delete_id').value = ''; 
+    document.getElementById('deleteNameDisplay').innerText = '';
+    // ★バックグラウンドでリスト同期を実行
+    google.script.run.syncListSheets();
   }).deleteCandidate(adminId);
 }
 </script>
