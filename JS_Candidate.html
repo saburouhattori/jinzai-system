@@ -1,12 +1,4 @@
 <script>
-function searchDataRouting() {
-  if (MODE === 'ADDINFO') {
-    searchDataAddInfo();
-  } else {
-    searchData();
-  }
-}
-
 function searchData() {
   let rawId = document.getElementById('searchId').value.trim();
   if (!rawId) { showModal('管理番号を入力してください。'); return; }
@@ -19,32 +11,29 @@ function searchData() {
     closeModal(); document.getElementById('searchBtn').disabled = false;
     if (data) {
       document.getElementById('targetRow').value = data.row;
-      if (MODE === 'COMMENT') {
-        document.getElementById('comment_name_display').value = data.name; 
-        document.getElementById('comment_text_input').value = data.comment || "";
-      } else {
-        const fields = ['name','furigana','nickname','birthday','gender','spouse','height','weight',
-                        'address','birthplace','email','school','eduSchool','eduDept','eduStatus',
-                        'eduStart','eduEnd','eduNote','expPeriod1','expContent1','expPeriod2','expContent2',
-                        'expPeriod3','expContent3','jlptLevel','jlptDate','jftLevel','jftDate',
-                        'kaigoSkill','kaigoSkillDate','kaigoLang','kaigoLangDate','otherExam',
-                        'otherExamDate','otherJapanese','otherJapaneseDate','comment'];
-        fields.forEach(f => { let el = document.getElementById(f); if(el) { let val = data[f] || ""; if(val.startsWith && val.startsWith("'")) val = val.substring(1); el.value = val; } });
-        let relSel = document.getElementById('relativeSelect'); let relDet = document.getElementById('relativeDetail');
-        if (data.relative && data.relative !== "日本に家族や親戚はいません。" && data.relative !== "無" && data.relative !== "なし") {
-          relSel.value = "有"; relDet.value = data.relative; relDet.style.display = "block";
-        } else { relSel.value = "無"; relDet.value = ""; relDet.style.display = "none"; }
-      }
+      
+      const fields = ['name','furigana','nickname','birthday','gender','spouse','height','weight',
+                      'address','birthplace','email','school','eduSchool','eduDept','eduStatus',
+                      'eduStart','eduEnd','eduNote','expPeriod1','expContent1','expPeriod2','expContent2',
+                      'expPeriod3','expContent3','jlptLevel','jlptDate','jftLevel','jftDate',
+                      'kaigoSkill','kaigoSkillDate','kaigoLang','kaigoLangDate','otherExam',
+                      'otherExamDate','otherJapanese','otherJapaneseDate','comment'];
+      fields.forEach(f => { let el = document.getElementById(f); if(el) { let val = data[f] || ""; if(val.startsWith && val.startsWith("'")) val = val.substring(1); el.value = val; } });
+      let relSel = document.getElementById('relativeSelect'); let relDet = document.getElementById('relativeDetail');
+      if (data.relative && data.relative !== "日本に家族や親戚はいません。" && data.relative !== "無" && data.relative !== "なし") {
+        relSel.value = "有"; relDet.value = data.relative; relDet.style.display = "block";
+      } else { relSel.value = "無"; relDet.value = ""; relDet.style.display = "none"; }
+      
       showModal(data.name + ' さんのデータを読み込みました。');
     } else { showModal('該当するデータが見つかりません。'); }
   }).safeSearchByAdminId(adminId);
 }
 
 function searchDataAddInfo() {
-  let rawId = document.getElementById('searchId').value.trim();
+  let rawId = document.getElementById('searchIdAddInfo').value.trim();
   if (!rawId) { showModal('管理番号を入力してください。'); return; }
   let adminId = formatId(rawId);
-  document.getElementById('searchId').value = adminId;
+  document.getElementById('searchIdAddInfo').value = adminId;
   showModal('検索中...', true);
   
   google.script.run.withSuccessHandler(function(data) {
@@ -83,22 +72,17 @@ function submitAddInfo() {
 
 function submitData() {
   let formData = {};
-  if (MODE === 'COMMENT') {
-    let row = document.getElementById('targetRow').value;
-    if (!row) { showModal('先に管理番号で検索してください。'); return; }
-    formData.row = row; 
-    formData.comment = document.getElementById('comment_text_input').value;
-  } else {
-    const fields = ['name','furigana','nickname','birthday','gender','spouse','height','weight','address','birthplace','email','school','eduSchool','eduDept','eduStatus','eduStart','eduEnd','eduNote','expPeriod1','expContent1','expPeriod2','expContent2','expPeriod3','expContent3','jlptLevel','jlptDate','jftLevel','jftDate','kaigoSkill','kaigoSkillDate','kaigoLang','kaigoLangDate','otherExam','otherExamDate','otherJapanese','otherJapaneseDate','comment'];
-    fields.forEach(f => { let el = document.getElementById(f); if(el) formData[f] = el.value; });
-    let relSel = document.getElementById('relativeSelect'); let relDet = document.getElementById('relativeDetail');
-    if (relSel && relDet) formData.relative = (relSel.value === '有') ? relDet.value : "日本に家族や親戚はいません。";
-    if (MODE === 'EDIT') {
-      formData.row = document.getElementById('targetRow').value;
-      if (!formData.row) { showModal('先に管理番号で検索してください。'); return; }
-    }
+  
+  const fields = ['name','furigana','nickname','birthday','gender','spouse','height','weight','address','birthplace','email','school','eduSchool','eduDept','eduStatus','eduStart','eduEnd','eduNote','expPeriod1','expContent1','expPeriod2','expContent2','expPeriod3','expContent3','jlptLevel','jlptDate','jftLevel','jftDate','kaigoSkill','kaigoSkillDate','kaigoLang','kaigoLangDate','otherExam','otherExamDate','otherJapanese','otherJapaneseDate','comment'];
+  fields.forEach(f => { let el = document.getElementById(f); if(el) formData[f] = el.value; });
+  let relSel = document.getElementById('relativeSelect'); let relDet = document.getElementById('relativeDetail');
+  if (relSel && relDet) formData.relative = (relSel.value === '有') ? relDet.value : "日本に家族や親戚はいません。";
+  
+  if (MODE === 'EDIT') {
+    formData.row = document.getElementById('targetRow').value;
+    if (!formData.row) { showModal('先に管理番号で検索してください。'); return; }
   }
-
+  
   let fileInput = document.getElementById('imageFile');
   if (fileInput && fileInput.files.length > 0) {
     let file = fileInput.files[0];

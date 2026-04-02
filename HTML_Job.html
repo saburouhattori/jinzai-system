@@ -1,4 +1,4 @@
-<div id="form-job" style="display: none;">
+<div id="form-job" style="display: <?= mode === 'JOB' ? 'block' : 'none' ?>;">
 <div class="section-title" >案件登録</div>
 <div class="field">
   <label>事業者名（文字を入力すると候補が出ます）</label>
@@ -19,7 +19,8 @@
 <div class="field" >
   <label>候補者（登録者IDを入力）</label>
   <p style="font-size: 11px; color: #555; margin-top: -3px; margin-bottom: 8px;">※候補者を変更する場合は、枠内のIDを直接書き換えてください。名前は自動で表示されます。</p>
-  <div id="job_cand_list"></div>
+  <div id="job_cand_list">
+    </div>
   <button class="btn-secondary" onclick="addJobCandRow()" style="margin-top:5px; font-size:11px; padding: 6px; width: auto;">+ 候補者IDを追加</button>
 </div>
 
@@ -32,7 +33,8 @@
 
 <div class="field">
   <label>関連ファイル（Googleドライブ）</label>
-  <div id="job_file_list"></div>
+  <div id="job_file_list">
+    </div>
   <button class="btn-secondary" onclick="addJobFileRow('job')" style="margin-top:5px; font-size:11px; padding: 6px; width: auto;">+ 関連ファイルを追加</button>
 </div>
 
@@ -44,7 +46,7 @@
 <button class="btn-primary" id="jobBtn" onclick="submitJob()" >登録</button>
 </div>
 
-<div id="form-job-edit" style="display: none;">
+<div id="form-job-edit" style="display: <?= mode === 'JOB_EDIT' ? 'block' : 'none' ?>;">
   <div class="search-box" style="max-width: 400px; margin-bottom: 20px;">
     <label>案件IDで検索</label>
     <div style="display: flex; gap: 10px;">
@@ -56,7 +58,9 @@
   <div id="job_edit_fields" style="display: none;">
     <input type="hidden" id="edit_job_row">
     <input type="hidden" id="edit_job_id">
+
     <div class="section-title">案件情報の修正</div>
+
     <div class="form-row">
       <div class="field">
         <label>ステータス</label>
@@ -73,6 +77,7 @@
         <input type="text" id="edit_job_company" list="company_list">
       </div>
     </div>
+
     <div class="field">
       <label>技能分野</label>
       <select id="edit_job_skill">
@@ -82,27 +87,34 @@
         <option value="飲食料品製造業">飲食料品製造業</option>
       </select>
     </div>
+
     <div class="field">
       <label>候補者（登録者IDを入力）</label>
       <p style="font-size: 11px; color: #555; margin-top: -3px; margin-bottom: 8px;">※候補者を変更する場合は、枠内のIDを直接書き換えてください。名前は自動で表示されます。</p>
-      <div id="edit_job_cand_list"></div>
+      <div id="edit_job_cand_list">
+        </div>
       <button class="btn-secondary" onclick="addJobEditCandRow()" style="margin-top:5px; font-size:11px; padding: 6px; width: auto;">+ 候補者IDを追加</button>
     </div>
+
     <div class="form-row">
       <div class="field">
         <label>面接日</label>
         <input type="date" id="edit_job_interviewDate" style="max-width: 200px;">
       </div>
     </div>
+
     <div class="field">
       <label>関連ファイル（Googleドライブ）</label>
-      <div id="edit_job_file_list"></div>
+      <div id="edit_job_file_list">
+        </div>
       <button class="btn-secondary" onclick="addJobFileRow('edit_job')" style="margin-top:5px; font-size:11px; padding: 6px; width: auto;">+ 関連ファイルを追加</button>
     </div>
+
     <div class="field">
       <label>備考・メモ</label>
       <textarea id="edit_job_memo" rows="3"></textarea>
     </div>
+
     <div style="display: flex; gap: 15px; margin-top: 20px;">
       <button class="btn-primary" onclick="submitJobEdit()" style="flex: 2;">更新を保存</button>
       <button class="btn-primary" onclick="submitJobDelete()" style="flex: 1; background: #d93025;">案件を削除</button>
@@ -110,7 +122,8 @@
   </div>
 </div>
 
-<div id="form-hire" style="display: none;">
+
+<div id="form-hire" style="display: <?= mode === 'HIRE' ? 'block' : 'none' ?>;">
 <div class="section-title" style="border-left-color: #34a853;">採用者一括登録</div>
 <div class="field">
   <label>採用元の案件ID</label>
@@ -132,14 +145,25 @@
 <p style="font-size: 11px; color: #555; margin-top: 10px; text-align: center;">※案件管理とマスタシートのステータスが更新されます。</p>
 </div>
 
-<div id="form-list" style="display: none;">
+<div id="form-list" style="display: <?= mode === 'LIST' ? 'block' : 'none' ?>;">
 <div class="section-title" style="border-left-color: #fbbc04;">簡易リスト作成</div>
 <div class="field" >
 <label>候補者（登録者IDを入力）</label>
 <p style="font-size: 11px; color: #555; margin-top: -3px; margin-bottom: 8px;">※候補者を変更する場合は、枠内のIDを直接書き換えてください。名前は自動で表示されます。</p>
-<div id="list_cand_inputs"></div>
+<div id="list_cand_inputs">
+  </div>
 <button class="btn-secondary" onclick="addListCandRow()" style="margin-top:5px; font-size:11px; padding: 6px; width: auto;">+ 候補者IDを追加</button>
 </div>
 <button class="btn-primary" id="listBtn" style="background: #fbbc04; color: #333;" onclick="submitList()" >簡易リストを作成</button>
 <p style="font-size: 11px; color: #555; margin-top: 10px;">※「簡易リスト」シートのB2:L51が毎回リセットされ、指定した候補者が出力されます。</p>
 </div>
+
+<script>
+  window.addEventListener('DOMContentLoaded', () => {
+    if (MODE === 'JOB') {
+      addJobCandRow();
+      addJobFileRow('job');
+    }
+    if (MODE === 'LIST') addListCandRow();
+  });
+</script>

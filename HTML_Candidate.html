@@ -1,192 +1,132 @@
-<div id="search-section" style="display: none; max-width: 400px; margin-bottom: 20px;">
-  <label>管理番号で検索</label>
-  <div style="display: flex; gap: 10px;">
-    <input type="text" id="searchId" placeholder=" 例: 1 または 0001 " oninput="checkCandId(this, 'searchNameDisplay')" onblur="applyFormat(this)" style="flex: 2;">
-    <button class="btn-secondary" id="searchBtn" onclick="searchDataRouting()" style="flex: 1; margin-top: 0; padding: 8px;">読み込む</button>
-  </div>
-  <div id="searchNameDisplay" style="font-size:11px; color:#1a73e8; margin-top:4px; height:14px;"></div>
-</div>
-
-<input type="hidden" id="targetRow">
-
-<div id="form-candidate-comment" style="display: none;">
-  <div class="field" ><label>名前</label><input type="text" id="comment_name_display" readonly style="background:#f8f9fa;"></div>
-  <div class="field" ><label>コメント</label><textarea id="comment_text_input" rows="15"></textarea></div>
-  <div style="text-align: center; margin-top: 20px;">
-    <button class="btn-primary" onclick="submitData()" style="width: 200px;">更新</button>
-  </div>
-</div>
-
-<div id="form-candidate-main" style="display: none;">
-  <div class="section-title" >基本情報</div>
-  <div class="form-row">
-    <div class="field"><label>名前</label><input type="text" id="name"></div>
-    <div class="field"><label>フリガナ</label><input type="text" id="furigana"></div>
-    <div class="field"><label>呼び名</label><input type="text" id="nickname"></div>
-  </div>
-  <div class="form-row">
-    <div class="field"><label>生年月日</label><input type="date" id="birthday"></div>
-    <div class="field"><label>性別</label><select id="gender"><option value="">未選択</option><option value="男性">男性</option><option value="女性">女性</option></select></div>
-    <div class="field"><label>配偶者</label><select id="spouse"><option value="">未選択</option><option value="無">無</option><option value="有">有</option></select></div>
-  </div>
-  <div class="form-row">
-    <div class="field"><label>身長</label><div class="unit-input"><input type="number" id="height"><span class="unit-label">cm</span></div></div>
-    <div class="field"><label>体重</label><div class="unit-input"><input type="number" id="weight"><span class="unit-label">kg</span></div></div>
-    <div class="field flex-2"><label>現住所</label><input type="text" id="address"></div>
-  </div>
-  <div class="form-row">
-    <div class="field"><label>出生地</label><input type="text" id="birthplace"></div>
-    <div class="field"><label>メールアドレス</label><input type="email" id="email"></div>
-    <div class="field"><label>所属日本語学校</label><select id="school"><option value="">未選択</option></select></div>
-  </div>
-
-  <div class="section-title" >学歴</div>
-  <div class="form-row">
-    <div class="field flex-2"><label>学校名</label><input type="text" id="eduSchool"></div>
-    <div class="field flex-2"><label>学部・学科・専攻</label><input type="text" id="eduDept"></div>
-    <div class="field"><label>状況</label><select id="eduStatus"><option value="">未選択</option><option value="卒業">卒業</option><option value="中途退学">中途退学</option><option value="在学中">在学中</option><option value="休学中">休学中</option></select></div>
-  </div>
-  <div class="form-row">
-    <div class="field"><label>入学年月</label><input type="text" id="eduStart" placeholder=" YYYY年MM月 "></div>
-    <div class="field"><label>卒業/中退年月</label><input type="text" id="eduEnd" placeholder=" YYYY年MM月 "></div>
-    <div class="field flex-2"><label>補足</label><input type="text" id="eduNote"></div>
-  </div>
-
-  <div class="section-title" >職歴</div>
-  <div class="form-row">
-    <div class="field"><label>職歴① 期間</label><input type="text" id="expPeriod1" placeholder="例: 2020年4月から2024年5月まで"></div>
-    <div class="field flex-2"><label>職歴① 内容</label><input type="text" id="expContent1" placeholder="例: スーパーのレジスタッフとして働いた。"></div>
-  </div>
-  <div class="form-row">
-    <div class="field"><label>職歴② 期間</label><input type="text" id="expPeriod2"></div>
-    <div class="field flex-2"><label>職歴② 内容</label><input type="text" id="expContent2"></div>
-  </div>
-  <div class="form-row">
-    <div class="field"><label>職歴③ 期間</label><input type="text" id="expPeriod3"></div>
-    <div class="field flex-2"><label>職歴③ 内容</label><input type="text" id="expContent3"></div>
-  </div>
-
-  <div class="section-title" >特定技能要件</div>
-  <div class="form-row">
-    <div class="field">
-      <label>JLPT</label>
-      <div class="sub-field"><select id="jlptLevel" style="flex:1;"><option value="">未選択</option><option value="N1">N1</option><option value="N2">N2</option><option value="N3">N3</option><option value="N4">N4</option></select><input type="text" id="jlptDate" placeholder="年月" style="flex:1;"></div>
-    </div>
-    <div class="field">
-      <label>JFT Basic</label>
-      <div class="sub-field"><select id="jftLevel" style="flex:1;"><option value="">未選択</option><option value="A2">A2</option></select><input type="text" id="jftDate" placeholder="年月" style="flex:1;"></div>
-    </div>
-  </div>
-  <div class="form-row">
-    <div class="field">
-      <label>介護技能評価試験</label>
-      <div class="sub-field"><select id="kaigoSkill" style="flex:1;"><option value="">未選択</option><option value="合格">合格</option><option value="受験予定">受験予定</option></select><input type="text" id="kaigoSkillDate" placeholder="年月" style="flex:1;"></div>
-    </div>
-    <div class="field">
-      <label>介護日本語評価試験</label>
-      <div class="sub-field"><select id="kaigoLang" style="flex:1;"><option value="">未選択</option><option value="合格">合格</option><option value="受験予定">受験予定</option></select><input type="text" id="kaigoLangDate" placeholder="年月" style="flex:1;"></div>
-    </div>
-  </div>
-
-  <div class="section-title" >その他</div>
-  <div class="form-row">
-    <div class="field">
-      <label>その他の日本語能力試験</label>
-      <div class="sub-field">
-        <select id="otherJapanese" style="flex:1;">
-          <option value="">未選択</option><option value="NAT-TEST 5級">NAT-TEST 5級</option><option value="NAT-TEST 4級">NAT-TEST 4級</option><option value="NAT-TEST 3級">NAT-TEST 3級</option><option value="NAT-TEST 2級">NAT-TEST 2級</option><option value="NAT-TEST 1級">NAT-TEST 1級</option><option value="J.TEST G級">J.TEST G級</option><option value="J.TEST F級">J.TEST F級</option><option value="J.TEST E級">J.TEST E級</option><option value="J.TEST D級">J.TEST D級</option><option value="J.TEST C級">J.TEST C級</option><option value="J.TEST 準B級">J.TEST 準B級</option><option value="J.TEST B級">J.TEST B級</option><option value="J.TEST 準A級">J.TEST 準A級</option><option value="J.TEST A級">J.TEST A級</option><option value="J.TEST 特A級">J.TEST 特A級</option><option value="J-cert A1">J-cert A1</option><option value="J-cert A2.1">J-cert A2.1</option><option value="J-cert A2.2">J-cert A2.2</option><option value="J-cert B1">J-cert B1</option><option value="J-cert B2">J-cert B2</option><option value="J-cert C1">J-cert C1</option><option value="J-cert C2">J-cert C2</option>
-        </select>
-        <input type="text" id="otherJapaneseDate" placeholder="年月" style="flex:1;">
-      </div>
-    </div>
-    <div class="field flex-2">
-      <label>日本在住の親族の有無</label>
-      <div class="sub-field">
-        <select id="relativeSelect" onchange="toggleRelative()" style="width:120px; flex-shrink: 0;"><option value="無">無</option><option value="有">有</option></select>
-        <input type="text" id="relativeDetail" style="display:none; flex:1;" placeholder=" 続柄・お名前など具体的に ">
-      </div>
-    </div>
-  </div>
-  <div class="form-row">
-    <div class="field flex-2"><label>コメント</label><textarea id="comment" rows="2"></textarea></div>
-    <div class="field"><label>写真</label><input type="file" id="imageFile" accept="image/*"></div>
-  </div>
-  <div style="text-align: center; margin-top: 20px;">
-    <button class="btn-primary" id="mainBtn" onclick="submitData()" style="width: 200px;"><span id="mainBtnText">保存</span></button>
-  </div>
-</div>
-
-<div id="form-addinfo" style="display: none;">
-  <div class="section-title">基本・パスポート情報</div>
-  <div class="form-row">
-    <div class="field"><label>所属送り出し機関</label><select id="add_agent"><option value="">未選択</option></select></div>
-    <div class="field"><label>内定日</label><input type="date" id="add_offerDate"></div>
-    <div class="field"><label>出生地（都市名）</label><input type="text" id="add_birthCity" oninput="this.value = this.value.toUpperCase();"></div>
-  </div>
-  <div class="form-row">
-    <div class="field"><label>住所詳細</label><input type="text" id="add_addressDetail" style="width: 100%;"></div>
-  </div>
-  <div class="form-row">
-    <div class="field"><label>パスポート番号</label><input type="text" id="add_passportNum" oninput="this.value = this.value.replace(/[^a-zA-Z0-9]/g, '');"></div>
-    <div class="field"><label>パスポート有効期限</label><input type="date" id="add_passportExp"></div>
-    <div class="field flex-2"></div>
-  </div>
+<script>
+function searchData() {
+  let rawId = document.getElementById('searchId').value.trim();
+  if (!rawId) { showModal('管理番号を入力してください。'); return; }
+  let adminId = formatId(rawId);
+  document.getElementById('searchId').value = adminId;
+  document.getElementById('searchBtn').disabled = true;
+  showModal('検索中...', true);
   
-  <div class="section-title">経歴・申請歴</div>
-  <div class="form-row">
-    <div class="field">
-      <label>職業</label>
-      <select id="add_job">
-        <option value="">未選択</option>
-        <option value="会社員">会社員</option>
-        <option value="アルバイト">アルバイト</option>
-        <option value="無職">無職</option>
-      </select>
-    </div>
-    <div class="field"><label>技能実習の経験の有無</label><select id="add_traineeExp"><option value="">未選択</option><option value="有">有</option><option value="無">無</option></select></div>
-    <div class="field"><label>技能実習修了書の有無</label><select id="add_traineeCert"><option value="">未選択</option><option value="有">有</option><option value="無">無</option></select></div>
-    <div class="field"><label>犯罪歴の有無</label><select id="add_crime"><option value="">未選択</option><option value="有">有</option><option value="無">無</option></select></div>
-  </div>
-  <div class="form-row">
-    <div class="field"><label>交付申請の回数</label><input type="number" id="add_applyCount" placeholder="例: 0"></div>
-    <div class="field"><label>不許可の回数</label><input type="number" id="add_rejectCount" placeholder="例: 0"></div>
-    <div class="field"><label>海外出入国歴の有無</label><select id="add_overseasExp"><option value="">未選択</option><option value="有">有</option><option value="無">無</option></select></div>
-    <div class="field"><label>出入国の回数</label><input type="number" id="add_travelCount" placeholder="例: 0"></div>
-  </div>
-  <div class="form-row">
-    <div class="field"><label>直近の入国日</label><input type="date" id="add_lastInDate"></div>
-    <div class="field"><label>直近の出国日</label><input type="date" id="add_lastOutDate"></div>
-    <div class="field flex-2"></div>
-  </div>
+  google.script.run.withSuccessHandler(function(data) {
+    closeModal(); document.getElementById('searchBtn').disabled = false;
+    if (data) {
+      document.getElementById('targetRow').value = data.row;
+      
+      const fields = ['name','furigana','nickname','birthday','gender','spouse','height','weight',
+                      'address','birthplace','email','school','eduSchool','eduDept','eduStatus',
+                      'eduStart','eduEnd','eduNote','expPeriod1','expContent1','expPeriod2','expContent2',
+                      'expPeriod3','expContent3','jlptLevel','jlptDate','jftLevel','jftDate',
+                      'kaigoSkill','kaigoSkillDate','kaigoLang','kaigoLangDate','otherExam',
+                      'otherExamDate','otherJapanese','otherJapaneseDate','comment'];
+      fields.forEach(f => { let el = document.getElementById(f); if(el) { let val = data[f] || ""; if(val.startsWith && val.startsWith("'")) val = val.substring(1); el.value = val; } });
+      let relSel = document.getElementById('relativeSelect'); let relDet = document.getElementById('relativeDetail');
+      if (data.relative && data.relative !== "日本に家族や親戚はいません。" && data.relative !== "無" && data.relative !== "なし") {
+        relSel.value = "有"; relDet.value = data.relative; relDet.style.display = "block";
+      } else { relSel.value = "無"; relDet.value = ""; relDet.style.display = "none"; }
+      
+      showModal(data.name + ' さんのデータを読み込みました。');
+    } else { showModal('該当するデータが見つかりません。'); }
+  }).safeSearchByAdminId(adminId);
+}
 
-  <div class="section-title">日本在住の親族情報</div>
-  <div class="form-row">
-    <div class="field"><label>親族の名前</label><input type="text" id="add_relName2"></div>
-    <div class="field"><label>続柄</label><input type="text" id="add_relRelation2"></div>
-    <div class="field"><label>親族の生年月日</label><input type="date" id="add_relBirth2"></div>
-    <div class="field"><label>国籍・地域</label><input type="text" id="add_relCountry2"></div>
-  </div>
-  <div class="form-row">
-    <div class="field"><label>同居予定の有無</label><select id="add_relLive2"><option value="">未選択</option><option value="有">有</option><option value="無">無</option></select></div>
-    <div class="field flex-2"><label>勤務先・通学先</label><input type="text" id="add_relWork2"></div>
-    <div class="field"><label>在留カード番号</label><input type="text" id="add_relCard2"></div>
-  </div>
+function searchDataAddInfo() {
+  let rawId = document.getElementById('searchIdAddInfo').value.trim();
+  if (!rawId) { showModal('管理番号を入力してください。'); return; }
+  let adminId = formatId(rawId);
+  document.getElementById('searchIdAddInfo').value = adminId;
+  showModal('検索中...', true);
+  
+  google.script.run.withSuccessHandler(function(data) {
+    closeModal();
+    if (data) {
+      document.getElementById('targetRow').value = data.row;
+      const fields = ['agent', 'offerDate', 'birthCity', 'addressDetail', 'passportNum', 'passportExp', 'job', 'traineeExp', 'traineeCert', 'crime', 'applyCount', 'rejectCount', 'overseasExp', 'travelCount', 'lastInDate', 'lastOutDate', 'relName2', 'relRelation2', 'relBirth2', 'relCountry2', 'relLive2', 'relWork2', 'relCard2', 'memo'];
+      fields.forEach(f => { let el = document.getElementById('add_' + f); if(el) { let val = data[f] || ""; if(typeof val === 'string' && val.startsWith("'")) val = val.substring(1); el.value = val; } });
+      showModal(data.name + ' さんのデータを読み込みました。\n採用後の追加情報を入力してください。');
+    } else { showModal('該当するデータが見つかりません。'); }
+  }).safeSearchByAdminId(adminId);
+}
 
-  <div class="section-title">備考</div>
-  <div class="field"><label>備考・メモ</label><textarea id="add_memo" rows="2"></textarea></div>
+function submitAddInfo() {
+  let row = document.getElementById('targetRow').value;
+  if (!row) { showModal('先に管理番号で検索して、データを読み込んでください。'); return; }
+  let formData = { row: row };
+  const fields = ['agent', 'offerDate', 'birthCity', 'addressDetail', 'passportNum', 'passportExp', 'job', 'traineeExp', 'traineeCert', 'crime', 'applyCount', 'rejectCount', 'overseasExp', 'travelCount', 'lastInDate', 'lastOutDate', 'relName2', 'relRelation2', 'relBirth2', 'relCountry2', 'relLive2', 'relWork2', 'relCard2', 'memo'];
+  
+  fields.forEach(f => { 
+    let el = document.getElementById('add_' + f); 
+    if (el) {
+      if (f === 'birthCity') {
+        formData[f] = el.value.toUpperCase();
+      } else if (f === 'passportNum') {
+        formData[f] = el.value.replace(/[^a-zA-Z0-9]/g, '');
+      } else {
+        formData[f] = el.value; 
+      }
+    }
+  });
+  
+  showModal('保存中...', true);
+  google.script.run.withSuccessHandler(function(msg) { 
+    showModal(msg); 
+    // ★バックグラウンドでリスト同期を実行
+    google.script.run.syncListSheets();
+  }).updateAddInfoRow(formData);
+}
 
-  <div style="text-align: center; margin-top: 20px;">
-    <button class="btn-primary" onclick="submitAddInfo()" style="width: 200px;">追加情報を保存</button>
-  </div>
-</div>
+function submitData() {
+  let formData = {};
+  
+  const fields = ['name','furigana','nickname','birthday','gender','spouse','height','weight','address','birthplace','email','school','eduSchool','eduDept','eduStatus','eduStart','eduEnd','eduNote','expPeriod1','expContent1','expPeriod2','expContent2','expPeriod3','expContent3','jlptLevel','jlptDate','jftLevel','jftDate','kaigoSkill','kaigoSkillDate','kaigoLang','kaigoLangDate','otherExam','otherExamDate','otherJapanese','otherJapaneseDate','comment'];
+  fields.forEach(f => { let el = document.getElementById(f); if(el) formData[f] = el.value; });
+  let relSel = document.getElementById('relativeSelect'); let relDet = document.getElementById('relativeDetail');
+  if (relSel && relDet) formData.relative = (relSel.value === '有') ? relDet.value : "日本に家族や親戚はいません。";
+  
+  if (MODE === 'EDIT') {
+    formData.row = document.getElementById('targetRow').value;
+    if (!formData.row) { showModal('先に管理番号で検索してください。'); return; }
+  }
+  
+  let fileInput = document.getElementById('imageFile');
+  if (fileInput && fileInput.files.length > 0) {
+    let file = fileInput.files[0];
+    let reader = new FileReader();
+    reader.onload = function(e) { formData.imageFile = { name: file.name, mimeType: file.type, contents: e.target.result.split(',')[1] }; sendData(formData); };
+    reader.readAsDataURL(file);
+  } else { sendData(formData); }
+}
 
-<div id="form-delete" style="display: none;">
-<div class="section-title" style="border-left-color: #d93025;">登録者削除</div>
-<div class="field">
-<label>削除する登録者ID</label>
-<input type="text" id="delete_id" placeholder=" 例: 1 または 0001 " oninput="checkCandId(this, 'deleteNameDisplay')" onblur="applyFormat(this)">
-<div id="deleteNameDisplay" style="font-size:11px; color:#d93025; margin-top:4px; height:14px;"></div>
-<p style="font-size: 11px; color: #d93025; margin-top: 5px;">※「登録者マスタ」および「候補者写真」から完全に削除されます。</p>
-</div>
-<button class="btn-primary" style="background: #d93025;" onclick="submitDelete()" >完全に削除する</button>
-</div>
+function sendData(formData) {
+  document.getElementById('mainBtn').disabled = true; showModal('処理中...', true);
+  if (MODE === 'NEW') { google.script.run.withSuccessHandler(onSuccess).addNewRow(formData); } 
+  else { google.script.run.withSuccessHandler(onSuccess).updateRow(formData); }
+}
+
+function onSuccess(msg) {
+  document.getElementById('mainBtn').disabled = false; showModal(msg);
+  if (MODE === 'NEW') {
+    let inputs = document.querySelectorAll('input[type="text"], input[type="date"], input[type="number"], input[type="email"], textarea');
+    inputs.forEach(input => input.value = '');
+    let selects = document.querySelectorAll('select'); selects.forEach(select => select.selectedIndex = 0);
+    let fileInput = document.getElementById('imageFile'); if (fileInput) fileInput.value = '';
+    document.getElementById('relativeDetail').style.display = 'none';
+  }
+  // ★バックグラウンドでリスト同期を実行
+  google.script.run.syncListSheets();
+}
+
+function submitDelete() {
+  let rawId = document.getElementById('delete_id').value.trim();
+  if (!rawId) { showModal('削除するIDを入力してください。'); return; }
+  let adminId = formatId(rawId);
+  if (!confirm(adminId + " のデータを完全に削除します。よろしいですか？")) return;
+  showModal('削除中...', true);
+  google.script.run.withSuccessHandler(function(msg) {
+    showModal(msg); 
+    document.getElementById('delete_id').value = ''; 
+    document.getElementById('deleteNameDisplay').innerText = '';
+    // ★バックグラウンドでリスト同期を実行
+    google.script.run.syncListSheets();
+  }).deleteCandidate(adminId);
+}
+</script>

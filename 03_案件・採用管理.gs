@@ -21,12 +21,19 @@ function convertToSmartChips(sheet, row, col, urlText) {
   let fullText = "";
   let linkData = [];
   let currentPos = 0;
-  
+
   urls.forEach((url, i) => {
     let fileName = url;
     try {
-      let idMatch = url.match(/\/d\/([-\w]{25,})/);
-      let fileId = idMatch ? idMatch[1] : (url.match(/id=([-\w]{25,})/) ? url.match(/id=([-\w]{25,})/)[1] : null);
+      let fileId = "";
+      const idMatch = url.match(/\/d\/([-\w]{25,})/);
+      if (idMatch) {
+        fileId = idMatch[1];
+      } else {
+        const queryMatch = url.match(/id=([-\w]{25,})/);
+        if (queryMatch) fileId = queryMatch[1];
+      }
+
       if (fileId) {
         fileName = DriveApp.getFileById(fileId).getName();
       }
@@ -44,7 +51,7 @@ function convertToSmartChips(sheet, row, col, urlText) {
     });
     currentPos = currentPos + (i > 0 ? 1 : 0) + textPart.length;
   });
-  
+
   richTextValue.setText(fullText);
   linkData.forEach(ld => {
     richTextValue.setLinkUrl(ld.start, ld.end, ld.url);
@@ -58,18 +65,15 @@ function convertToSmartChips(sheet, row, col, urlText) {
 function addJob(formData) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName('案件管理');
-  
-  // --- ★追加機能：新規事業者の自動マスタ登録 ---
+  if (!sheet) throw new Error("「案件管理」シートが見つかりません。");
+
   const companyName = String(formData.company || "").trim();
   if (companyName) {
     const compSheet = ss.getSheetByName('事業者マスタ');
     if (compSheet) {
       const compData = compSheet.getDataRange().getValues();
-      // 2列目（インデックス1）が事業者名と想定
       const exists = compData.some(row => String(row[1]).trim() === companyName);
-      
       if (!exists) {
-        // マスタに存在しない場合、新しく登録
         let lastIdNum = 0;
         for (let i = 1; i < compData.length; i++) {
           let idVal = String(compData[i][0]);
@@ -80,21 +84,17 @@ function addJob(formData) {
           }
         }
         const nextCompId = "CO-" + (lastIdNum + 1).toString().padStart(4, '0');
-        // 事業者ID, 名称, ヨミ, 所在地, HP, 備考 の順で空行を作成
         compSheet.appendRow([nextCompId, companyName, "", "", "", "案件登録により自動追加"]);
       }
     }
   }
-  // ------------------------------------------
 
-  const idVals = sheet.getRange("A1:A" + sheet.getMaxRows()).getValues();
-  let lastDataRow = 1;
+  const lastRow = sheet.getLastRow();
   let lastIdNum = 0;
-
-  for (let i = 1; i < idVals.length; i++) {
-    let idVal = String(idVals[i][0]).trim();
-    if (idVal !== "") {
-      lastDataRow = i + 1;
+  if (lastRow > 1) {
+    const idVals = sheet.getRange(1, 1, lastRow, 1).getValues();
+    for (let i = 1; i < idVals.length; i++) {
+      let idVal = String(idVals[i][0]).trim();
       let match = idVal.match(/\d+/);
       if (match) {
         let num = parseInt(match[0], 10);
@@ -103,43 +103,57 @@ function addJob(formData) {
     }
   }
 
-  sheet.insertRowAfter(lastDataRow);
-  const targetRow = lastDataRow + 1;
-
+  const targetRow = lastRow + 1;
   const nextId = "JOB-" + (lastIdNum + 1).toString().padStart(4, '0');
   const todayStr = Utilities.formatDate(new Date(), "JST", "yyyy/MM/dd");
-  const fileUrls = Array.isArray(formData.relatedFiles) ? formData.relatedFiles.join('\n') : '';
+  
+  const candidatesArr = Array.isArray(formData.candidates) ? formData.candidates : [];
+  const fileUrlsArr = Array.isArray(formData.relatedFiles) ? formData.relatedFiles : [];
+  const fileUrlsText = fileUrlsArr.join('\n');
 
   const rowData = [
-    nextId,
-    '未着手',
-    todayStr,
-    companyName,
-    formData.skill,
-    formData.candidates.join('\n'),
-    formData.interviewDate || '',
-    '', 
-    '', 
-    formData.memo || ''
+    nextId,                           
+    '未着手',                          
+    todayStr,                         
+    companyName,                      
+    formData.skill || '',             
+    candidatesArr.join('\n'),         
+    formData.interviewDate || '',     
+    '',                               
+    '',                               
+    '',                               
+    formData.memo || ''               
   ];
-  
+
   sheet.getRange(targetRow, 1, 1, rowData.length).setValues([rowData]);
-  convertToSmartChips(sheet, targetRow, 9, fileUrls);
+  
+  if (fileUrlsText) {
+    convertToSmartChips(sheet, targetRow, 10, fileUrlsText);
+  }
+  
   sheet.getRange(targetRow, 3).setNumberFormat('yyyy/MM/dd');
 
   return `案件登録が完了しました: ${nextId}`;
 }
 
+/**
+ * 案件詳細の取得
+ */
 function getJobDetails(jobId) {
   const sheet = getMasterSheet('案件管理');
-  const data = sheet.getDataRange().getValues();
+  if (!sheet) return null;
+  
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) return null;
+
+  const data = sheet.getRange(1, 1, lastRow, 11).getValues();
   const searchId = String(jobId).trim().toUpperCase();
 
   for (let i = 1; i < data.length; i++) {
     if (String(data[i][0]).trim().toUpperCase() === searchId) {
       let rawUrls = "";
       try {
-        const richText = sheet.getRange(i + 1, 9).getRichTextValue();
+        const richText = sheet.getRange(i + 1, 10).getRichTextValue();
         if (richText) {
           const runs = richText.getRuns();
           const urlArray = [];
@@ -149,8 +163,11 @@ function getJobDetails(jobId) {
           });
           rawUrls = urlArray.join('\n');
         }
-      } catch(e) {}
-      if (!rawUrls) rawUrls = String(data[i][8] || "");
+      } catch(e) {
+        console.error("URL抽出エラー: " + e);
+      }
+      
+      if (!rawUrls) rawUrls = String(data[i][9] || ""); 
 
       let ivDate = data[i][6];
       if (ivDate instanceof Date) ivDate = Utilities.formatDate(ivDate, "JST", "yyyy-MM-dd");
@@ -158,57 +175,91 @@ function getJobDetails(jobId) {
       if (rDate instanceof Date) rDate = Utilities.formatDate(rDate, "JST", "yyyy-MM-dd");
 
       return {
-        row: i + 1, id: data[i][0], status: data[i][1], date: rDate, company: data[i][3],
-        skill: data[i][4], candidates: data[i][5], interviewDate: ivDate,
-        hireNames: data[i][7], relatedFile: rawUrls, memo: data[i][9]
+        row: i + 1,
+        id: data[i][0],
+        status: data[i][1],
+        date: rDate,
+        company: data[i][3],
+        skill: data[i][4],
+        candidates: String(data[i][5] || ""),
+        interviewDate: ivDate,
+        hireNames: data[i][7],
+        relatedFile: rawUrls, 
+        memo: data[i][10]
       };
     }
   }
   return null;
 }
 
+/**
+ * 案件情報の更新
+ */
 function updateJob(formData) {
   const sheet = getMasterSheet('案件管理');
   const row = Number(formData.row);
-  const fileUrls = Array.isArray(formData.relatedFiles) ? formData.relatedFiles.join('\n') : '';
+  if (!row || row < 2) return "エラー：無効な行番号です。";
+
+  const candidatesArr = Array.isArray(formData.candidates) ? formData.candidates : [];
+  const fileUrlsArr = Array.isArray(formData.relatedFiles) ? formData.relatedFiles : [];
+  const fileUrlsText = fileUrlsArr.join('\n');
   
-  sheet.getRange(row, 2).setValue(formData.status);
-  sheet.getRange(row, 4).setValue(formData.company);
-  sheet.getRange(row, 5).setValue(formData.skill);
-  sheet.getRange(row, 6).setValue(formData.candidates.join('\n'));
-  sheet.getRange(row, 7).setValue(formData.interviewDate);
-  sheet.getRange(row, 10).setValue(formData.memo);
-  convertToSmartChips(sheet, row, 9, fileUrls);
+  sheet.getRange(row, 2).setValue(formData.status || '未着手');
+  sheet.getRange(row, 4).setValue(formData.company || '');
+  sheet.getRange(row, 5).setValue(formData.skill || '');
+  sheet.getRange(row, 6).setValue(candidatesArr.join('\n'));
+  sheet.getRange(row, 7).setValue(formData.interviewDate || '');
+  sheet.getRange(row, 11).setValue(formData.memo || '');
+  
+  convertToSmartChips(sheet, row, 10, fileUrlsText);
   
   return "案件情報を更新しました。";
 }
 
+/**
+ * 案件の削除
+ */
 function deleteJobRow(jobId) {
   const sheet = getMasterSheet('案件管理');
+  if (!sheet) return "エラー：シートが見つかりません。";
+  
   const data = sheet.getDataRange().getValues();
   for (let i = data.length - 1; i >= 1; i--) {
-    if (String(data[i][0]) === jobId) {
+    if (String(data[i][0]).trim() === String(jobId).trim()) {
       sheet.deleteRow(i + 1);
       return "案件を削除しました。";
     }
   }
-  return "エラー：案件が見つかりませんでした。";
+  return "エラー：対象の案件が見つかりませんでした。";
 }
 
+/**
+ * 案件に紐づく候補者情報のリスト取得
+ */
 function getJobCandidates(jobId) {
   const details = getJobDetails(jobId);
   if (!details || !details.candidates) return [];
-  const candDict = getCandidateDict();
-  const ids = details.candidates.split(/\r?\n/);
+
+  const candDict = getCandidateDict(); 
+  const ids = details.candidates.split(/\r?\n/).filter(id => id.trim());
+
   return ids.map(id => {
-    const cleanId = id.split('-').slice(0,2).join('-').trim();
-    return { id: cleanId, display: candDict[cleanId] ? `${cleanId} (${candDict[cleanId]})` : cleanId };
+    const cleanId = id.split('-').slice(0, 2).join('-').trim();
+    return { 
+      id: cleanId, 
+      display: candDict[cleanId] ? `${cleanId} (${candDict[cleanId]})` : id 
+    };
   }).filter(c => c.id);
 }
 
+/**
+ * 採用登録
+ */
 function registerHire(jobId, hiredIds) {
   const sheet = getMasterSheet('案件管理');
   const mSheet = getMasterSheet('登録者マスタ');
+  if (!sheet || !mSheet) return "エラー：シートへのアクセスに失敗しました。";
+
   const mCol = getMasterColumnMap(mSheet);
   const data = sheet.getDataRange().getValues();
   const mData = mSheet.getDataRange().getValues();
@@ -217,7 +268,7 @@ function registerHire(jobId, hiredIds) {
   let targetJobRow = -1;
 
   for (let i = 1; i < data.length; i++) {
-    if (String(data[i][0]) === jobId) {
+    if (String(data[i][0]).trim() === String(jobId).trim()) {
       companyName = data[i][3];
       targetJobRow = i + 1;
       break;
@@ -227,11 +278,12 @@ function registerHire(jobId, hiredIds) {
 
   const hiredNames = [];
   const candDict = getCandidateDict();
+
   hiredIds.forEach(id => {
     const name = candDict[id] || id;
     hiredNames.push(name);
     for (let j = 1; j < mData.length; j++) {
-      if (String(mData[j][0]) === id) {
+      if (String(mData[j][0]).trim() === String(id).trim()) {
         if (mCol['ステータス']) mSheet.getRange(j + 1, mCol['ステータス']).setValue('採用');
         if (mCol['採用事業者']) mSheet.getRange(j + 1, mCol['採用事業者']).setValue(companyName);
         break;
