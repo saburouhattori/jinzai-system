@@ -21,7 +21,7 @@ function convertToSmartChips(sheet, row, col, urlText) {
   let fullText = "";
   let linkData = [];
   let currentPos = 0;
-  
+
   urls.forEach((url, i) => {
     let fileName = url;
     try {
@@ -44,7 +44,7 @@ function convertToSmartChips(sheet, row, col, urlText) {
     });
     currentPos = currentPos + (i > 0 ? 1 : 0) + textPart.length;
   });
-  
+
   richTextValue.setText(fullText);
   linkData.forEach(ld => {
     richTextValue.setLinkUrl(ld.start, ld.end, ld.url);
@@ -58,7 +58,7 @@ function convertToSmartChips(sheet, row, col, urlText) {
 function addJob(formData) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName('案件管理');
-  
+
   // --- ★追加機能：新規事業者の自動マスタ登録 ---
   const companyName = String(formData.company || "").trim();
   if (companyName) {
@@ -67,7 +67,6 @@ function addJob(formData) {
       const compData = compSheet.getDataRange().getValues();
       // 2列目（インデックス1）が事業者名と想定
       const exists = compData.some(row => String(row[1]).trim() === companyName);
-      
       if (!exists) {
         // マスタに存在しない場合、新しく登録
         let lastIdNum = 0;
@@ -110,21 +109,24 @@ function addJob(formData) {
   const todayStr = Utilities.formatDate(new Date(), "JST", "yyyy/MM/dd");
   const fileUrls = Array.isArray(formData.relatedFiles) ? formData.relatedFiles.join('\n') : '';
 
+  // 11列分（K列：備考・メモまで）の配列を正確に構築します
   const rowData = [
-    nextId,
-    '未着手',
-    todayStr,
-    companyName,
-    formData.skill,
-    formData.candidates.join('\n'),
-    formData.interviewDate || '',
-    '', 
-    '', 
-    formData.memo || ''
+    nextId,                           // 1: A列 案件ID
+    '未着手',                          // 2: B列 ステータス
+    todayStr,                         // 3: C列 案件登録日
+    companyName,                      // 4: D列 事業者名
+    formData.skill,                   // 5: E列 技能分野
+    formData.candidates.join('\n'),   // 6: F列 候補者名
+    formData.interviewDate || '',     // 7: G列 面接日
+    '',                               // 8: H列 採用者氏名
+    '',                               // 9: I列 求人票
+    '',                               // 10: J列 関連ファイル（この後スマートチップで書き込み）
+    formData.memo || ''               // 11: K列 備考・メモ
   ];
-  
+
   sheet.getRange(targetRow, 1, 1, rowData.length).setValues([rowData]);
-  convertToSmartChips(sheet, targetRow, 9, fileUrls);
+  // 第3引数を 9 から 10（J列）へ変更
+  convertToSmartChips(sheet, targetRow, 10, fileUrls);
   sheet.getRange(targetRow, 3).setNumberFormat('yyyy/MM/dd');
 
   return `案件登録が完了しました: ${nextId}`;
@@ -139,7 +141,8 @@ function getJobDetails(jobId) {
     if (String(data[i][0]).trim().toUpperCase() === searchId) {
       let rawUrls = "";
       try {
-        const richText = sheet.getRange(i + 1, 9).getRichTextValue();
+        // J列（10列目）から取得するように変更
+        const richText = sheet.getRange(i + 1, 10).getRichTextValue();
         if (richText) {
           const runs = richText.getRuns();
           const urlArray = [];
@@ -150,7 +153,8 @@ function getJobDetails(jobId) {
           rawUrls = urlArray.join('\n');
         }
       } catch(e) {}
-      if (!rawUrls) rawUrls = String(data[i][8] || "");
+      // data[i][9] が J列（関連ファイル）
+      if (!rawUrls) rawUrls = String(data[i][9] || ""); 
 
       let ivDate = data[i][6];
       if (ivDate instanceof Date) ivDate = Utilities.formatDate(ivDate, "JST", "yyyy-MM-dd");
@@ -160,7 +164,8 @@ function getJobDetails(jobId) {
       return {
         row: i + 1, id: data[i][0], status: data[i][1], date: rDate, company: data[i][3],
         skill: data[i][4], candidates: data[i][5], interviewDate: ivDate,
-        hireNames: data[i][7], relatedFile: rawUrls, memo: data[i][9]
+        hireNames: data[i][7], relatedFile: rawUrls, 
+        memo: data[i][10] // K列（インデックス10）に変更
       };
     }
   }
@@ -170,6 +175,7 @@ function getJobDetails(jobId) {
 function updateJob(formData) {
   const sheet = getMasterSheet('案件管理');
   const row = Number(formData.row);
+
   const fileUrls = Array.isArray(formData.relatedFiles) ? formData.relatedFiles.join('\n') : '';
   
   sheet.getRange(row, 2).setValue(formData.status);
@@ -177,8 +183,10 @@ function updateJob(formData) {
   sheet.getRange(row, 5).setValue(formData.skill);
   sheet.getRange(row, 6).setValue(formData.candidates.join('\n'));
   sheet.getRange(row, 7).setValue(formData.interviewDate);
-  sheet.getRange(row, 10).setValue(formData.memo);
-  convertToSmartChips(sheet, row, 9, fileUrls);
+  // メモの書き込み先を 11（K列）に変更
+  sheet.getRange(row, 11).setValue(formData.memo);
+  // 関連ファイルの書き込み先を 10（J列）に変更
+  convertToSmartChips(sheet, row, 10, fileUrls);
   
   return "案件情報を更新しました。";
 }
@@ -186,6 +194,7 @@ function updateJob(formData) {
 function deleteJobRow(jobId) {
   const sheet = getMasterSheet('案件管理');
   const data = sheet.getDataRange().getValues();
+
   for (let i = data.length - 1; i >= 1; i--) {
     if (String(data[i][0]) === jobId) {
       sheet.deleteRow(i + 1);
@@ -198,8 +207,10 @@ function deleteJobRow(jobId) {
 function getJobCandidates(jobId) {
   const details = getJobDetails(jobId);
   if (!details || !details.candidates) return [];
+
   const candDict = getCandidateDict();
   const ids = details.candidates.split(/\r?\n/);
+
   return ids.map(id => {
     const cleanId = id.split('-').slice(0,2).join('-').trim();
     return { id: cleanId, display: candDict[cleanId] ? `${cleanId} (${candDict[cleanId]})` : cleanId };
@@ -210,6 +221,7 @@ function registerHire(jobId, hiredIds) {
   const sheet = getMasterSheet('案件管理');
   const mSheet = getMasterSheet('登録者マスタ');
   const mCol = getMasterColumnMap(mSheet);
+
   const data = sheet.getDataRange().getValues();
   const mData = mSheet.getDataRange().getValues();
   
@@ -227,6 +239,7 @@ function registerHire(jobId, hiredIds) {
 
   const hiredNames = [];
   const candDict = getCandidateDict();
+
   hiredIds.forEach(id => {
     const name = candDict[id] || id;
     hiredNames.push(name);
