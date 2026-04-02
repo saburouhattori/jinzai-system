@@ -280,8 +280,11 @@ function registerHire(jobId, hiredIds) {
   const candDict = getCandidateDict();
 
   hiredIds.forEach(id => {
-    const name = candDict[id] || id;
-    hiredNames.push(name);
+    const name = candDict[id] || "";
+    // ★ F列と同様に「ID-名前」の形式に変更
+    const displayVal = name ? `${id}-${name}` : id;
+    hiredNames.push(displayVal);
+    
     for (let j = 1; j < mData.length; j++) {
       if (String(mData[j][0]).trim() === String(id).trim()) {
         if (mCol['ステータス']) mSheet.getRange(j + 1, mCol['ステータス']).setValue('採用');
@@ -291,7 +294,8 @@ function registerHire(jobId, hiredIds) {
     }
   });
 
-  sheet.getRange(targetJobRow, 8).setValue(hiredNames.join(', '));
+  // ★ F列と同様に改行(\n)区切りで書き込むよう変更
+  sheet.getRange(targetJobRow, 8).setValue(hiredNames.join('\n'));
   sheet.getRange(targetJobRow, 2).setValue('終了');
 
   return `${hiredIds.length} 名の採用登録を完了しました。案件ステータスを「終了」にしました。`;
