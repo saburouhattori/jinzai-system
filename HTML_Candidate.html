@@ -1,117 +1,122 @@
-<div id="form-candidate" style="display: <?= (mode === 'NEW' || mode === 'EDIT' || mode === 'COMMENT') ? 'block' : 'none' ?>;">
-<? if (mode === 'COMMENT') { ?>
-<div class="field" ><label>名前</label><input type= "text" id="name" readonly style="background:#f8f9fa;"></div>
-<div class="field" ><label>コメント</label><textarea id= "comment" rows="15"></textarea></div>
-<? } else { ?>
-<div class="section-title" >基本情報</div>
-<div class="form-row">
-  <div class="field"><label>名前</label><input type="text" id="name"></div>
-  <div class="field"><label>フリガナ</label><input type="text" id="furigana"></div>
-  <div class="field"><label>呼び名</label><input type="text" id="nickname"></div>
-</div>
-<div class="form-row">
-  <div class="field"><label>生年月日</label><input type="date" id="birthday"></div>
-  <div class="field"><label>性別</label><select id="gender"><option value="">未選択</option><option value="男性">男性</option><option value="女性">女性</option></select></div>
-  <div class="field"><label>配偶者</label><select id="spouse"><option value="">未選択</option><option value="無">無</option><option value="有">有</option></select></div>
-</div>
-<div class="form-row">
-  <div class="field"><label>身長</label><div class="unit-input"><input type="number" id="height"><span class="unit-label">cm</span></div></div>
-  <div class="field"><label>体重</label><div class="unit-input"><input type="number" id="weight"><span class="unit-label">kg</span></div></div>
-  <div class="field flex-2"><label>現住所</label><input type="text" id="address"></div>
-</div>
-<div class="form-row">
-  <div class="field"><label>出生地</label><input type="text" id="birthplace"></div>
-  <div class="field"><label>メールアドレス</label><input type="email" id="email"></div>
-  <div class="field"><label>所属日本語学校</label><select id="school"><option value="">未選択</option></select></div>
+<div id="search-section" style="display: none; max-width: 400px; margin-bottom: 20px;">
+  <label>管理番号で検索</label>
+  <div style="display: flex; gap: 10px;">
+    <input type="text" id="searchId" placeholder=" 例: 1 または 0001 " oninput="checkCandId(this, 'searchNameDisplay')" onblur="applyFormat(this)" style="flex: 2;">
+    <button class="btn-secondary" id="searchBtn" onclick="searchDataRouting()" style="flex: 1; margin-top: 0; padding: 8px;">読み込む</button>
+  </div>
+  <div id="searchNameDisplay" style="font-size:11px; color:#1a73e8; margin-top:4px; height:14px;"></div>
 </div>
 
-<div class="section-title" >学歴</div>
-<div class="form-row">
-  <div class="field flex-2"><label>学校名</label><input type="text" id="eduSchool"></div>
-  <div class="field flex-2"><label>学部・学科・専攻</label><input type="text" id="eduDept"></div>
-  <div class="field"><label>状況</label><select id="eduStatus"><option value="">未選択</option><option value="卒業">卒業</option><option value="中途退学">中途退学</option><option value="在学中">在学中</option><option value="休学中">休学中</option></select></div>
-</div>
-<div class="form-row">
-  <div class="field"><label>入学年月</label><input type="text" id="eduStart" placeholder=" YYYY年MM月 "></div>
-  <div class="field"><label>卒業/中退年月</label><input type="text" id="eduEnd" placeholder=" YYYY年MM月 "></div>
-  <div class="field flex-2"><label>補足</label><input type="text" id="eduNote"></div>
-</div>
+<input type="hidden" id="targetRow">
 
-<div class="section-title" >職歴</div>
-<div class="form-row">
-  <div class="field"><label>職歴① 期間</label><input type="text" id="expPeriod1" placeholder="例: 2020年4月から2024年5月まで"></div>
-  <div class="field flex-2"><label>職歴① 内容</label><input type="text" id="expContent1" placeholder="例: スーパーのレジスタッフとして働いた。"></div>
-</div>
-<div class="form-row">
-  <div class="field"><label>職歴② 期間</label><input type="text" id="expPeriod2"></div>
-  <div class="field flex-2"><label>職歴② 内容</label><input type="text" id="expContent2"></div>
-</div>
-<div class="form-row">
-  <div class="field"><label>職歴③ 期間</label><input type="text" id="expPeriod3"></div>
-  <div class="field flex-2"><label>職歴③ 内容</label><input type="text" id="expContent3"></div>
-</div>
-
-<div class="section-title" >特定技能要件</div>
-<div class="form-row">
-  <div class="field">
-    <label>JLPT</label>
-    <div class="sub-field"><select id="jlptLevel" style="flex:1;"><option value="">未選択</option><option value="N1">N1</option><option value="N2">N2</option><option value="N3">N3</option><option value="N4">N4</option></select><input type="text" id="jlptDate" placeholder="年月" style="flex:1;"></div>
-  </div>
-  <div class="field">
-    <label>JFT Basic</label>
-    <div class="sub-field"><select id="jftLevel" style="flex:1;"><option value="">未選択</option><option value="A2">A2</option></select><input type="text" id="jftDate" placeholder="年月" style="flex:1;"></div>
-  </div>
-</div>
-<div class="form-row">
-  <div class="field">
-    <label>介護技能評価試験</label>
-    <div class="sub-field"><select id="kaigoSkill" style="flex:1;"><option value="">未選択</option><option value="合格">合格</option><option value="受験予定">受験予定</option></select><input type="text" id="kaigoSkillDate" placeholder="年月" style="flex:1;"></div>
-  </div>
-  <div class="field">
-    <label>介護日本語評価試験</label>
-    <div class="sub-field"><select id="kaigoLang" style="flex:1;"><option value="">未選択</option><option value="合格">合格</option><option value="受験予定">受験予定</option></select><input type="text" id="kaigoLangDate" placeholder="年月" style="flex:1;"></div>
+<div id="form-candidate-comment" style="display: none;">
+  <div class="field" ><label>名前</label><input type="text" id="comment_name_display" readonly style="background:#f8f9fa;"></div>
+  <div class="field" ><label>コメント</label><textarea id="comment_text_input" rows="15"></textarea></div>
+  <div style="text-align: center; margin-top: 20px;">
+    <button class="btn-primary" onclick="submitData()" style="width: 200px;">更新</button>
   </div>
 </div>
 
-<div class="section-title" >その他</div>
-<div class="form-row">
-  <div class="field">
-    <label>その他の日本語能力試験</label>
-    <div class="sub-field">
-      <select id="otherJapanese" style="flex:1;">
-        <option value="">未選択</option><option value="NAT-TEST 5級">NAT-TEST 5級</option><option value="NAT-TEST 4級">NAT-TEST 4級</option><option value="NAT-TEST 3級">NAT-TEST 3級</option><option value="NAT-TEST 2級">NAT-TEST 2級</option><option value="NAT-TEST 1級">NAT-TEST 1級</option><option value="J.TEST G級">J.TEST G級</option><option value="J.TEST F級">J.TEST F級</option><option value="J.TEST E級">J.TEST E級</option><option value="J.TEST D級">J.TEST D級</option><option value="J.TEST C級">J.TEST C級</option><option value="J.TEST 準B級">J.TEST 準B級</option><option value="J.TEST B級">J.TEST B級</option><option value="J.TEST 準A級">J.TEST 準A級</option><option value="J.TEST A級">J.TEST A級</option><option value="J.TEST 特A級">J.TEST 特A級</option><option value="J-cert A1">J-cert A1</option><option value="J-cert A2.1">J-cert A2.1</option><option value="J-cert A2.2">J-cert A2.2</option><option value="J-cert B1">J-cert B1</option><option value="J-cert B2">J-cert B2</option><option value="J-cert C1">J-cert C1</option><option value="J-cert C2">J-cert C2</option>
-      </select>
-      <input type="text" id="otherJapaneseDate" placeholder="年月" style="flex:1;">
+<div id="form-candidate-main" style="display: none;">
+  <div class="section-title" >基本情報</div>
+  <div class="form-row">
+    <div class="field"><label>名前</label><input type="text" id="name"></div>
+    <div class="field"><label>フリガナ</label><input type="text" id="furigana"></div>
+    <div class="field"><label>呼び名</label><input type="text" id="nickname"></div>
+  </div>
+  <div class="form-row">
+    <div class="field"><label>生年月日</label><input type="date" id="birthday"></div>
+    <div class="field"><label>性別</label><select id="gender"><option value="">未選択</option><option value="男性">男性</option><option value="女性">女性</option></select></div>
+    <div class="field"><label>配偶者</label><select id="spouse"><option value="">未選択</option><option value="無">無</option><option value="有">有</option></select></div>
+  </div>
+  <div class="form-row">
+    <div class="field"><label>身長</label><div class="unit-input"><input type="number" id="height"><span class="unit-label">cm</span></div></div>
+    <div class="field"><label>体重</label><div class="unit-input"><input type="number" id="weight"><span class="unit-label">kg</span></div></div>
+    <div class="field flex-2"><label>現住所</label><input type="text" id="address"></div>
+  </div>
+  <div class="form-row">
+    <div class="field"><label>出生地</label><input type="text" id="birthplace"></div>
+    <div class="field"><label>メールアドレス</label><input type="email" id="email"></div>
+    <div class="field"><label>所属日本語学校</label><select id="school"><option value="">未選択</option></select></div>
+  </div>
+
+  <div class="section-title" >学歴</div>
+  <div class="form-row">
+    <div class="field flex-2"><label>学校名</label><input type="text" id="eduSchool"></div>
+    <div class="field flex-2"><label>学部・学科・専攻</label><input type="text" id="eduDept"></div>
+    <div class="field"><label>状況</label><select id="eduStatus"><option value="">未選択</option><option value="卒業">卒業</option><option value="中途退学">中途退学</option><option value="在学中">在学中</option><option value="休学中">休学中</option></select></div>
+  </div>
+  <div class="form-row">
+    <div class="field"><label>入学年月</label><input type="text" id="eduStart" placeholder=" YYYY年MM月 "></div>
+    <div class="field"><label>卒業/中退年月</label><input type="text" id="eduEnd" placeholder=" YYYY年MM月 "></div>
+    <div class="field flex-2"><label>補足</label><input type="text" id="eduNote"></div>
+  </div>
+
+  <div class="section-title" >職歴</div>
+  <div class="form-row">
+    <div class="field"><label>職歴① 期間</label><input type="text" id="expPeriod1" placeholder="例: 2020年4月から2024年5月まで"></div>
+    <div class="field flex-2"><label>職歴① 内容</label><input type="text" id="expContent1" placeholder="例: スーパーのレジスタッフとして働いた。"></div>
+  </div>
+  <div class="form-row">
+    <div class="field"><label>職歴② 期間</label><input type="text" id="expPeriod2"></div>
+    <div class="field flex-2"><label>職歴② 内容</label><input type="text" id="expContent2"></div>
+  </div>
+  <div class="form-row">
+    <div class="field"><label>職歴③ 期間</label><input type="text" id="expPeriod3"></div>
+    <div class="field flex-2"><label>職歴③ 内容</label><input type="text" id="expContent3"></div>
+  </div>
+
+  <div class="section-title" >特定技能要件</div>
+  <div class="form-row">
+    <div class="field">
+      <label>JLPT</label>
+      <div class="sub-field"><select id="jlptLevel" style="flex:1;"><option value="">未選択</option><option value="N1">N1</option><option value="N2">N2</option><option value="N3">N3</option><option value="N4">N4</option></select><input type="text" id="jlptDate" placeholder="年月" style="flex:1;"></div>
+    </div>
+    <div class="field">
+      <label>JFT Basic</label>
+      <div class="sub-field"><select id="jftLevel" style="flex:1;"><option value="">未選択</option><option value="A2">A2</option></select><input type="text" id="jftDate" placeholder="年月" style="flex:1;"></div>
     </div>
   </div>
-  <div class="field flex-2">
-    <label>日本在住の親族の有無</label>
-    <div class="sub-field">
-      <select id="relativeSelect" onchange="toggleRelative()" style="width:120px; flex-shrink: 0;"><option value="無">無</option><option value="有">有</option></select>
-      <input type="text" id="relativeDetail" style="display:none; flex:1;" placeholder=" 続柄・お名前など具体的に ">
+  <div class="form-row">
+    <div class="field">
+      <label>介護技能評価試験</label>
+      <div class="sub-field"><select id="kaigoSkill" style="flex:1;"><option value="">未選択</option><option value="合格">合格</option><option value="受験予定">受験予定</option></select><input type="text" id="kaigoSkillDate" placeholder="年月" style="flex:1;"></div>
+    </div>
+    <div class="field">
+      <label>介護日本語評価試験</label>
+      <div class="sub-field"><select id="kaigoLang" style="flex:1;"><option value="">未選択</option><option value="合格">合格</option><option value="受験予定">受験予定</option></select><input type="text" id="kaigoLangDate" placeholder="年月" style="flex:1;"></div>
     </div>
   </div>
-</div>
-<div class="form-row">
-  <div class="field flex-2"><label>コメント</label><textarea id="comment" rows="2"></textarea></div>
-  <div class="field"><label>写真</label><input type="file" id="imageFile" accept="image/*"></div>
-</div>
-<? } ?>
-<div style="text-align: center; margin-top: 20px;">
-  <button class="btn-primary" id="mainBtn" onclick="submitData()" style="width: 200px;"><?= mode === 'NEW' ? ' 新規登録 ' : ' 更新 ' ?></button>
-</div>
-</div>
 
-<div id="form-addinfo" style="display: <?= mode === 'ADDINFO' ? 'block' : 'none' ?>;">
-  <div class="search-box" style="max-width: 400px; margin-bottom: 20px;">
-    <label>管理番号で検索</label>
-    <div style="display: flex; gap: 10px;">
-      <input type="text" id="searchIdAddInfo" placeholder=" 例: 1 または 0001 " oninput="checkCandId(this, 'searchNameAddInfo')" onblur="applyFormat(this)" style="flex: 2;">
-      <button class="btn-secondary" onclick="searchDataAddInfo()" style="flex: 1; margin-top: 0; padding: 8px;">読み込む</button>
+  <div class="section-title" >その他</div>
+  <div class="form-row">
+    <div class="field">
+      <label>その他の日本語能力試験</label>
+      <div class="sub-field">
+        <select id="otherJapanese" style="flex:1;">
+          <option value="">未選択</option><option value="NAT-TEST 5級">NAT-TEST 5級</option><option value="NAT-TEST 4級">NAT-TEST 4級</option><option value="NAT-TEST 3級">NAT-TEST 3級</option><option value="NAT-TEST 2級">NAT-TEST 2級</option><option value="NAT-TEST 1級">NAT-TEST 1級</option><option value="J.TEST G級">J.TEST G級</option><option value="J.TEST F級">J.TEST F級</option><option value="J.TEST E級">J.TEST E級</option><option value="J.TEST D級">J.TEST D級</option><option value="J.TEST C級">J.TEST C級</option><option value="J.TEST 準B級">J.TEST 準B級</option><option value="J.TEST B級">J.TEST B級</option><option value="J.TEST 準A級">J.TEST 準A級</option><option value="J.TEST A級">J.TEST A級</option><option value="J.TEST 特A級">J.TEST 特A級</option><option value="J-cert A1">J-cert A1</option><option value="J-cert A2.1">J-cert A2.1</option><option value="J-cert A2.2">J-cert A2.2</option><option value="J-cert B1">J-cert B1</option><option value="J-cert B2">J-cert B2</option><option value="J-cert C1">J-cert C1</option><option value="J-cert C2">J-cert C2</option>
+        </select>
+        <input type="text" id="otherJapaneseDate" placeholder="年月" style="flex:1;">
+      </div>
     </div>
-    <div id="searchNameAddInfo" style="font-size:11px; color:#1a73e8; margin-top:4px; height:14px;"></div>
+    <div class="field flex-2">
+      <label>日本在住の親族の有無</label>
+      <div class="sub-field">
+        <select id="relativeSelect" onchange="toggleRelative()" style="width:120px; flex-shrink: 0;"><option value="無">無</option><option value="有">有</option></select>
+        <input type="text" id="relativeDetail" style="display:none; flex:1;" placeholder=" 続柄・お名前など具体的に ">
+      </div>
+    </div>
   </div>
+  <div class="form-row">
+    <div class="field flex-2"><label>コメント</label><textarea id="comment" rows="2"></textarea></div>
+    <div class="field"><label>写真</label><input type="file" id="imageFile" accept="image/*"></div>
+  </div>
+  <div style="text-align: center; margin-top: 20px;">
+    <button class="btn-primary" id="mainBtn" onclick="submitData()" style="width: 200px;"><span id="mainBtnText">保存</span></button>
+  </div>
+</div>
 
+<div id="form-addinfo" style="display: none;">
   <div class="section-title">基本・パスポート情報</div>
   <div class="form-row">
     <div class="field"><label>所属送り出し機関</label><select id="add_agent"><option value="">未選択</option></select></div>
@@ -175,7 +180,7 @@
   </div>
 </div>
 
-<div id="form-delete" style="display: <?= mode === 'DELETE' ? 'block' : 'none' ?>;">
+<div id="form-delete" style="display: none;">
 <div class="section-title" style="border-left-color: #d93025;">登録者削除</div>
 <div class="field">
 <label>削除する登録者ID</label>

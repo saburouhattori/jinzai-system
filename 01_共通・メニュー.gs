@@ -2,6 +2,9 @@
 // システム全体の設定値・共通関数・UI
 // =========================================
 
+/**
+ * シートを取得する共通関数
+ */
 function getMasterSheet(sheetName) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName(sheetName);
@@ -11,6 +14,9 @@ function getMasterSheet(sheetName) {
   return sheet;
 }
 
+/**
+ * ヘッダー名から列番号を取得
+ */
 function getMasterColumnMap(sheet) {
   if (!sheet) return {};
   const lastCol = sheet.getLastColumn();
@@ -25,7 +31,7 @@ function getMasterColumnMap(sheet) {
 }
 
 /**
- * HTMLファイル読み込み用（★最速で表示させるため、そのままのHTMLとして読み込みます）
+ * HTMLファイル読み込み用（★修正：安全な読み込み方式）
  */
 function include(filename) {
   return HtmlService.createHtmlOutputFromFile(filename).getContent();
@@ -37,7 +43,6 @@ function include(filename) {
 
 function onOpen() {
   const ui = SpreadsheetApp.getUi();
-  
   ui.createMenu( '人材事業メニュー' )
     .addItem( '候補者登録' , 'showSidebarNew')
     .addItem( 'データ更新' , 'showSidebarEdit')
@@ -53,7 +58,7 @@ function onOpen() {
     .addSeparator()
     .addItem('採用・未採用リストの同期', 'runSyncListSheets')
     .addToUi();
-
+    
   ui.createMenu( '案件・採用管理' )
     .addItem( '案件登録' , 'showSidebarJobNew')
     .addItem( '案件更新/削除' , 'showSidebarJobEdit')
@@ -61,11 +66,16 @@ function onOpen() {
     .addToUi();
 }
 
+/**
+ * サイドバー/ダイアログ表示の共通処理
+ */
 function showMainSidebar(mode, title, prefillName) {
-  const html = HtmlService.createTemplateFromFile('MainSidebar');
-  html.mode = mode || "";
-  html.prefillName = prefillName || ""; // 引継ぎ用
-  const output = html.evaluate()
+  // ★修正：テンプレートを正しく評価（evaluate）し、HTML構造を崩さずに表示します
+  const template = HtmlService.createTemplateFromFile('MainSidebar');
+  template.mode = mode || "";
+  template.prefillName = prefillName || "";
+  
+  const output = template.evaluate()
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
     .setWidth(800)
     .setHeight(650);

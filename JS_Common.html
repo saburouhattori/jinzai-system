@@ -3,50 +3,8 @@ let candidateDict = {};
 let jobDict = {};
 let currentFileInput = null;
 
-window.addEventListener('DOMContentLoaded', () => {
-  // 1. 各フォーム要素の表示・非表示制御
-  const forms = [
-    'form-candidate-main', 'form-candidate-comment', 
-    'form-addinfo', 'form-delete', 
-    'form-company', 'form-job', 'form-job-edit', 
-    'form-hire', 'form-list'
-  ];
-  forms.forEach(id => {
-    let el = document.getElementById(id);
-    if(el) el.style.display = 'none';
-  });
-
-  const searchSec = document.getElementById('search-section');
-  if(searchSec) searchSec.style.display = 'none';
-
-  if (MODE === 'NEW') { document.getElementById('form-candidate-main').style.display = 'block'; }
-  if (MODE === 'EDIT') { 
-    if(searchSec) searchSec.style.display = 'block'; 
-    document.getElementById('form-candidate-main').style.display = 'block'; 
-  }
-  if (MODE === 'COMMENT') { 
-    if(searchSec) searchSec.style.display = 'block';
-    document.getElementById('form-candidate-comment').style.display = 'block'; 
-  }
-  if (MODE === 'ADDINFO') { 
-    if(searchSec) searchSec.style.display = 'block';
-    document.getElementById('form-addinfo').style.display = 'block'; 
-  }
-  if (MODE === 'DELETE') { document.getElementById('form-delete').style.display = 'block'; }
-  if (MODE === 'COMPANY') { document.getElementById('form-company').style.display = 'block'; }
-  if (MODE === 'JOB') { document.getElementById('form-job').style.display = 'block'; addJobCandRow(); addJobFileRow('job'); }
-  if (MODE === 'JOB_EDIT') { document.getElementById('form-job-edit').style.display = 'block'; }
-  if (MODE === 'HIRE') { document.getElementById('form-hire').style.display = 'block'; }
-  if (MODE === 'LIST') { document.getElementById('form-list').style.display = 'block'; addListCandRow(); }
-
-  if (MODE === 'COMPANY' && typeof PREFILL_NAME !== 'undefined' && PREFILL_NAME) {
-    let compInput = document.getElementById('comp_name');
-    if (compInput) compInput.value = PREFILL_NAME;
-  }
-});
-
-window.onload = function() {
-  // ★通信を「1回」にまとめてサーバーの負荷を激減させる
+// MainSidebar.htmlから呼ばれるデータ読み込み関数
+function loadInitialData() {
   google.script.run.withSuccessHandler(function(data) {
     candidateDict = data.candidateDict || {};
     if (data.jobDict) jobDict = data.jobDict;
@@ -64,7 +22,7 @@ window.onload = function() {
       if(select) data.agents.forEach(function(agent) { let opt = document.createElement('option'); opt.value = agent; opt.text = agent; select.appendChild(opt); });
     }
   }).getInitialData(MODE);
-};
+}
 
 function openDrivePicker(btnElement) { 
   if (btnElement) {
