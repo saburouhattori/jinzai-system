@@ -111,24 +111,25 @@ function addJob(formData) {
   const fileUrlsArr = Array.isArray(formData.relatedFiles) ? formData.relatedFiles : [];
   const fileUrlsText = fileUrlsArr.join('\n');
 
+  // I列削除に伴い、10項目に調整
   const rowData = [
-    nextId,                           
-    '未着手',                          
-    todayStr,                         
-    companyName,                      
-    formData.skill || '',             
-    candidatesArr.join('\n'),         
-    formData.interviewDate || '',     
-    '',                               
-    '',                               
-    '',                               
-    formData.memo || ''               
+    nextId,                           // 1: A 案件ID
+    '未着手',                          // 2: B ステータス
+    todayStr,                         // 3: C 案件登録日
+    companyName,                      // 4: D 事業者名
+    formData.skill || '',             // 5: E 技能分野
+    candidatesArr.join('\n'),         // 6: F 候補者名
+    formData.interviewDate || '',     // 7: G 面接日
+    '',                               // 8: H 採用者名
+    '',                               // 9: I 関連ファイル (後でスマートチップ化)
+    formData.memo || ''               // 10: J 備考・メモ
   ];
 
   sheet.getRange(targetRow, 1, 1, rowData.length).setValues([rowData]);
   
+  // 第3引数を 10 から 9（I列）に変更
   if (fileUrlsText) {
-    convertToSmartChips(sheet, targetRow, 10, fileUrlsText);
+    convertToSmartChips(sheet, targetRow, 9, fileUrlsText);
   }
   
   sheet.getRange(targetRow, 3).setNumberFormat('yyyy/MM/dd');
@@ -146,14 +147,16 @@ function getJobDetails(jobId) {
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return null;
 
-  const data = sheet.getRange(1, 1, lastRow, 11).getValues();
+  // 10列分を取得
+  const data = sheet.getRange(1, 1, lastRow, 10).getValues();
   const searchId = String(jobId).trim().toUpperCase();
 
   for (let i = 1; i < data.length; i++) {
     if (String(data[i][0]).trim().toUpperCase() === searchId) {
       let rawUrls = "";
       try {
-        const richText = sheet.getRange(i + 1, 10).getRichTextValue();
+        // 第9列（I列）から取得
+        const richText = sheet.getRange(i + 1, 9).getRichTextValue();
         if (richText) {
           const runs = richText.getRuns();
           const urlArray = [];
@@ -167,7 +170,8 @@ function getJobDetails(jobId) {
         console.error("URL抽出エラー: " + e);
       }
       
-      if (!rawUrls) rawUrls = String(data[i][9] || ""); 
+      // インデックスを 9(旧J) から 8(新I) に変更
+      if (!rawUrls) rawUrls = String(data[i][8] || ""); 
 
       let ivDate = data[i][6];
       if (ivDate instanceof Date) ivDate = Utilities.formatDate(ivDate, "JST", "yyyy-MM-dd");
@@ -185,7 +189,7 @@ function getJobDetails(jobId) {
         interviewDate: ivDate,
         hireNames: data[i][7],
         relatedFile: rawUrls, 
-        memo: data[i][10]
+        memo: data[i][9] // 11(旧K) から 10(新J) に変更
       };
     }
   }
@@ -209,9 +213,12 @@ function updateJob(formData) {
   sheet.getRange(row, 5).setValue(formData.skill || '');
   sheet.getRange(row, 6).setValue(candidatesArr.join('\n'));
   sheet.getRange(row, 7).setValue(formData.interviewDate || '');
-  sheet.getRange(row, 11).setValue(formData.memo || '');
   
-  convertToSmartChips(sheet, row, 10, fileUrlsText);
+  // 備考の列を 11(旧K) から 10(新J) に変更
+  sheet.getRange(row, 10).setValue(formData.memo || '');
+  
+  // 関連ファイルの列を 10(旧J) から 9(新I) に変更
+  convertToSmartChips(sheet, row, 9, fileUrlsText);
   
   return "案件情報を更新しました。";
 }
@@ -281,7 +288,6 @@ function registerHire(jobId, hiredIds) {
 
   hiredIds.forEach(id => {
     const name = candDict[id] || "";
-    // ★ F列と同様に「ID-名前」の形式に変更
     const displayVal = name ? `${id}-${name}` : id;
     hiredNames.push(displayVal);
     
@@ -294,7 +300,6 @@ function registerHire(jobId, hiredIds) {
     }
   });
 
-  // ★ F列と同様に改行(\n)区切りで書き込むよう変更
   sheet.getRange(targetJobRow, 8).setValue(hiredNames.join('\n'));
   sheet.getRange(targetJobRow, 2).setValue('終了');
 
