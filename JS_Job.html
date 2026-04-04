@@ -4,16 +4,32 @@ function submitCompany() {
   let name = document.getElementById('comp_name').value.trim();
   if (!name) { showModal('事業者名称は必須です。'); return; }
   let formData = { name: name, yomi: document.getElementById('comp_yomi').value, address: document.getElementById('comp_address').value, url: document.getElementById('comp_url').value, note: document.getElementById('comp_note').value };
-  document.getElementById('compBtn').disabled = true; showModal('登録中...', true);
-  google.script.run.withSuccessHandler(function(msg) {
-    document.getElementById('compBtn').disabled = false; showModal(msg);
-    document.querySelectorAll('#form-company input, #form-company textarea').forEach(el => el.value = '');
-    document.getElementById('comp_warning').style.display = 'none';
-  }).addCompany(formData);
+  
+  document.getElementById('compBtn').disabled = true; 
+  showModal('登録中...', true);
+  
+  google.script.run
+    .withSuccessHandler(function(msg) {
+      try {
+        document.getElementById('compBtn').disabled = false; 
+        showModal(msg);
+        document.querySelectorAll('#form-company input, #form-company textarea').forEach(el => el.value = '');
+        let warningEl = document.getElementById('comp_warning');
+        if(warningEl) warningEl.style.display = 'none';
+      } catch(e) {
+        showModal('登録は完了しましたが、画面のクリアに失敗しました: ' + e.message);
+      }
+    })
+    .withFailureHandler(function(err) {
+      document.getElementById('compBtn').disabled = false; 
+      showModal('サーバーエラー: ' + err.message);
+    })
+    .addCompany(formData);
 }
 
 function liveCheckDuplicate(name) {
   let warningBox = document.getElementById('comp_warning');
+  if (!warningBox) return;
   if (!name.trim()) { warningBox.style.display = 'none'; return; }
   google.script.run.withSuccessHandler(function(isDup) { warningBox.style.display = isDup ? 'block' : 'none'; }).checkCompanyDuplicate(name);
 }
@@ -30,6 +46,7 @@ function createCandRowHTML(className, val = '', nameVal = '') {
 function addJobFileRow(prefix, urlVal = '') {
   const containerId = prefix + '_file_list';
   const container = document.getElementById(containerId);
+  if (!container) return;
   const className = prefix + '-file-input';
   
   const html = `<div style="display: flex; gap: 10px; align-items: center; margin-bottom: 8px;">
@@ -43,14 +60,17 @@ function addJobFileRow(prefix, urlVal = '') {
 
 // --- 案件登録（新規） ---
 function addJobCandRow() {
-  document.getElementById('job_cand_list').insertAdjacentHTML('beforeend', createCandRowHTML('job-cand-id'));
+  const listEl = document.getElementById('job_cand_list');
+  if(listEl) listEl.insertAdjacentHTML('beforeend', createCandRowHTML('job-cand-id'));
 }
 
 function submitJob() {
-  let company = document.getElementById('job_company').value.trim();
+  let companyEl = document.getElementById('job_company');
+  let company = companyEl ? companyEl.value.trim() : '';
   if (!company) { showModal('事業者名を入力してください。'); return; }
   
-  let candInputDivs = document.getElementById('job_cand_list').children; 
+  let candListEl = document.getElementById('job_cand_list');
+  let candInputDivs = candListEl ? candListEl.children : []; 
   let candidates = [];
   Array.from(candInputDivs).forEach(div => { 
     let inputEl = div.querySelector('input.job-cand-id');
@@ -74,91 +94,148 @@ function submitJob() {
     if(val) relatedFiles.push(val);
   });
 
+  let skillEl = document.getElementById('job_skill');
+  let interviewDateEl = document.getElementById('job_interviewDate');
+  let memoEl = document.getElementById('job_memo');
+
   let formData = {
     company: company,
-    skill: document.getElementById('job_skill').value,
+    skill: skillEl ? skillEl.value : '',
     candidates: candidates,
-    interviewDate: document.getElementById('job_interviewDate').value,
+    interviewDate: interviewDateEl ? interviewDateEl.value : '',
     relatedFiles: relatedFiles,
-    memo: document.getElementById('job_memo').value
+    memo: memoEl ? memoEl.value : ''
   };
   
-  document.getElementById('jobBtn').disabled = true; showModal('案件を登録中...', true);
-  google.script.run.withSuccessHandler(function(msg) {
-    document.getElementById('jobBtn').disabled = false; showModal(msg);
-    document.getElementById('job_company').value = ''; 
-    document.getElementById('job_skill').value = '';
-    document.getElementById('job_interviewDate').value = '';
-    document.getElementById('job_file_list').innerHTML = ''; addJobFileRow('job');
-    document.getElementById('job_memo').value = '';
-    document.getElementById('job_cand_list').innerHTML = createCandRowHTML('job-cand-id');
-  }).addJob(formData);
+  let btnEl = document.getElementById('jobBtn');
+  if(btnEl) btnEl.disabled = true; 
+  
+  showModal('案件を登録中...', true);
+  
+  google.script.run
+    .withSuccessHandler(function(msg) {
+      try {
+        if(btnEl) btnEl.disabled = false; 
+        
+        // ★ エラーが起きてもメッセージが出るように確実に表示
+        showModal(msg);
+        
+        // フォームのクリア処理（要素が存在するかチェックしながら安全に実行）
+        if(companyEl) companyEl.value = ''; 
+        if(skillEl) skillEl.value = '';
+        if(interviewDateEl) interviewDateEl.value = '';
+        if(memoEl) memoEl.value = '';
+        
+        let fileListEl = document.getElementById('job_file_list');
+        if(fileListEl) {
+           fileListEl.innerHTML = ''; 
+           addJobFileRow('job');
+        }
+        if(candListEl) {
+           candListEl.innerHTML = createCandRowHTML('job-cand-id');
+        }
+      } catch(frontendErr) {
+        showModal('登録は完了しましたが、画面の初期化に失敗しました。画面を更新してください。');
+        console.error(frontendErr);
+      }
+    })
+    .withFailureHandler(function(err) {
+      if(btnEl) btnEl.disabled = false; 
+      showModal('サーバーエラー: ' + err.message);
+    })
+    .addJob(formData);
 }
 
 // --- 案件情報の修正・削除 ---
 function searchJobData() {
-  let rawId = document.getElementById('edit_job_searchId').value.trim();
+  let searchIdEl = document.getElementById('edit_job_searchId');
+  if(!searchIdEl) return;
+  
+  let rawId = searchIdEl.value.trim();
   if (!rawId) { showModal('案件IDを入力してください。'); return; }
   let jobId = formatJobId(rawId);
-  document.getElementById('edit_job_searchId').value = jobId;
+  searchIdEl.value = jobId;
 
   showModal('検索中...', true);
-  google.script.run.withSuccessHandler(function(data) {
-    closeModal();
-    if (data) {
-      document.getElementById('job_edit_fields').style.display = 'block';
-      document.getElementById('edit_job_row').value = data.row;
-      document.getElementById('edit_job_id').value = data.id;
-      document.getElementById('edit_job_status').value = data.status || "未着手";
-      document.getElementById('edit_job_company').value = data.company || "";
-      document.getElementById('edit_job_skill').value = data.skill || "";
-      document.getElementById('edit_job_interviewDate').value = data.interviewDate || "";
-      document.getElementById('edit_job_memo').value = data.memo || "";
+  google.script.run
+    .withSuccessHandler(function(data) {
+      try {
+        closeModal();
+        let editFields = document.getElementById('job_edit_fields');
+        if (data && editFields) {
+          editFields.style.display = 'block';
+          let setVal = (id, val) => { let el = document.getElementById(id); if(el) el.value = val; };
+          
+          setVal('edit_job_row', data.row);
+          setVal('edit_job_id', data.id);
+          setVal('edit_job_status', data.status || "未着手");
+          setVal('edit_job_company', data.company || "");
+          setVal('edit_job_skill', data.skill || "");
+          setVal('edit_job_interviewDate', data.interviewDate || "");
+          setVal('edit_job_memo', data.memo || "");
 
-      let candContainer = document.getElementById('edit_job_cand_list');
-      candContainer.innerHTML = '';
-      if (data.candidates) {
-        let cands = data.candidates.split(/\r?\n/);
-        cands.forEach(c => {
-           let idMatch = c.match(/^([a-zA-Z]+-\d+)/);
-           let candId = idMatch ? idMatch[1] : c.split('-')[0].trim();
-           let candName = idMatch ? c.substring(candId.length).replace(/^-/, '').trim() : "";
-           if(candId) { addJobEditCandRow(candId, candName); }
-        });
-      }
-      if(candContainer.innerHTML === '') addJobEditCandRow('');
-      
-      let fileContainer = document.getElementById('edit_job_file_list');
-      fileContainer.innerHTML = '';
-      if (data.relatedFile) {
-        let urls = String(data.relatedFile).split(/\r?\n/);
-        urls.forEach(u => {
-          if(u.trim()) addJobFileRow('edit_job', u.trim());
-        });
-      }
-      if(fileContainer.innerHTML === '') addJobFileRow('edit_job');
+          let candContainer = document.getElementById('edit_job_cand_list');
+          if(candContainer) {
+            candContainer.innerHTML = '';
+            if (data.candidates) {
+              let cands = data.candidates.split(/\r?\n/);
+              cands.forEach(c => {
+                 let idMatch = c.match(/^([a-zA-Z]+-\d+)/);
+                 let candId = idMatch ? idMatch[1] : c.split('-')[0].trim();
+                 let candName = idMatch ? c.substring(candId.length).replace(/^-/, '').trim() : "";
+                 if(candId) { addJobEditCandRow(candId, candName); }
+              });
+            }
+            if(candContainer.innerHTML === '') addJobEditCandRow('');
+          }
+          
+          let fileContainer = document.getElementById('edit_job_file_list');
+          if(fileContainer) {
+            fileContainer.innerHTML = '';
+            if (data.relatedFile) {
+              let urls = String(data.relatedFile).split(/\r?\n/);
+              urls.forEach(u => {
+                if(u.trim()) addJobFileRow('edit_job', u.trim());
+              });
+            }
+            if(fileContainer.innerHTML === '') addJobFileRow('edit_job');
+          }
 
-    } else {
-      showModal('該当する案件が見つかりません。');
-      document.getElementById('job_edit_fields').style.display = 'none';
-    }
-  }).getJobDetails(jobId);
+        } else {
+          showModal('該当する案件が見つかりません。');
+          if(editFields) editFields.style.display = 'none';
+        }
+      } catch(e) {
+        showModal('データは取得できましたが、画面の表示に失敗しました: ' + e.message);
+      }
+    })
+    .withFailureHandler(function(err) {
+      showModal('検索エラー: ' + err.message);
+    })
+    .getJobDetails(jobId);
 }
 
 function addJobEditCandRow(val = '', nameVal = '') {
-  document.getElementById('edit_job_cand_list').insertAdjacentHTML('beforeend', createCandRowHTML('edit-job-cand-id', val, nameVal));
-  if(val && !nameVal) {
-    let inputs = document.querySelectorAll('.edit-job-cand-id');
-    checkCandId(inputs[inputs.length - 1]);
+  let listEl = document.getElementById('edit_job_cand_list');
+  if(listEl) {
+    listEl.insertAdjacentHTML('beforeend', createCandRowHTML('edit-job-cand-id', val, nameVal));
+    if(val && !nameVal) {
+      let inputs = document.querySelectorAll('.edit-job-cand-id');
+      if(inputs.length > 0) checkCandId(inputs[inputs.length - 1]);
+    }
   }
 }
 
 function submitJobEdit() {
-  let row = document.getElementById('edit_job_row').value;
-  if (!row) return;
+  let rowEl = document.getElementById('edit_job_row');
+  if (!rowEl || !rowEl.value) return;
+  let row = rowEl.value;
 
-  let company = document.getElementById('edit_job_company').value.trim();
-  let candInputDivs = document.getElementById('edit_job_cand_list').children; 
+  let companyEl = document.getElementById('edit_job_company');
+  let company = companyEl ? companyEl.value.trim() : '';
+  
+  let candListEl = document.getElementById('edit_job_cand_list');
+  let candInputDivs = candListEl ? candListEl.children : []; 
   let candidates = [];
   Array.from(candInputDivs).forEach(div => { 
     let inputEl = div.querySelector('input.edit-job-cand-id');
@@ -182,93 +259,156 @@ function submitJobEdit() {
     if(val) relatedFiles.push(val);
   });
 
+  let getVal = (id) => { let el = document.getElementById(id); return el ? el.value : ''; };
+
   let formData = {
     row: row,
-    id: document.getElementById('edit_job_id').value,
-    status: document.getElementById('edit_job_status').value,
+    id: getVal('edit_job_id'),
+    status: getVal('edit_job_status'),
     company: company,
-    skill: document.getElementById('edit_job_skill').value,
+    skill: getVal('edit_job_skill'),
     candidates: candidates,
-    interviewDate: document.getElementById('edit_job_interviewDate').value,
+    interviewDate: getVal('edit_job_interviewDate'),
     relatedFiles: relatedFiles,
-    memo: document.getElementById('edit_job_memo').value
+    memo: getVal('edit_job_memo')
   };
 
   showModal('更新中...', true);
-  google.script.run.withSuccessHandler(function(msg) {
-    showModal(msg);
-  }).updateJob(formData);
+  google.script.run
+    .withSuccessHandler(function(msg) {
+      showModal(msg);
+    })
+    .withFailureHandler(function(err) {
+      showModal('更新エラー: ' + err.message);
+    })
+    .updateJob(formData);
 }
 
 function submitJobDelete() {
-  let jobId = document.getElementById('edit_job_id').value;
-  if (!jobId) return;
+  let idEl = document.getElementById('edit_job_id');
+  if (!idEl || !idEl.value) return;
+  let jobId = idEl.value;
 
   if (!confirm(`案件 ${jobId} を完全に削除します。よろしいですか？\n※この操作は取り消せません。`)) {
     return;
   }
 
   showModal('削除中...', true);
-  google.script.run.withSuccessHandler(function(msg) {
-    showModal(msg);
-    document.getElementById('job_edit_fields').style.display = 'none';
-    document.getElementById('edit_job_searchId').value = '';
-  }).deleteJobRow(jobId);
+  google.script.run
+    .withSuccessHandler(function(msg) {
+      showModal(msg);
+      let fieldsEl = document.getElementById('job_edit_fields');
+      let searchEl = document.getElementById('edit_job_searchId');
+      if(fieldsEl) fieldsEl.style.display = 'none';
+      if(searchEl) searchEl.value = '';
+    })
+    .withFailureHandler(function(err) {
+      showModal('削除エラー: ' + err.message);
+    })
+    .deleteJobRow(jobId);
 }
 
 // --- 採用登録 ---
 function fetchJobCandidates(mode) {
-  let rawId = document.getElementById(mode + '_job_id').value.trim();
+  let idEl = document.getElementById(mode + '_job_id');
+  if(!idEl) return;
+  let rawId = idEl.value.trim();
   if (!rawId) { showModal('案件IDを入力してください。'); return; }
-  let jobId = formatJobId(rawId); document.getElementById(mode + '_job_id').value = jobId;
+  let jobId = formatJobId(rawId); 
+  idEl.value = jobId;
+  
   showModal('候補者を取得中...', true);
   
-  google.script.run.withSuccessHandler(function(candidates) {
-    closeModal(); let container = document.getElementById(mode + '_cand_list');
-    if (!candidates || candidates.length === 0) { container.innerHTML = '<div style="color:#d93025; font-size:12px;">候補者が見つかりません。案件IDを確認してください。</div>'; return; }
-    let html = '';
-    candidates.forEach(c => {
-      html += `<label style="display:flex; align-items:center; margin-bottom:8px; font-size:14px; cursor:pointer;">
-                 <input type="checkbox" class="${mode}-cand-checkbox" value="${c.id}" style="margin:0 8px 0 0; width:16px; height:16px; flex-shrink:0;">
-                 <span style="line-height:1.2;">${c.display}</span>
-               </label>`;
-    });
-    container.innerHTML = html;
-  }).getJobCandidates(jobId);
+  google.script.run
+    .withSuccessHandler(function(candidates) {
+      closeModal(); 
+      let container = document.getElementById(mode + '_cand_list');
+      if(!container) return;
+      if (!candidates || candidates.length === 0) { 
+        container.innerHTML = '<div style="color:#d93025; font-size:12px;">候補者が見つかりません。案件IDを確認してください。</div>'; 
+        return; 
+      }
+      let html = '';
+      candidates.forEach(c => {
+        html += `<label style="display:flex; align-items:center; margin-bottom:8px; font-size:14px; cursor:pointer;">
+                   <input type="checkbox" class="${mode}-cand-checkbox" value="${c.id}" style="margin:0 8px 0 0; width:16px; height:16px; flex-shrink:0;">
+                   <span style="line-height:1.2;">${c.display}</span>
+                 </label>`;
+      });
+      container.innerHTML = html;
+    })
+    .withFailureHandler(function(err) {
+      showModal('候補者取得エラー: ' + err.message);
+    })
+    .getJobCandidates(jobId);
 }
 
 function submitHire() {
-  let rawId = document.getElementById('hire_job_id').value.trim();
+  let idEl = document.getElementById('hire_job_id');
+  if(!idEl) return;
+  let rawId = idEl.value.trim();
   if (!rawId) { showModal('案件IDを入力してください。'); return; }
   let jobId = formatJobId(rawId);
+  
   let checkboxes = document.querySelectorAll('.hire-cand-checkbox');
   if (checkboxes.length === 0) { showModal('先に「候補者検索」を行ってください。'); return; }
   
   let hiredIds = []; checkboxes.forEach(cb => { if (cb.checked) hiredIds.push(cb.value); });
   if (!confirm(`選択した ${hiredIds.length} 名を「採用」として登録します。よろしいですか？`)) return;
   
-  document.getElementById('hireBtn').disabled = true; showModal('採用登録を実行中...', true);
-  google.script.run.withSuccessHandler(function(msg) {
-    document.getElementById('hireBtn').disabled = false; showModal(msg);
-    document.getElementById('hire_job_id').value = ''; document.getElementById('hireJobDisplay').innerText = '';
-    document.getElementById('hire_cand_list').innerHTML = '<div style="font-size: 12px; color: #888;">-- 上の検索ボタンを押してください --</div>';
-    
-    // ★バックグラウンドでリスト同期を実行
-    google.script.run.syncListSheets();
-  }).registerHire(jobId, hiredIds);
+  let btnEl = document.getElementById('hireBtn');
+  if(btnEl) btnEl.disabled = true; 
+  
+  showModal('採用登録を実行中...', true);
+  google.script.run
+    .withSuccessHandler(function(msg) {
+      try {
+        if(btnEl) btnEl.disabled = false; 
+        showModal(msg);
+        idEl.value = ''; 
+        let dispEl = document.getElementById('hireJobDisplay');
+        let listEl = document.getElementById('hire_cand_list');
+        if(dispEl) dispEl.innerText = '';
+        if(listEl) listEl.innerHTML = '<div style="font-size: 12px; color: #888;">-- 上の検索ボタンを押してください --</div>';
+        
+        // バックグラウンドで同期を実行
+        google.script.run.syncListSheets();
+      } catch(e) {
+        showModal('採用登録は完了しましたが、画面の更新に失敗しました: ' + e.message);
+      }
+    })
+    .withFailureHandler(function(err) {
+      if(btnEl) btnEl.disabled = false; 
+      showModal('採用登録エラー: ' + err.message);
+    })
+    .registerHire(jobId, hiredIds);
 }
 
 // --- 簡易リスト作成 ---
 function addListCandRow() {
-  document.getElementById('list_cand_inputs').insertAdjacentHTML('beforeend', createCandRowHTML('list-cand-id'));
+  let inputsEl = document.getElementById('list_cand_inputs');
+  if(inputsEl) inputsEl.insertAdjacentHTML('beforeend', createCandRowHTML('list-cand-id'));
 }
 
 function submitList() {
-  let candInputs = document.querySelectorAll('.list-cand-id'); let candidates = [];
+  let candInputs = document.querySelectorAll('.list-cand-id'); 
+  let candidates = [];
   candInputs.forEach(input => { let val = input.value.trim(); if (val) candidates.push(formatId(val)); });
   if (candidates.length === 0) { showModal('候補者を少なくとも1名入力してください。'); return; }
   
-  document.getElementById('listBtn').disabled = true; showModal('簡易リストを作成中...', true);
-  google.script.run.withSuccessHandler(function(msg) { document.getElementById('listBtn').disabled = false; showModal(msg); }).generateSimpleList(candidates);
+  let btnEl = document.getElementById('listBtn');
+  if(btnEl) btnEl.disabled = true; 
+  
+  showModal('簡易リストを作成中...', true);
+  google.script.run
+    .withSuccessHandler(function(msg) { 
+      if(btnEl) btnEl.disabled = false; 
+      showModal(msg); 
+    })
+    .withFailureHandler(function(err) { 
+      if(btnEl) btnEl.disabled = false; 
+      showModal('リスト作成エラー: ' + err.message); 
+    })
+    .generateSimpleList(candidates);
 }
 </script>
