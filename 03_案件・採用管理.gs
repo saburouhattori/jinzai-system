@@ -63,80 +63,90 @@ function convertToSmartChips(sheet, row, col, urlText) {
  * 案件登録（新規事業者の自動マスタ登録付き）
  */
 function addJob(formData) {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName('案件管理');
-  if (!sheet) throw new Error("「案件管理」シートが見つかりません。");
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName('案件管理');
+    if (!sheet) throw new Error("「案件管理」シートが見つかりません。");
 
-  const companyName = String(formData.company || "").trim();
-  if (companyName) {
-    const compSheet = ss.getSheetByName('事業者マスタ');
-    if (compSheet) {
-      const compData = compSheet.getDataRange().getValues();
-      const exists = compData.some(row => String(row[1]).trim() === companyName);
-      if (!exists) {
-        let lastIdNum = 0;
-        for (let i = 1; i < compData.length; i++) {
-          let idVal = String(compData[i][0]);
-          let match = idVal.match(/\d+/);
-          if (match) {
-            let num = parseInt(match[0], 10);
-            if (num > lastIdNum) lastIdNum = num;
+    const companyName = String(formData.company || "").trim();
+    if (companyName) {
+      const compSheet = ss.getSheetByName('事業者マスタ');
+      if (compSheet) {
+        const compData = compSheet.getDataRange().getValues();
+        const exists = compData.some(row => String(row[1]).trim() === companyName);
+        if (!exists) {
+          let lastIdNum = 0;
+          for (let i = 1; i < compData.length; i++) {
+            let idVal = String(compData[i][0]);
+            let match = idVal.match(/\d+/);
+            if (match) {
+              let num = parseInt(match[0], 10);
+              if (num > lastIdNum) lastIdNum = num;
+            }
           }
+          const nextCompId = "CO-" + (lastIdNum + 1).toString().padStart(4, '0');
+          compSheet.appendRow([nextCompId, companyName, "", "", "", "案件登録により自動追加"]);
         }
-        const nextCompId = "CO-" + (lastIdNum + 1).toString().padStart(4, '0');
-        compSheet.appendRow([nextCompId, companyName, "", "", "", "案件登録により自動追加"]);
       }
     }
-  }
 
-  const lastRow = sheet.getLastRow();
-  let lastIdNum = 0;
-  if (lastRow > 1) {
-    const idVals = sheet.getRange(1, 1, lastRow, 1).getValues();
-    for (let i = 1; i < idVals.length; i++) {
-      let idVal = String(idVals[i][0]).trim();
-      let match = idVal.match(/\d+/);
-      if (match) {
-        let num = parseInt(match[0], 10);
-        if (num > lastIdNum) lastIdNum = num;
+    const lastRow = sheet.getLastRow();
+    let lastIdNum = 0;
+    if (lastRow > 1) {
+      const idVals = sheet.getRange(1, 1, lastRow, 1).getValues();
+      for (let i = 1; i < idVals.length; i++) {
+        let idVal = String(idVals[i][0]).trim();
+        let match = idVal.match(/\d+/);
+        if (match) {
+          let num = parseInt(match[0], 10);
+          if (num > lastIdNum) lastIdNum = num;
+        }
       }
     }
+
+    const targetRow = lastRow + 1;
+    const nextId = "JOB-" + (lastIdNum + 1).toString().padStart(4, '0');
+    
+    // 日付は既存の安定した方法（文字列）で一旦保持
+    const todayStr = Utilities.formatDate(new Date(), "JST", "yyyy/MM/dd");
+    
+    const candidatesArr = Array.isArray(formData.candidates) ? formData.candidates : [];
+    const fileUrlsArr = Array.isArray(formData.relatedFiles) ? formData.relatedFiles : [];
+    const fileUrlsText = fileUrlsArr.join('\n');
+
+    const rowData = [
+      nextId,                           
+      '未着手',                          
+      todayStr,                         
+      companyName,                      
+      formData.skill || '',             
+      candidatesArr.join('\n'),         
+      formData.interviewDate || '',     
+      '',                               
+      '',                               
+      formData.memo || ''               
+    ];
+
+    // データ書き込み
+    sheet.getRange(targetRow, 1, 1, rowData.length).setValues([rowData]);
+    
+    // リンク処理と書式設定（エラーが起きやすいためtry-catchで囲む）
+    try {
+      if (fileUrlsText) {
+        convertToSmartChips(sheet, targetRow, 9, fileUrlsText);
+      }
+      sheet.getRange(targetRow, 3).setNumberFormat('yyyy/MM/dd');
+      sheet.getRange(targetRow, 7).setNumberFormat('yyyy/MM/dd');
+    } catch(e) {
+      console.warn("補助処理でエラーが発生しましたが登録は継続します: " + e.message);
+    }
+
+    return `案件登録が完了しました: ${nextId}`;
+
+  } catch(e) {
+    // 致命的なエラーが起きた場合はエラーメッセージを返す
+    throw new Error("登録に失敗しました: " + e.message);
   }
-
-  const targetRow = lastRow + 1;
-  const nextId = "JOB-" + (lastIdNum + 1).toString().padStart(4, '0');
-  
-  // ★ システム内部(裏側)での日付は「yyyy-MM-dd」に統一
-  const todayStr = Utilities.formatDate(new Date(), "JST", "yyyy-MM-dd");
-  
-  const candidatesArr = Array.isArray(formData.candidates) ? formData.candidates : [];
-  const fileUrlsArr = Array.isArray(formData.relatedFiles) ? formData.relatedFiles : [];
-  const fileUrlsText = fileUrlsArr.join('\n');
-
-  const rowData = [
-    nextId,                           
-    '未着手',                          
-    todayStr,                         
-    companyName,                      
-    formData.skill || '',             
-    candidatesArr.join('\n'),         
-    formData.interviewDate || '',     
-    '',                               
-    '',                               
-    formData.memo || ''               
-  ];
-
-  sheet.getRange(targetRow, 1, 1, rowData.length).setValues([rowData]);
-  
-  if (fileUrlsText) {
-    convertToSmartChips(sheet, targetRow, 9, fileUrlsText);
-  }
-  
-  // ★ 見た目(表側)のフォーマットを「yyyy年m月d日」に装飾
-  sheet.getRange(targetRow, 3).setNumberFormat('yyyy"年"m"月"d"日"'); // C列: 案件登録日
-  sheet.getRange(targetRow, 7).setNumberFormat('yyyy"年"m"月"d"日"'); // G列: 面接日
-
-  return `案件登録が完了しました: ${nextId}`;
 }
 
 /**
@@ -172,30 +182,24 @@ function getJobDetails(jobId) {
       
       if (!rawUrls) rawUrls = String(data[i][8] || ""); 
 
-      // ★ 取得時に確実に「yyyy-MM-dd」形式でフロントエンドへ渡す
-      let ivDate = data[i][6];
-      if (ivDate instanceof Date) {
-        ivDate = Utilities.formatDate(ivDate, "JST", "yyyy-MM-dd");
-      } else if (typeof ivDate === 'string' && ivDate) {
-        ivDate = ivDate.replace(/\//g, '-');
-      }
-
-      let rDate = data[i][2];
-      if (rDate instanceof Date) {
-        rDate = Utilities.formatDate(rDate, "JST", "yyyy-MM-dd");
-      } else if (typeof rDate === 'string' && rDate) {
-        rDate = rDate.replace(/\//g, '-');
-      }
+      const toIsoDate = (val) => {
+        if (val instanceof Date) return Utilities.formatDate(val, "JST", "yyyy-MM-dd");
+        if (typeof val === 'string' && val) {
+          const clean = val.replace(/[年月]/g, '-').replace(/日/g, '').replace(/\//g, '-');
+          return clean;
+        }
+        return '';
+      };
 
       return {
         row: i + 1,
         id: data[i][0],
         status: data[i][1],
-        date: rDate,
+        date: toIsoDate(data[i][2]),
         company: data[i][3],
         skill: data[i][4],
         candidates: String(data[i][5] || ""),
-        interviewDate: ivDate,
+        interviewDate: toIsoDate(data[i][6]),
         hireNames: data[i][7],
         relatedFile: rawUrls, 
         memo: data[i][9]
@@ -209,29 +213,32 @@ function getJobDetails(jobId) {
  * 案件情報の更新
  */
 function updateJob(formData) {
-  const sheet = getMasterSheet('案件管理');
-  const row = Number(formData.row);
-  if (!row || row < 2) return "エラー：無効な行番号です。";
+  try {
+    const sheet = getMasterSheet('案件管理');
+    const row = Number(formData.row);
+    if (!row || row < 2) return "エラー：無効な行番号です。";
 
-  const candidatesArr = Array.isArray(formData.candidates) ? formData.candidates : [];
-  const fileUrlsArr = Array.isArray(formData.relatedFiles) ? formData.relatedFiles : [];
-  const fileUrlsText = fileUrlsArr.join('\n');
-  
-  sheet.getRange(row, 2).setValue(formData.status || '未着手');
-  sheet.getRange(row, 4).setValue(formData.company || '');
-  sheet.getRange(row, 5).setValue(formData.skill || '');
-  sheet.getRange(row, 6).setValue(candidatesArr.join('\n'));
-  
-  // ★ システム内部(裏側)での日付は「yyyy-MM-dd」として書き込む
-  sheet.getRange(row, 7).setValue(formData.interviewDate || '');
-  // ★ 見た目(表側)のフォーマットを「yyyy年m月d日」に装飾
-  sheet.getRange(row, 7).setNumberFormat('yyyy"年"m"月"d"日"');
-  
-  sheet.getRange(row, 10).setValue(formData.memo || '');
-  
-  convertToSmartChips(sheet, row, 9, fileUrlsText);
-  
-  return "案件情報を更新しました。";
+    const candidatesArr = Array.isArray(formData.candidates) ? formData.candidates : [];
+    const fileUrlsArr = Array.isArray(formData.relatedFiles) ? formData.relatedFiles : [];
+    const fileUrlsText = fileUrlsArr.join('\n');
+    
+    sheet.getRange(row, 2).setValue(formData.status || '未着手');
+    sheet.getRange(row, 4).setValue(formData.company || '');
+    sheet.getRange(row, 5).setValue(formData.skill || '');
+    sheet.getRange(row, 6).setValue(candidatesArr.join('\n'));
+    sheet.getRange(row, 7).setValue(formData.interviewDate || '');
+    sheet.getRange(row, 10).setValue(formData.memo || '');
+    
+    try {
+      convertToSmartChips(sheet, row, 9, fileUrlsText);
+    } catch(e) {
+      console.warn("スマートチップ更新失敗: " + e.message);
+    }
+    
+    return "案件情報を更新しました。";
+  } catch(e) {
+    throw new Error("更新失敗: " + e.message);
+  }
 }
 
 /**
@@ -311,7 +318,7 @@ function registerHire(jobId, hiredIds) {
     }
   });
 
-  sheet.getRange(targetJobRow, 8).setValue(hiredNames.join('\n'));
+  sheet.getRange(targetRow, 8).setValue(hiredNames.join('\n'));
   sheet.getRange(targetJobRow, 2).setValue('終了');
 
   return `${hiredIds.length} 名の採用登録を完了しました。案件ステータスを「終了」にしました。`;
