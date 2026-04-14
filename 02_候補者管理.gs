@@ -22,19 +22,37 @@ function addCandidate(formData) {
     const sheet = getMasterSheet('登録者マスタ');
     if (!sheet) throw new Error("「登録者マスタ」シートが見つかりません。");
 
+    // ★安全装置1：シートの列数が足りない場合は自動で拡張する（エラー回避）
+    const requiredCols = 71;
+    if (sheet.getMaxColumns() < requiredCols) {
+      sheet.insertColumnsAfter(sheet.getMaxColumns(), requiredCols - sheet.getMaxColumns());
+    }
+
     const data = sheet.getDataRange().getValues();
     let maxId = 0;
+    let targetRow = 1; 
+
+    // A列（ID）が入っている本当の最終行を特定する
     for (let i = 1; i < data.length; i++) {
-      let idStr = String(data[i][0]);
+      let idStr = String(data[i][0]).trim();
       if (idStr.startsWith("SD-")) {
         let num = parseInt(idStr.replace("SD-", ""), 10);
         if (num > maxId) maxId = num;
+        targetRow = i + 1; 
       }
     }
+    
+    const nextRow = targetRow + 1; 
+    
+    // ★安全装置2：シートの行数が足りない場合は自動で拡張する（エラー回避）
+    if (nextRow > sheet.getMaxRows()) {
+      sheet.insertRowsAfter(sheet.getMaxRows(), 1);
+    }
+
     const nextId = "SD-" + (maxId + 1).toString().padStart(4, '0');
     
-    // 現在の最新の列数（71列）に合わせた空配列を作成
-    const rowData = new Array(71).fill('');
+    // シートの実際の列数に合わせた空配列を作成
+    const rowData = new Array(sheet.getMaxColumns()).fill('');
     rowData[0] = nextId;
     rowData[1] = formData.name;
     rowData[3] = formData.kana;
@@ -76,7 +94,8 @@ function addCandidate(formData) {
     rowData[41] = formData.family;
     rowData[43] = '未採用'; 
 
-    sheet.appendRow(rowData);
+    sheet.getRange(nextRow, 1, 1, rowData.length).setValues([rowData]);
+    
     return `登録者 ${nextId} を新規登録しました。`;
   } catch (e) {
     throw new Error("登録エラー: " + e.message);
@@ -131,31 +150,94 @@ function updateCandidate(formData) {
     const row = Number(formData.row);
     if (!row) throw new Error("行特定不可");
 
-    // 既存の顔写真(C列)と修正前コメント(AO列)を保持
-    const currentValues = sheet.getRange(row, 1, 1, 71).getValues()[0];
+    // ★安全装置：シートの列数が足りない場合は自動で拡張する
+    const requiredCols = 71;
+    if (sheet.getMaxColumns() < requiredCols) {
+      sheet.insertColumnsAfter(sheet.getMaxColumns(), requiredCols - sheet.getMaxColumns());
+    }
+
+    // 既存の顔写真(C列)と修正前コメント(AO列)等を保持
+    const currentValues = sheet.getRange(row, 1, 1, sheet.getMaxColumns()).getValues()[0];
     const photo = currentValues[2];
     const oldComment = currentValues[40];
 
-    const rowData = [
-      formData.id, formData.name, photo, formData.kana, formData.nickname,
-      formData.birthday, '', formData.gender, formData.marriage,
-      formData.height, formData.weight, formData.address, formData.origin,
-      formData.email, formData.school, formData.eduName, formData.eduMajor,
-      formData.eduStatus, formData.eduStart, formData.eduEnd, formData.eduMemo,
-      formData.work1Period, formData.work1Detail, formData.work2Period, formData.work2Detail,
-      formData.work3Period, formData.work3Detail,
-      formData.jlpt, formData.jlptDate, formData.jft, formData.jftDate,
-      formData.kaigoG, formData.kaigoGDate, formData.kaigoN, formData.kaigoNDate,
-      formData.otherTest, formData.otherTestDate, formData.otherSkill, formData.otherSkillDate,
-      formData.memo, oldComment, formData.family, formData.interviewHist,
-      formData.status, formData.hiredBy, formData.skillField, formData.agent,
-      formData.regDate, formData.hireDate, formData.birthPlace, formData.addressDetail,
-      formData.passportNo, formData.passportExp, formData.job, formData.expJissyu,
-      formData.certJissyu, formData.crime, formData.visaApplyCount, formData.visaRejectCount,
-      formData.overseasHist, formData.overseasCount, formData.lastEntry, formData.lastExit,
-      formData.relName, formData.relType, formData.relBirth, formData.relNat,
-      formData.relLive, formData.relWork, formData.relCard, formData.generalMemo
-    ];
+    const rowData = new Array(sheet.getMaxColumns()).fill('');
+    rowData[0] = formData.id;
+    rowData[1] = formData.name;
+    rowData[2] = photo;
+    rowData[3] = formData.kana;
+    rowData[4] = formData.nickname;
+    rowData[5] = formData.birthday;
+    // 6: 満年齢(ARRAYFORMULAで自動計算)
+    rowData[7] = formData.gender;
+    rowData[8] = formData.marriage;
+    rowData[9] = formData.height;
+    rowData[10] = formData.weight;
+    rowData[11] = formData.address;
+    rowData[12] = formData.origin;
+    rowData[13] = formData.email;
+    rowData[14] = formData.school;
+    rowData[15] = formData.eduName;
+    rowData[16] = formData.eduMajor;
+    rowData[17] = formData.eduStatus;
+    rowData[18] = formData.eduStart;
+    rowData[19] = formData.eduEnd;
+    rowData[20] = formData.eduMemo;
+    rowData[21] = formData.work1Period;
+    rowData[22] = formData.work1Detail;
+    rowData[23] = formData.work2Period;
+    rowData[24] = formData.work2Detail;
+    rowData[25] = formData.work3Period;
+    rowData[26] = formData.work3Detail;
+    rowData[27] = formData.jlpt;
+    rowData[28] = formData.jlptDate;
+    rowData[29] = formData.jft;
+    rowData[30] = formData.jftDate;
+    rowData[31] = formData.kaigoG;
+    rowData[32] = formData.kaigoGDate;
+    rowData[33] = formData.kaigoN;
+    rowData[34] = formData.kaigoNDate;
+    rowData[35] = formData.otherTest;
+    rowData[36] = formData.otherTestDate;
+    rowData[37] = formData.otherSkill;
+    rowData[38] = formData.otherSkillDate;
+    rowData[39] = formData.memo;
+    rowData[40] = oldComment;
+    rowData[41] = formData.family;
+    rowData[42] = formData.interviewHist;
+    rowData[43] = formData.status;
+    rowData[44] = formData.hiredBy;
+    rowData[45] = formData.skillField;
+    rowData[46] = formData.agent;
+    rowData[47] = formData.regDate;
+    rowData[48] = formData.hireDate;
+    rowData[49] = formData.birthPlace;
+    rowData[50] = formData.addressDetail;
+    rowData[51] = formData.passportNo;
+    rowData[52] = formData.passportExp;
+    rowData[53] = formData.job;
+    rowData[54] = formData.expJissyu;
+    rowData[55] = formData.certJissyu;
+    rowData[56] = formData.crime;
+    rowData[57] = formData.visaApplyCount;
+    rowData[58] = formData.visaRejectCount;
+    rowData[59] = formData.overseasHist;
+    rowData[60] = formData.overseasCount;
+    rowData[61] = formData.lastEntry;
+    rowData[62] = formData.lastExit;
+    rowData[63] = formData.relName;
+    rowData[64] = formData.relType;
+    rowData[65] = formData.relBirth;
+    rowData[66] = formData.relNat;
+    rowData[67] = formData.relLive;
+    rowData[68] = formData.relWork;
+    rowData[69] = formData.relCard;
+    rowData[70] = formData.generalMemo;
+
+    // 71列目以降が存在する場合は元のデータを保護・維持する
+    for (let i = 71; i < currentValues.length; i++) {
+      rowData[i] = currentValues[i];
+    }
 
     sheet.getRange(row, 1, 1, rowData.length).setValues([rowData]);
     return "候補者情報を更新しました。";
