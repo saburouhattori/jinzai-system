@@ -1,299 +1,132 @@
 <script>
-// =========================================
-// 候補者管理用 JavaScript
-// =========================================
-
-// --- 初期化 ---
-function initCandidateForm() {
-  showLoading();
-  google.script.run
-    .withSuccessHandler(function(lists) {
-      populateSelect('agent', lists.agent);
-      populateSelect('school', lists.school);
-      populateSelect('hiredBy', lists.company);
-      hideLoading();
-    })
-    .withFailureHandler(function(err) {
-      hideLoading();
-      showError("初期化エラー: " + err.message);
-    })
-    .getListsForCandidate();
-}
-
-function populateSelect(id, list) {
-  const elem = document.getElementById(id);
-  if (!elem) return;
-  const currentValue = elem.value;
-  elem.innerHTML = '<option value="">未選択</option>';
-  list.forEach(item => {
-    const opt = document.createElement('option');
-    opt.value = item;
-    opt.textContent = item;
-    elem.appendChild(opt);
-  });
-  if (currentValue) elem.value = currentValue;
-}
-
-// --- データの収集 ---
-function collectCandidateFormData() {
-  // ★修正：要素が存在しない(null)場合でもエラーで止まらずに空文字を返す安全な関数
-  const getVal = (id) => document.getElementById(id) ? document.getElementById(id).value : '';
+function searchData() {
+  let rawId = document.getElementById('searchId').value.trim();
+  if (!rawId) { showModal('管理番号を入力してください。'); return; }
+  let adminId = formatId(rawId);
+  document.getElementById('searchId').value = adminId;
+  document.getElementById('searchBtn').disabled = true;
+  showModal('検索中...', true);
   
-  return {
-    id: getVal('candId'),
-    name: getVal('candName'),
-    kana: getVal('candKana'),
-    nickname: getVal('candNickname'),
-    birthday: getVal('birthday'),
-    gender: getVal('gender'),
-    marriage: getVal('marriage'),
-    height: getVal('height'),
-    weight: getVal('weight'),
-    address: getVal('address'),
-    origin: getVal('origin'),
-    email: getVal('email'),
-    school: getVal('school'),
-    eduName: getVal('eduName'),
-    eduMajor: getVal('eduMajor'),
-    eduStatus: getVal('eduStatus'),
-    eduStart: getVal('eduStart'),
-    eduEnd: getVal('eduEnd'),
-    eduMemo: getVal('eduMemo'),
-    work1Period: getVal('work1Period'),
-    work1Detail: getVal('work1Detail'),
-    work2Period: getVal('work2Period'),
-    work2Detail: getVal('work2Detail'),
-    work3Period: getVal('work3Period'),
-    work3Detail: getVal('work3Detail'),
-    jlpt: getVal('jlpt'),
-    jlptDate: getVal('jlptDate'),
-    jft: getVal('jft'),
-    jftDate: getVal('jftDate'),
-    kaigoG: getVal('kaigoG'),
-    kaigoGDate: getVal('kaigoGDate'),
-    kaigoN: getVal('kaigoN'),
-    kaigoNDate: getVal('kaigoNDate'),
-    otherTest: getVal('otherTest'),
-    otherTestDate: getVal('otherTestDate'),
-    otherSkill: getVal('otherSkill'),
-    otherSkillDate: getVal('otherSkillDate'),
-    family: getVal('family'),
-    interviewHist: getVal('interviewHist'),
-    memo: getVal('memo'),
-    status: getVal('status'),
-    hiredBy: getVal('hiredBy'),
-    skillField: getVal('skillField'),
-    agent: getVal('agent'),
-    regDate: getVal('regDate'),
-    hireDate: getVal('hireDate'),
-    birthPlace: getVal('birthPlace'),
-    addressDetail: getVal('addressDetail'),
-    passportNo: getVal('passportNo'),
-    passportExp: getVal('passportExp'),
-    job: getVal('job'),
-    expJissyu: getVal('expJissyu'),
-    certJissyu: getVal('certJissyu'),
-    crime: getVal('crime'),
-    visaApplyCount: getVal('visaApplyCount'),
-    visaRejectCount: getVal('visaRejectCount'),
-    overseasHist: getVal('overseasHist'),
-    overseasCount: getVal('overseasCount'),
-    lastEntry: getVal('lastEntry'),
-    lastExit: getVal('lastExit'),
-    relName: getVal('relName'),
-    relType: getVal('relType'),
-    relBirth: getVal('relBirth'),
-    relNat: getVal('relNat'),
-    relLive: getVal('relLive'),
-    relWork: getVal('relWork'),
-    relCard: getVal('relCard'),
-    generalMemo: getVal('generalMemo'),
-    row: getVal('candRow')
-  };
+  google.script.run.withSuccessHandler(function(data) {
+    closeModal(); document.getElementById('searchBtn').disabled = false;
+    if (data) {
+      document.getElementById('targetRow').value = data.row;
+      
+      const fields = ['name','furigana','nickname','birthday','gender','spouse','height','weight',
+                      'address','birthplace','email','school','eduSchool','eduDept','eduStatus',
+                      'eduStart','eduEnd','eduNote','expPeriod1','expContent1','expPeriod2','expContent2',
+                      'expPeriod3','expContent3','jlptLevel','jlptDate','jftLevel','jftDate',
+                      'kaigoSkill','kaigoSkillDate','kaigoLang','kaigoLangDate','otherExam',
+                      'otherExamDate','otherJapanese','otherJapaneseDate','comment'];
+      fields.forEach(f => { let el = document.getElementById(f); if(el) { let val = data[f] || ""; if(val.startsWith && val.startsWith("'")) val = val.substring(1); el.value = val; } });
+      let relSel = document.getElementById('relativeSelect'); let relDet = document.getElementById('relativeDetail');
+      if (data.relative && data.relative !== "日本に家族や親戚はいません。" && data.relative !== "無" && data.relative !== "なし") {
+        relSel.value = "有"; relDet.value = data.relative; relDet.style.display = "block";
+      } else { relSel.value = "無"; relDet.value = ""; relDet.style.display = "none"; }
+      
+      showModal(data.name + ' さんのデータを読み込みました。');
+    } else { showModal('該当するデータが見つかりません。'); }
+  }).safeSearchByAdminId(adminId);
 }
 
-// --- 新規登録 ---
-function submitCandidate() {
-  if (!document.getElementById('candName').value) {
-    showError("名前は必須です。");
-    return;
-  }
-  showLoading();
-  const formData = collectCandidateFormData();
+function searchDataAddInfo() {
+  let rawId = document.getElementById('searchIdAddInfo').value.trim();
+  if (!rawId) { showModal('管理番号を入力してください。'); return; }
+  let adminId = formatId(rawId);
+  document.getElementById('searchIdAddInfo').value = adminId;
+  showModal('検索中...', true);
   
-  google.script.run
-    .withSuccessHandler(function(msg) {
-      hideLoading();
-      showSuccess(msg);
-      clearCandidateForm();
-    })
-    .withFailureHandler(function(err) {
-      hideLoading();
-      showError(err.message);
-    })
-    .addCandidate(formData);
+  google.script.run.withSuccessHandler(function(data) {
+    closeModal();
+    if (data) {
+      document.getElementById('targetRow').value = data.row;
+      const fields = ['agent', 'offerDate', 'birthCity', 'addressDetail', 'passportNum', 'passportExp', 'job', 'traineeExp', 'traineeCert', 'crime', 'applyCount', 'rejectCount', 'overseasExp', 'travelCount', 'lastInDate', 'lastOutDate', 'relName2', 'relRelation2', 'relBirth2', 'relCountry2', 'relLive2', 'relWork2', 'relCard2', 'memo'];
+      fields.forEach(f => { let el = document.getElementById('add_' + f); if(el) { let val = data[f] || ""; if(typeof val === 'string' && val.startsWith("'")) val = val.substring(1); el.value = val; } });
+      showModal(data.name + ' さんのデータを読み込みました。\n採用後の追加情報を入力してください。');
+    } else { showModal('該当するデータが見つかりません。'); }
+  }).safeSearchByAdminId(adminId);
 }
 
-// --- 更新 ---
-function updateCandidateData() {
-  if (!document.getElementById('candRow').value) {
-    showError("更新対象が選択されていません。検索からやり直してください。");
-    return;
-  }
-  showLoading();
-  const formData = collectCandidateFormData();
+function submitAddInfo() {
+  let row = document.getElementById('targetRow').value;
+  if (!row) { showModal('先に管理番号で検索して、データを読み込んでください。'); return; }
+  let formData = { row: row };
+  const fields = ['agent', 'offerDate', 'birthCity', 'addressDetail', 'passportNum', 'passportExp', 'job', 'traineeExp', 'traineeCert', 'crime', 'applyCount', 'rejectCount', 'overseasExp', 'travelCount', 'lastInDate', 'lastOutDate', 'relName2', 'relRelation2', 'relBirth2', 'relCountry2', 'relLive2', 'relWork2', 'relCard2', 'memo'];
   
-  google.script.run
-    .withSuccessHandler(function(msg) {
-      hideLoading();
-      showSuccess(msg);
-      switchTab('tab-candidate-search');
-    })
-    .withFailureHandler(function(err) {
-      hideLoading();
-      showError(err.message);
-    })
-    .updateCandidate(formData);
-}
-
-// --- 検索 ---
-function searchCandidateDetails() {
-  const candId = document.getElementById('searchCandId').value;
-  if (!candId) {
-    showError("登録者IDを入力してください。");
-    return;
-  }
-  showLoading();
-  google.script.run
-    .withSuccessHandler(function(data) {
-      hideLoading();
-      if (!data) {
-        showError("指定されたIDの登録者は見つかりませんでした。");
-        return;
+  fields.forEach(f => { 
+    let el = document.getElementById('add_' + f); 
+    if (el) {
+      if (f === 'birthCity') {
+        formData[f] = el.value.toUpperCase();
+      } else if (f === 'passportNum') {
+        formData[f] = el.value.replace(/[^a-zA-Z0-9]/g, '');
+      } else {
+        formData[f] = el.value; 
       }
-      
-      const setVal = (id, val) => { if(document.getElementById(id)) document.getElementById(id).value = val || ''; };
-      
-      setVal('candRow', data.row);
-      setVal('candId', data.id);
-      setVal('candName', data.name);
-      setVal('candKana', data.kana);
-      setVal('candNickname', data.nickname);
-      setVal('birthday', data.birthday);
-      setVal('gender', data.gender);
-      setVal('marriage', data.marriage);
-      setVal('height', data.height);
-      setVal('weight', data.weight);
-      setVal('address', data.address);
-      setVal('origin', data.origin);
-      setVal('email', data.email);
-      setVal('school', data.school);
-      setVal('eduName', data.eduName);
-      setVal('eduMajor', data.eduMajor);
-      setVal('eduStatus', data.eduStatus);
-      setVal('eduStart', data.eduStart);
-      setVal('eduEnd', data.eduEnd);
-      setVal('eduMemo', data.eduMemo);
-      setVal('work1Period', data.work1Period);
-      setVal('work1Detail', data.work1Detail);
-      setVal('work2Period', data.work2Period);
-      setVal('work2Detail', data.work2Detail);
-      setVal('work3Period', data.work3Period);
-      setVal('work3Detail', data.work3Detail);
-      setVal('jlpt', data.jlpt);
-      setVal('jlptDate', data.jlptDate);
-      setVal('jft', data.jft);
-      setVal('jftDate', data.jftDate);
-      setVal('kaigoG', data.kaigoG);
-      setVal('kaigoGDate', data.kaigoGDate);
-      setVal('kaigoN', data.kaigoN);
-      setVal('kaigoNDate', data.kaigoNDate);
-      setVal('otherTest', data.otherTest);
-      setVal('otherTestDate', data.otherTestDate);
-      setVal('otherSkill', data.otherSkill);
-      setVal('otherSkillDate', data.otherSkillDate);
-      setVal('family', data.family);
-      setVal('interviewHist', data.interviewHist);
-      setVal('memo', data.memo);
-      setVal('status', data.status);
-      setVal('hiredBy', data.hiredBy);
-      setVal('skillField', data.skillField);
-      setVal('agent', data.agent);
-      setVal('regDate', data.regDate);
-      setVal('hireDate', data.hireDate);
-      setVal('birthPlace', data.birthPlace);
-      setVal('addressDetail', data.addressDetail);
-      setVal('passportNo', data.passportNo);
-      setVal('passportExp', data.passportExp);
-      setVal('job', data.job);
-      setVal('expJissyu', data.expJissyu);
-      setVal('certJissyu', data.certJissyu);
-      setVal('crime', data.crime);
-      setVal('visaApplyCount', data.visaApplyCount);
-      setVal('visaRejectCount', data.visaRejectCount);
-      setVal('overseasHist', data.overseasHist);
-      setVal('overseasCount', data.overseasCount);
-      setVal('lastEntry', data.lastEntry);
-      setVal('lastExit', data.lastExit);
-      setVal('relName', data.relName);
-      setVal('relType', data.relType);
-      setVal('relBirth', data.relBirth);
-      setVal('relNat', data.relNat);
-      setVal('relLive', data.relLive);
-      setVal('relWork', data.relWork);
-      setVal('relCard', data.relCard);
-      setVal('generalMemo', data.generalMemo);
-
-      document.getElementById('btn-add-cand').style.display = 'none';
-      document.getElementById('btn-update-cand').style.display = 'inline-block';
-      document.getElementById('btn-delete-cand').style.display = 'inline-block';
-      
-      switchTab('tab-candidate-form');
-      showSuccess("データを読み込みました。");
-    })
-    .withFailureHandler(function(err) {
-      hideLoading();
-      showError(err.message);
-    })
-    .getCandidateDetails(candId);
-}
-
-// --- 削除 ---
-function confirmDeleteCandidate() {
-  const candId = document.getElementById('candId').value;
-  if (!candId) return;
-  if (!confirm(`登録者 ${candId} を削除してもよろしいですか？この操作は取り消せません。`)) {
-    return;
-  }
-  showLoading();
-  google.script.run
-    .withSuccessHandler(function(msg) {
-      hideLoading();
-      showSuccess(msg);
-      clearCandidateForm();
-      switchTab('tab-candidate-search');
-    })
-    .withFailureHandler(function(err) {
-      hideLoading();
-      showError(err.message);
-    })
-    .deleteCandidateRow(candId);
-}
-
-// --- クリア ---
-function clearCandidateForm() {
-  document.querySelectorAll('#candidate-form input, #candidate-form select, #candidate-form textarea').forEach(el => el.value = '');
-  document.getElementById('btn-add-cand').style.display = 'inline-block';
-  document.getElementById('btn-update-cand').style.display = 'none';
-  document.getElementById('btn-delete-cand').style.display = 'none';
+    }
+  });
   
-  // 今日の日付をセット
-  const today = new Date();
-  const yyyy = today.getFullYear();
-  const mm = String(today.getMonth() + 1).padStart(2, '0');
-  const dd = String(today.getDate()).padStart(2, '0');
-  if(document.getElementById('regDate')) {
-    document.getElementById('regDate').value = `${yyyy}-${mm}-${dd}`;
+  showModal('保存中...', true);
+  google.script.run.withSuccessHandler(function(msg) { 
+    showModal(msg); 
+    // ★バックグラウンドでリスト同期を実行
+    google.script.run.syncListSheets();
+  }).updateAddInfoRow(formData);
+}
+
+function submitData() {
+  let formData = {};
+  
+  const fields = ['name','furigana','nickname','birthday','gender','spouse','height','weight','address','birthplace','email','school','eduSchool','eduDept','eduStatus','eduStart','eduEnd','eduNote','expPeriod1','expContent1','expPeriod2','expContent2','expPeriod3','expContent3','jlptLevel','jlptDate','jftLevel','jftDate','kaigoSkill','kaigoSkillDate','kaigoLang','kaigoLangDate','otherExam','otherExamDate','otherJapanese','otherJapaneseDate','comment'];
+  fields.forEach(f => { let el = document.getElementById(f); if(el) formData[f] = el.value; });
+  let relSel = document.getElementById('relativeSelect'); let relDet = document.getElementById('relativeDetail');
+  if (relSel && relDet) formData.relative = (relSel.value === '有') ? relDet.value : "日本に家族や親戚はいません。";
+  
+  if (MODE === 'EDIT') {
+    formData.row = document.getElementById('targetRow').value;
+    if (!formData.row) { showModal('先に管理番号で検索してください。'); return; }
   }
+  
+  let fileInput = document.getElementById('imageFile');
+  if (fileInput && fileInput.files.length > 0) {
+    let file = fileInput.files[0];
+    let reader = new FileReader();
+    reader.onload = function(e) { formData.imageFile = { name: file.name, mimeType: file.type, contents: e.target.result.split(',')[1] }; sendData(formData); };
+    reader.readAsDataURL(file);
+  } else { sendData(formData); }
+}
+
+function sendData(formData) {
+  document.getElementById('mainBtn').disabled = true; showModal('処理中...', true);
+  if (MODE === 'NEW') { google.script.run.withSuccessHandler(onSuccess).addNewRow(formData); } 
+  else { google.script.run.withSuccessHandler(onSuccess).updateRow(formData); }
+}
+
+function onSuccess(msg) {
+  document.getElementById('mainBtn').disabled = false; showModal(msg);
+  if (MODE === 'NEW') {
+    let inputs = document.querySelectorAll('input[type="text"], input[type="date"], input[type="number"], input[type="email"], textarea');
+    inputs.forEach(input => input.value = '');
+    let selects = document.querySelectorAll('select'); selects.forEach(select => select.selectedIndex = 0);
+    let fileInput = document.getElementById('imageFile'); if (fileInput) fileInput.value = '';
+    document.getElementById('relativeDetail').style.display = 'none';
+  }
+  // ★バックグラウンドでリスト同期を実行
+  google.script.run.syncListSheets();
+}
+
+function submitDelete() {
+  let rawId = document.getElementById('delete_id').value.trim();
+  if (!rawId) { showModal('削除するIDを入力してください。'); return; }
+  let adminId = formatId(rawId);
+  if (!confirm(adminId + " のデータを完全に削除します。よろしいですか？")) return;
+  showModal('削除中...', true);
+  google.script.run.withSuccessHandler(function(msg) {
+    showModal(msg); 
+    document.getElementById('delete_id').value = ''; 
+    document.getElementById('deleteNameDisplay').innerText = '';
+    // ★バックグラウンドでリスト同期を実行
+    google.script.run.syncListSheets();
+  }).deleteCandidate(adminId);
 }
 </script>

@@ -120,67 +120,117 @@ function syncListSheets() {
     const mData = masterSheet.getDataRange().getValues();
     if (mData.length < 2) return "マスタにデータがありません。";
 
-    // --- 採用者一覧の列指定 (Masterの列番号を1ベースで指定) ---
-    // 1:採用事業者(45), 2:技能分野(46), 3:内定日(49), 4:ID(1), 5:名前(2), 6:フリガナ(4)...
-    const adoptedCols = [
-      45, 46, 49, 1, 2, 4, 5, 6, 7, 8, 9, 14, 28, 30, 15, 47, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71
-    ].map(c => c - 1);
+    // 採用者一覧の列指定
+    const adoptedCols = [45, 48, 1, 2, 4, 5, 6, 7, 8, 9, 14, 28, 30, 15, 46, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70].map(c => c - 1);
     
     const unadoptedData = [];
     const adoptedData = [];
 
+    // 日付フォーマットのヘルパー
     const formatDate = (val) => {
-      if (val instanceof Date) return Utilities.formatDate(val, "JST", "yyyy/MM/dd");
+      if (val instanceof Date) {
+        return Utilities.formatDate(val, "JST", "yyyy/MM/dd");
+      }
       return val;
     };
 
     for (let i = 1; i < mData.length; i++) {
       const row = mData[i];
-      const status = String(row[43]).trim(); // AR列: ステータス
+      const status = String(row[43]).trim(); // AR列 (インデックス43) がステータス
 
       if (status === '未採用') {
         let quals = [];
-        // JLPT (AB列: 28)
+        
+        // JLPT (インデックス27: AB列)
         let jlpt = String(row[27] || "").trim();
-        if (jlpt && jlpt !== "-" && jlpt !== "×" && !jlpt.includes("予定") && !jlpt.includes("不合格")) quals.push(jlpt);
+        if (jlpt && jlpt !== "-" && jlpt !== "×" && !jlpt.includes("予定") && !jlpt.includes("不合格")) {
+          quals.push(jlpt);
+        }
         
-        // JFT (AD列: 30)
+        // JFT (インデックス29: AD列)
         let jft = String(row[29] || "").trim();
-        if (jft && jft !== "-" && jft !== "×" && !jft.includes("予定") && !jft.includes("不合格")) quals.push(jft);
+        if (jft && jft !== "-" && jft !== "×" && !jft.includes("予定") && !jft.includes("不合格")) {
+          quals.push(jft);
+        }
         
-        // 介護 (AF, AH)
-        if (String(row[31]).includes("予定")) quals.push("介護技能（受験予定）");
-        else if (row[31]) quals.push("介護技能（合格）");
-        if (String(row[33]).includes("予定")) quals.push("介護日本語（受験予定）");
-        else if (row[33]) quals.push("介護日本語（合格）");
-
-        // その他 (AJ列: 36)
+        // 介護技能 (インデックス31: AF列)
+        let kaigoG = String(row[31] || "").trim();
+        if (kaigoG && kaigoG !== "-" && kaigoG !== "×" && !kaigoG.includes("不合格")) {
+          if (kaigoG.includes("予定")) {
+            quals.push("介護技能（受験予定）");
+          } else {
+            quals.push("介護技能（合格）");
+          }
+        }
+        
+        // 介護日本語 (インデックス33: AH列)
+        let kaigoN = String(row[33] || "").trim();
+        if (kaigoN && kaigoN !== "-" && kaigoN !== "×" && !kaigoN.includes("不合格")) {
+          if (kaigoN.includes("予定")) {
+            quals.push("介護日本語（受験予定）");
+          } else {
+            quals.push("介護日本語（合格）");
+          }
+        }
+        
+        // その他 (インデックス35: AJ列)
         let other = String(row[35] || "").trim();
-        if (other && !other.includes("不合格")) {
-          if (other.includes("外食業")) quals.push("外食業技能（合格）");
-          else if (other.includes("飲食料品製造")) quals.push("飲食料品製造技能（合格）");
-          else quals.push(other + (other.includes("合格") ? "" : "（合格）"));
+        if (other && other !== "-" && other !== "×" && !other.includes("不合格")) {
+          if (other === "外食業特定技能１号技能測定試験") {
+            quals.push("外食業技能（合格）");
+          } else if (other === "飲食料品製造業特定技能１号技能測定試験") {
+            quals.push("飲食料品製造技能（合格）");
+          } else {
+            if (other.includes("合格")) {
+              quals.push(other);
+            } else {
+              quals.push(other + "（合格）");
+            }
+          }
         }
 
-        unadoptedData.push([
-          formatDate(row[0]), formatDate(row[1]), formatDate(row[6]), formatDate(row[7]), 
-          quals.join(", "), formatDate(row[42]), formatDate(row[39])
-        ]);
+        const skillReq = quals.join(", ");
+
+        const uRow = [
+          formatDate(row[0]),   // A: 登録者ID
+          formatDate(row[1]),   // B: 名前
+          formatDate(row[6]),   // C: 満年齢
+          formatDate(row[7]),   // D: 性別
+          skillReq,             // E: 特定技能要件
+          formatDate(row[42]),  // F: 面接履歴
+          formatDate(row[39])   // G: コメント
+        ];
+        unadoptedData.push(uRow);
       } else if (status === '採用' || status === '内定') {
-        adoptedData.push(adoptedCols.map(idx => row[idx] !== undefined ? formatDate(row[idx]) : ""));
+        const aRow = adoptedCols.map(idx => row[idx] !== undefined ? formatDate(row[idx]) : "");
+        adoptedData.push(aRow);
       }
     }
 
-    const writeToSheet = (name, data) => {
-      const target = ss.getSheetByName(name);
-      if (!target) return;
-      if (target.getLastRow() > 1) target.getRange(2, 1, target.getLastRow()-1, target.getLastColumn()).clearContent();
-      if (data.length) target.getRange(2, 1, data.length, data[0].length).setValues(data);
-    };
+    // 書き込み用関数
+    function writeToSheet(sheetName, data) {
+      const targetSheet = ss.getSheetByName(sheetName);
+      if (!targetSheet) return;
+      
+      const lastRow = targetSheet.getLastRow();
+      const lastCol = targetSheet.getLastColumn();
+      
+      // 2行目以降の既存データをクリア
+      if (lastRow > 1 && lastCol > 0) {
+        targetSheet.getRange(2, 1, lastRow - 1, lastCol).clearContent();
+      }
+      
+      // 新しいデータをセット
+      if (data.length > 0) {
+        targetSheet.getRange(2, 1, data.length, data[0].length).setValues(data);
+      }
+    }
 
     writeToSheet('未採用者一覧', unadoptedData);
     writeToSheet('採用者一覧', adoptedData);
 
     return "リストの同期が完了しました。";
-  } catch (e) { return "エラー: " + e.message; }
+  } catch (e) {
+    return "エラーが発生しました: " + e.message;
+  }
 }
