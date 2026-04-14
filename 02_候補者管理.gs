@@ -22,7 +22,7 @@ function addCandidate(formData) {
     const sheet = getMasterSheet('登録者マスタ');
     if (!sheet) throw new Error("「登録者マスタ」シートが見つかりません。");
 
-    // ★安全装置1：シートの列数が足りない場合は自動で拡張する（エラー回避）
+    // ★安全装置1：シートの列数が足りない場合は自動で拡張する
     const requiredCols = 71;
     if (sheet.getMaxColumns() < requiredCols) {
       sheet.insertColumnsAfter(sheet.getMaxColumns(), requiredCols - sheet.getMaxColumns());
@@ -44,61 +44,95 @@ function addCandidate(formData) {
     
     const nextRow = targetRow + 1; 
     
-    // ★安全装置2：シートの行数が足りない場合は自動で拡張する（エラー回避）
+    // ★安全装置2：シートの行数が足りない場合は自動で拡張する
     if (nextRow > sheet.getMaxRows()) {
       sheet.insertRowsAfter(sheet.getMaxRows(), 1);
     }
 
     const nextId = "SD-" + (maxId + 1).toString().padStart(4, '0');
     
-    // シートの実際の列数に合わせた空配列を作成
-    const rowData = new Array(sheet.getMaxColumns()).fill('');
-    rowData[0] = nextId;
-    rowData[1] = formData.name;
-    rowData[3] = formData.kana;
-    rowData[4] = formData.nickname;
-    rowData[5] = formData.birthday;
-    rowData[7] = formData.gender;
-    rowData[8] = formData.marriage;
-    rowData[9] = formData.height;
-    rowData[10] = formData.weight;
-    rowData[11] = formData.address;
-    rowData[12] = formData.origin;
-    rowData[13] = formData.email;
-    rowData[14] = formData.school;
-    rowData[15] = formData.eduName;
-    rowData[16] = formData.eduMajor;
-    rowData[17] = formData.eduStatus;
-    rowData[18] = formData.eduStart;
-    rowData[19] = formData.eduEnd;
-    rowData[20] = formData.eduMemo;
-    rowData[21] = formData.work1Period;
-    rowData[22] = formData.work1Detail;
-    rowData[23] = formData.work2Period;
-    rowData[24] = formData.work2Detail;
-    rowData[25] = formData.work3Period;
-    rowData[26] = formData.work3Detail;
-    rowData[27] = formData.jlpt;
-    rowData[28] = formData.jlptDate;
-    rowData[29] = formData.jft;
-    rowData[30] = formData.jftDate;
-    rowData[31] = formData.kaigoG;
-    rowData[32] = formData.kaigoGDate;
-    rowData[33] = formData.kaigoN;
-    rowData[34] = formData.kaigoNDate;
-    rowData[35] = formData.otherTest;
-    rowData[36] = formData.otherTestDate;
-    rowData[37] = formData.otherSkill;
-    rowData[38] = formData.otherSkillDate;
-    rowData[39] = formData.memo;
-    rowData[41] = formData.family;
-    rowData[43] = '未採用'; 
+    // ★修正：fill('') だと ARRAYFORMULA を壊すため fill(null) に変更
+    const rowData = new Array(sheet.getMaxColumns()).fill(null);
+    
+    // 全71項目の正確なマッピング（未定義の場合はnullを入れて数式を保護）
+    rowData[0] = nextId; // A: 登録者ID
+    rowData[1] = formData.name || null; // B: 名前
+    // C(2): 顔写真 (新規は空)
+    rowData[3] = formData.kana || null; // D: フリガナ
+    rowData[4] = formData.nickname || null; // E: 呼び名
+    rowData[5] = formData.birthday || null; // F: 生年月日
+    // G(6): 満年齢 (数式のため null のまま保護)
+    rowData[7] = formData.gender || null; // H: 性別
+    rowData[8] = formData.marriage || null; // I: 配偶者
+    rowData[9] = formData.height || null; // J: 身長
+    rowData[10] = formData.weight || null; // K: 体重
+    rowData[11] = formData.address || null; // L: 現住所
+    rowData[12] = formData.origin || null; // M: 住所（出身地）
+    rowData[13] = formData.email || null; // N: メールアドレス
+    rowData[14] = formData.school || null; // O: 所属日本語学校
+    rowData[15] = formData.eduName || null; // P: 学歴 学校名
+    rowData[16] = formData.eduMajor || null; // Q: 学歴 学科
+    rowData[17] = formData.eduStatus || null; // R: 学歴 状況
+    rowData[18] = formData.eduStart || null; // S: 学歴 入学
+    rowData[19] = formData.eduEnd || null; // T: 学歴 卒業
+    rowData[20] = formData.eduMemo || null; // U: 学歴 補足
+    rowData[21] = formData.work1Period || null; // V: 職歴1 期間
+    rowData[22] = formData.work1Detail || null; // W: 職歴1 内容
+    rowData[23] = formData.work2Period || null; // X: 職歴2 期間
+    rowData[24] = formData.work2Detail || null; // Y: 職歴2 内容
+    rowData[25] = formData.work3Period || null; // Z: 職歴3 期間
+    rowData[26] = formData.work3Detail || null; // AA: 職歴3 内容
+    rowData[27] = formData.jlpt || null; // AB: JLPT
+    rowData[28] = formData.jlptDate || null; // AC: JLPT年月
+    rowData[29] = formData.jft || null; // AD: JFT
+    rowData[30] = formData.jftDate || null; // AE: JFT年月
+    rowData[31] = formData.kaigoG || null; // AF: 介護技能
+    rowData[32] = formData.kaigoGDate || null; // AG: 介護技能年月
+    rowData[33] = formData.kaigoN || null; // AH: 介護日本語
+    rowData[34] = formData.kaigoNDate || null; // AI: 介護日本語年月
+    rowData[35] = formData.otherTest || null; // AJ: その他評価
+    rowData[36] = formData.otherTestDate || null; // AK: その他年月
+    rowData[37] = formData.otherSkill || null; // AL: その他能力試験
+    rowData[38] = formData.otherSkillDate || null; // AM: その他取得年月
+    rowData[39] = formData.memo || null; // AN: コメント
+    // AO(40): 修正前コメント (新規は空)
+    rowData[41] = formData.family || null; // AP: 親族について
+    // AQ(42): 面接履歴 (新規は空)
+    rowData[43] = '未採用'; // AR: ステータス
+    // AS(44): 採用事業者 (新規は空)
+    rowData[45] = formData.skillField || null; // AT: 技能分野
+    rowData[46] = formData.agent || null; // AU: 所属送り出し機関
+    rowData[47] = Utilities.formatDate(new Date(), "JST", "yyyy-MM-dd"); // AV: 登録日
+    // AW(48): 内定日
+    rowData[49] = formData.birthPlace || null; // AX: 出生地
+    rowData[50] = formData.addressDetail || null; // AY: 住所詳細
+    rowData[51] = formData.passportNo || null; // AZ: パスポート番号
+    rowData[52] = formData.passportExp || null; // BA: パスポート期限
+    rowData[53] = formData.job || null; // BB: 職業
+    rowData[54] = formData.expJissyu || null; // BC: 実習経験
+    rowData[55] = formData.certJissyu || null; // BD: 修了書
+    rowData[56] = formData.crime || null; // BE: 犯罪歴
+    rowData[57] = formData.visaApplyCount || null; // BF: 申請回数
+    rowData[58] = formData.visaRejectCount || null; // BG: 不許可回数
+    rowData[59] = formData.overseasHist || null; // BH: 出入国歴
+    rowData[60] = formData.overseasCount || null; // BI: 出入国回数
+    rowData[61] = formData.lastEntry || null; // BJ: 入国日
+    rowData[62] = formData.lastExit || null; // BK: 出国日
+    rowData[63] = formData.relName || null; // BL: 親族名
+    rowData[64] = formData.relType || null; // BM: 続柄
+    rowData[65] = formData.relBirth || null; // BN: 親族生年月日
+    rowData[66] = formData.relNat || null; // BO: 親族国籍
+    rowData[67] = formData.relLive || null; // BP: 同居予定
+    rowData[68] = formData.relWork || null; // BQ: 勤務先
+    rowData[69] = formData.relCard || null; // BR: 在留カード
+    rowData[70] = formData.generalMemo || null; // BS: 備考・メモ
 
     sheet.getRange(nextRow, 1, 1, rowData.length).setValues([rowData]);
     
     return `登録者 ${nextId} を新規登録しました。`;
   } catch (e) {
-    throw new Error("登録エラー: " + e.message);
+    // ★デバッグ強化：どこでエラーになったか詳細をフロントに返す
+    throw new Error("バックエンド処理エラー: " + e.message + " (行: " + e.lineNumber + ")");
   }
 }
 
@@ -150,25 +184,23 @@ function updateCandidate(formData) {
     const row = Number(formData.row);
     if (!row) throw new Error("行特定不可");
 
-    // ★安全装置：シートの列数が足りない場合は自動で拡張する
     const requiredCols = 71;
     if (sheet.getMaxColumns() < requiredCols) {
       sheet.insertColumnsAfter(sheet.getMaxColumns(), requiredCols - sheet.getMaxColumns());
     }
 
-    // 既存の顔写真(C列)と修正前コメント(AO列)等を保持
     const currentValues = sheet.getRange(row, 1, 1, sheet.getMaxColumns()).getValues()[0];
     const photo = currentValues[2];
     const oldComment = currentValues[40];
 
-    const rowData = new Array(sheet.getMaxColumns()).fill('');
+    const rowData = new Array(sheet.getMaxColumns()).fill(null);
     rowData[0] = formData.id;
     rowData[1] = formData.name;
     rowData[2] = photo;
     rowData[3] = formData.kana;
     rowData[4] = formData.nickname;
     rowData[5] = formData.birthday;
-    // 6: 満年齢(ARRAYFORMULAで自動計算)
+    // 6: 満年齢(ARRAYFORMULAで自動計算のため保護)
     rowData[7] = formData.gender;
     rowData[8] = formData.marriage;
     rowData[9] = formData.height;
@@ -234,7 +266,6 @@ function updateCandidate(formData) {
     rowData[69] = formData.relCard;
     rowData[70] = formData.generalMemo;
 
-    // 71列目以降が存在する場合は元のデータを保護・維持する
     for (let i = 71; i < currentValues.length; i++) {
       rowData[i] = currentValues[i];
     }
