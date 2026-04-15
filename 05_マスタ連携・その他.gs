@@ -1,236 +1,221 @@
-// =========================================
-// その他の便利ツール・マスタ連携
-// =========================================
+// ====== マスタ連携・その他共通処理 ======
 
-function getAgentList() {
-  const sheet = getMasterSheet('送り出し機関マスタ');
-  return sheet ? [...new Set(sheet.getDataRange().getValues().slice(1).map(row => row[1]).filter(n => n))].sort() : [];
+/**
+ * 全角半角スペース、改行などをすべて除去し、小文字化して比較用文字列を作る内部関数
+ * （表記ゆれを完全に吸収します）
+ */
+function normalize_(str) {
+  if (str === null || str === undefined) return '';
+  return String(str).replace(/[\s　\n\r]+/g, '').toLowerCase();
 }
 
-function getSchoolList() {
-  const sheet = getMasterSheet('日本語学校マスタ');
-  return sheet ? [...new Set(sheet.getDataRange().getValues().slice(1).map(row => row[1]).filter(n => n))].sort() : [];
+/**
+ * ターゲットシートのヘッダー配列に従って、データマップから1行分の配列を生成する内部関数
+ * （これによって列が入れ替わったり挿入されたりしても、自動で正しい位置にデータが入ります）
+ */
+function buildRowByHeaders_(headers, dataMap) {
+  return headers.map(h => {
+    const key = normalize_(h);
+    return dataMap[key] !== undefined ? dataMap[key] : '';
+  });
 }
 
-function getCompanyList() {
-  const sheet = getMasterSheet('事業者マスタ');
-  return sheet ? [...new Set(sheet.getDataRange().getValues().slice(1).map(row => row[1]).filter(n => n))].sort() : [];
-}
+/**
+ * 登録者マスタから「採用者一覧」「未採用者一覧」シートを更新する
+ */
+function updateCandidateLists() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const masterSheet = ss.getSheetByName('登録者マスタ');
+  const hiredSheet = ss.getSheetByName('採用者一覧');
+  const unhiredSheet = ss.getSheetByName('未採用者一覧');
+  const jobSheet = ss.getSheetByName('案件管理'); // 案件管理シートを追加
 
-function getCandidateDict() {
-  const sheet = getMasterSheet('登録者マスタ');
-  if (!sheet) return {};
-  const lastRow = sheet.getLastRow();
-  if (lastRow < 2) return {};
-  const data = sheet.getRange(2, 1, lastRow - 1, 2).getValues();
-  const dict = {};
-  data.forEach(row => { if (row[0]) dict[String(row[0]).trim()] = String(row[1]); });
-  return dict;
-}
+  if (!masterSheet || !hiredSheet || !unhiredSheet || !jobSheet) {
+    throw new Error('必要なシート（登録者マスタ、採用者一覧、未採用者一覧、案件管理）のいずれかが見つかりません。');
+  }
 
-function getJobDict() {
-  const sheet = getMasterSheet('案件管理');
-  if (!sheet) return {};
-  const lastRow = sheet.getLastRow();
-  if (lastRow < 2) return {};
-  const data = sheet.getRange(2, 1, lastRow - 1, 4).getValues();
-  const dict = {};
-  data.forEach(row => { if (row[0]) dict[String(row[0]).trim()] = `${row[3]} (${row[1]})`; });
-  return dict;
-}
+  // マスタデータの取得
+  const masterData = masterSheet.getDataRange().getValues();
+  const masterHeaders = masterData.shift();
 
-function searchDriveFiles(fileNameQuery) {
-  try {
-    const files = [];
-    let query = 'trashed = false';
-    if (fileNameQuery) {
-      query += ' and title contains "' + fileNameQuery + '"';
+  // 出力先ヘッダーの取得（動的生成の要：シートの構成変更に自動追従します）
+  const hiredHeaders = hiredSheet.getRange(1, 1, 1, hiredSheet.getLastColumn()).getValues()[0];
+  const unhiredHeaders = unhiredSheet.getRange(1, 1, 1, unhiredSheet.getLastColumn()).getValues()[0];
+  
+  // 案件管理データの取得と事前マップ化（検索高速化のため）
+  const jobData = jobSheet.getDataRange().getValues();
+  const jobHeaders = jobData.shift();
+  const jobList = jobData.map(row => {
+    const jobMap = {};
+    for (let i = 0; i < jobHeaders.length; i++) {
+      jobMap[normalize_(jobHeaders[i])] = row[i];
     }
+    return jobMap;
+  });
+
+  const hiredData = [];
+  const unhiredData = [];
+
+  // マスタの必須項目チェック
+  if (masterHeaders.findIndex(h => normalize_(h) === normalize_('登録者ID')) === -1) {
+    throw new Error('登録者マスタに「登録者ID」列が見つかりません。');
+  }
+
+  // マスタデータを1行ずつ処理
+  for (let i = 0; i < masterData.length; i++) {
+    const row = masterData[i];
     
-    const iter = DriveApp.searchFiles(query);
-    let count = 0;
-    while (iter.hasNext() && count < 15) {
-      const file = iter.next();
-      files.push({
-        name: file.getName(),
-        url: file.getUrl(),
-        type: file.getMimeType()
-      });
-      count++;
+    // 1. 各行のデータを「ヘッダー名」をキーにした連想配列(dataMap)に変換
+    const dataMap = {};
+    for (let c = 0; c < masterHeaders.length; c++) {
+      dataMap[normalize_(masterHeaders[c])] = row[c];
     }
-    return files;
-  } catch (e) { return []; }
-}
 
-function generateSimpleList(candIds) {
-  try {
-    const masterSheet = getMasterSheet('登録者マスタ');
-    const masterData = masterSheet.getDataRange().getValues();
-    const col = getMasterColumnMap(masterSheet);
-    const listSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('簡易リスト');
+    const candidateId = dataMap[normalize_('登録者ID')];
+    const status = dataMap[normalize_('ステータス')];
+    const companyName = dataMap[normalize_('採用事業者')];
+
+    // 空行はスキップ
+    if (!candidateId) continue;
+
+    // 2. 特殊項目（結合や別名など）の計算・追加
+    const jlpt = dataMap[normalize_('特定技能要件＞JLPTレベル')];
+    const jft = dataMap[normalize_('特定技能要件＞JFT Basicレベル')];
+    const kaigoGinou = dataMap[normalize_('特定技能要件＞介護技能評価試験')];
+    const kaigoNihongo = dataMap[normalize_('特定技能要件＞介護日本語評価試験')];
     
-    const lastRowList = listSheet.getLastRow();
-    if (lastRowList >= 2) {
-      listSheet.getRange(2, 2, lastRowList, 11).clearContent();
-    }
+    // ▽ 未採用者一覧用「特定技能要件」の結合文字列
+    let reqs = [];
+    if (jlpt) reqs.push(jlpt);
+    if (jft) reqs.push(jft);
+    if (kaigoGinou) reqs.push(`介護技能（${kaigoGinou}）`);
+    if (kaigoNihongo) reqs.push(`介護日本語（${kaigoNihongo}）`);
+    dataMap[normalize_('特定技能要件')] = reqs.join(', ');
 
-    const result = [];
-    const formulas = [];
-    candIds.forEach(id => {
-      let rowData = null;
-      const sid = String(id).trim().toUpperCase();
-      for (let i = 1; i < masterData.length; i++) { 
-        if (String(masterData[i][0]).trim().toUpperCase() === sid) { 
-          rowData = masterData[i]; 
-          break; 
-        } 
-      }
-      if (rowData) {
-        const getVal = (name) => col[name.replace(/\s/g, '')] ? rowData[col[name.replace(/\s/g, '')]-1] : "";
-        result.push([
-          getVal('名前'), 
-          getVal('フリガナ'), 
-          getVal('満年齢'), 
-          getVal('性別'), 
-          getVal('学歴＞学校名'), 
-          getVal('学歴＞状況'), 
-          getVal('特定技能要件＞JLPTレベル') || "×", 
-          getVal('特定技能要件＞JFTBasicレベル') || "×", 
-          getVal('その他の日本語能力試験'), 
-          id
-        ]);
-        formulas.push(['=IFERROR(VLOOKUP(L' + (result.length + 1) + ', \'登録者マスタ\'!$A:$C, 3, FALSE), "")']);
-      }
-    });
-    if (result.length) {
-      listSheet.getRange(2, 3, result.length, 10).setValues(result);
-      listSheet.getRange(2, 2, formulas.length, 1).setFormulas(formulas);
-    }
-    return `${result.length}名の簡易リストを作成しました。`;
-  } catch(e) { return "エラー: " + e.message; }
-}
+    // ▽ ヘッダー名の揺れ（エイリアス）をマッピング
+    dataMap[normalize_('JLPT')] = jlpt;
+    dataMap[normalize_('JFT Basic')] = jft;
+    dataMap[normalize_('採用事業者名')] = companyName; // マスタは「採用事業者」、一覧は「採用事業者名」
+    dataMap[normalize_('在留資格交付申請の有無')] = dataMap[normalize_('在留資格交付申請の回数')];
 
-// 採用者・未採用者一覧を「静的テキスト」で同期する処理
-function syncListSheets() {
-  try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const masterSheet = ss.getSheetByName('登録者マスタ');
-    if (!masterSheet) return "登録者マスタが見つかりません。";
-
-    const mData = masterSheet.getDataRange().getValues();
-    if (mData.length < 2) return "マスタにデータがありません。";
-
-    // 採用者一覧の列指定
-    const adoptedCols = [45, 48, 1, 2, 4, 5, 6, 7, 8, 9, 14, 28, 30, 15, 46, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70].map(c => c - 1);
-    
-    const unadoptedData = [];
-    const adoptedData = [];
-
-    // 日付フォーマットのヘルパー
-    const formatDate = (val) => {
-      if (val instanceof Date) {
-        return Utilities.formatDate(val, "JST", "yyyy/MM/dd");
-      }
-      return val;
-    };
-
-    for (let i = 1; i < mData.length; i++) {
-      const row = mData[i];
-      const status = String(row[43]).trim(); // AR列 (インデックス43) がステータス
-
-      if (status === '未採用') {
-        let quals = [];
-        
-        // JLPT (インデックス27: AB列)
-        let jlpt = String(row[27] || "").trim();
-        if (jlpt && jlpt !== "-" && jlpt !== "×" && !jlpt.includes("予定") && !jlpt.includes("不合格")) {
-          quals.push(jlpt);
-        }
-        
-        // JFT (インデックス29: AD列)
-        let jft = String(row[29] || "").trim();
-        if (jft && jft !== "-" && jft !== "×" && !jft.includes("予定") && !jft.includes("不合格")) {
-          quals.push(jft);
-        }
-        
-        // 介護技能 (インデックス31: AF列)
-        let kaigoG = String(row[31] || "").trim();
-        if (kaigoG && kaigoG !== "-" && kaigoG !== "×" && !kaigoG.includes("不合格")) {
-          if (kaigoG.includes("予定")) {
-            quals.push("介護技能（受験予定）");
-          } else {
-            quals.push("介護技能（合格）");
-          }
-        }
-        
-        // 介護日本語 (インデックス33: AH列)
-        let kaigoN = String(row[33] || "").trim();
-        if (kaigoN && kaigoN !== "-" && kaigoN !== "×" && !kaigoN.includes("不合格")) {
-          if (kaigoN.includes("予定")) {
-            quals.push("介護日本語（受験予定）");
-          } else {
-            quals.push("介護日本語（合格）");
-          }
-        }
-        
-        // その他 (インデックス35: AJ列)
-        let other = String(row[35] || "").trim();
-        if (other && other !== "-" && other !== "×" && !other.includes("不合格")) {
-          if (other === "外食業特定技能１号技能測定試験") {
-            quals.push("外食業技能（合格）");
-          } else if (other === "飲食料品製造業特定技能１号技能測定試験") {
-            quals.push("飲食料品製造技能（合格）");
-          } else {
-            if (other.includes("合格")) {
-              quals.push(other);
-            } else {
-              quals.push(other + "（合格）");
-            }
-          }
-        }
-
-        const skillReq = quals.join(", ");
-
-        const uRow = [
-          formatDate(row[0]),   // A: 登録者ID
-          formatDate(row[1]),   // B: 名前
-          formatDate(row[6]),   // C: 満年齢
-          formatDate(row[7]),   // D: 性別
-          skillReq,             // E: 特定技能要件
-          formatDate(row[42]),  // F: 面接履歴
-          formatDate(row[39])   // G: コメント
-        ];
-        unadoptedData.push(uRow);
-      } else if (status === '採用' || status === '内定') {
-        const aRow = adoptedCols.map(idx => row[idx] !== undefined ? formatDate(row[idx]) : "");
-        adoptedData.push(aRow);
-      }
-    }
-
-    // 書き込み用関数
-    function writeToSheet(sheetName, data) {
-      const targetSheet = ss.getSheetByName(sheetName);
-      if (!targetSheet) return;
+    // 3. ステータスに応じた処理
+    if (status === '採用') {
+      let jobId = '';
+      let skillField = '';
       
-      const lastRow = targetSheet.getLastRow();
-      const lastCol = targetSheet.getLastColumn();
-      
-      // 2行目以降の既存データをクリア
-      if (lastRow > 1 && lastCol > 0) {
-        targetSheet.getRange(2, 1, lastRow - 1, lastCol).clearContent();
+      // 案件管理から「案件ID」と「技能分野」を取得
+      if (companyName) {
+        // 事業者名が一致し、かつ候補者名か採用者名にこの登録者IDが含まれる案件を探す
+        const matchedJob = jobList.find(job => {
+          const jComp = job[normalize_('事業者名')];
+          const jCands = String(job[normalize_('候補者名')] || '');
+          const jHired = String(job[normalize_('採用者名')] || '');
+          
+          return jComp === companyName && (jCands.includes(candidateId) || jHired.includes(candidateId));
+        });
+        
+        if (matchedJob) {
+          jobId = matchedJob[normalize_('案件ID')] || '';
+          skillField = matchedJob[normalize_('技能分野')] || '';
+        }
       }
       
-      // 新しいデータをセット
-      if (data.length > 0) {
-        targetSheet.getRange(2, 1, data.length, data[0].length).setValues(data);
-      }
+      // 取得した案件情報をdataMapに追加
+      dataMap[normalize_('案件ID')] = jobId;
+      dataMap[normalize_('技能分野')] = skillField;
+
+      // 「採用者一覧」のヘッダー順に従って、dataMapから自動的に配列を組み立てる
+      const outRow = buildRowByHeaders_(hiredHeaders, dataMap);
+      hiredData.push(outRow);
+
+    } else if (status === '未採用' || status === '辞退' || status === '保留') {
+      // 「未採用者一覧」のヘッダー順に従って、自動的に配列を組み立てる
+      const outRow = buildRowByHeaders_(unhiredHeaders, dataMap);
+      unhiredData.push(outRow);
+    }
+  }
+
+  // ----------------------------
+  // シートへの書き込み処理
+  // ----------------------------
+  if (hiredData.length > 0) {
+    const lastRow = hiredSheet.getLastRow();
+    if (lastRow > 1) hiredSheet.getRange(2, 1, lastRow - 1, hiredHeaders.length).clearContent();
+    hiredSheet.getRange(2, 1, hiredData.length, hiredHeaders.length).setValues(hiredData);
+  }
+
+  if (unhiredData.length > 0) {
+    const lastRow = unhiredSheet.getLastRow();
+    if (lastRow > 1) unhiredSheet.getRange(2, 1, lastRow - 1, unhiredHeaders.length).clearContent();
+    unhiredSheet.getRange(2, 1, unhiredData.length, unhiredHeaders.length).setValues(unhiredData);
+  }
+
+  SpreadsheetApp.getUi().alert('リストの更新が完了しました。');
+}
+
+/**
+ * 簡易リストの更新処理
+ */
+function updateSimpleList() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const masterSheet = ss.getSheetByName('登録者マスタ');
+  const simpleSheet = ss.getSheetByName('簡易リスト');
+
+  if (!masterSheet || !simpleSheet) {
+    throw new Error('必要なシートが見つかりません。');
+  }
+
+  const masterData = masterSheet.getDataRange().getValues();
+  const masterHeaders = masterData.shift();
+
+  const simpleData = [];
+  let no = 1;
+
+  for (let i = 0; i < masterData.length; i++) {
+    const row = masterData[i];
+    
+    // こちらも同様にdataMap化
+    const dataMap = {};
+    for (let c = 0; c < masterHeaders.length; c++) {
+      dataMap[normalize_(masterHeaders[c])] = row[c];
     }
 
-    writeToSheet('未採用者一覧', unadoptedData);
-    writeToSheet('採用者一覧', adoptedData);
+    const candId = dataMap[normalize_('登録者ID')];
+    if (!candId) continue;
 
-    return "リストの同期が完了しました。";
-  } catch (e) {
-    return "エラーが発生しました: " + e.message;
+    const jlpt = dataMap[normalize_('特定技能要件＞JLPTレベル')];
+    const jft = dataMap[normalize_('特定技能要件＞JFT Basicレベル')];
+
+    // ※簡易リストは「写真」などの特殊列（B列）を保持するため、これまで通りの列セットを行います
+    simpleData.push([
+      no++,                                      // A: No
+      '',                                        // B: 写真（数式等のため空）
+      dataMap[normalize_('名前')] || '',           // C: 名前
+      dataMap[normalize_('フリガナ')] || '',       // D: フリガナ
+      dataMap[normalize_('満年齢')] || '',         // E: 年齢
+      dataMap[normalize_('性別')] || '',           // F: 性別
+      dataMap[normalize_('学歴＞学校名')] || '',     // G: 学歴(学校名)
+      dataMap[normalize_('学歴＞状況')] || '',       // H: 状況(卒業など)
+      jlpt ? jlpt : '×',                          // I: JLPT
+      jft ? jft : '×',                            // J: JFT
+      dataMap[normalize_('その他の日本語能力試験')] || '', // K: その他の日本語
+      candId                                     // L: 登録者ID
+    ]);
+  }
+
+  if (simpleData.length > 0) {
+    const lastRow = simpleSheet.getLastRow();
+    if (lastRow > 1) {
+      // B列（写真）はクリアしないよう分けてクリア
+      simpleSheet.getRange(2, 1, lastRow - 1, 1).clearContent();
+      simpleSheet.getRange(2, 3, lastRow - 1, 10).clearContent();
+    }
+    
+    // 値のセット (B列はスキップする)
+    const rangeA = simpleData.map(r => [r[0]]);
+    const rangeC_L = simpleData.map(r => r.slice(2));
+    
+    simpleSheet.getRange(2, 1, simpleData.length, 1).setValues(rangeA);
+    simpleSheet.getRange(2, 3, simpleData.length, 10).setValues(rangeC_L);
   }
 }
