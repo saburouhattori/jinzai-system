@@ -1,6 +1,16 @@
 // ====== マスタ連携・その他共通処理 ======
 
 /**
+ * 登録や更新後に各一覧シートを同期する統合関数
+ * （02_候補者管理.gs などから呼び出されます）
+ */
+function syncListSheets() {
+  // true を渡すことでポップアップアラートを非表示にしてバックグラウンド実行します
+  updateCandidateLists(true);
+  updateSimpleList();
+}
+
+/**
  * 全角半角スペース、改行などをすべて除去し、小文字化して比較用文字列を作る内部関数
  * （表記ゆれを完全に吸収します）
  */
@@ -22,13 +32,14 @@ function buildRowByHeaders_(headers, dataMap) {
 
 /**
  * 登録者マスタから「採用者一覧」「未採用者一覧」シートを更新する
+ * @param {boolean} silent - true の場合、完了時のアラートを表示しない
  */
-function updateCandidateLists() {
+function updateCandidateLists(silent = false) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const masterSheet = ss.getSheetByName('登録者マスタ');
   const hiredSheet = ss.getSheetByName('採用者一覧');
   const unhiredSheet = ss.getSheetByName('未採用者一覧');
-  const jobSheet = ss.getSheetByName('案件管理'); // 案件管理シートを追加
+  const jobSheet = ss.getSheetByName('案件管理');
 
   if (!masterSheet || !hiredSheet || !unhiredSheet || !jobSheet) {
     throw new Error('必要なシート（登録者マスタ、採用者一覧、未採用者一覧、案件管理）のいずれかが見つかりません。');
@@ -150,7 +161,13 @@ function updateCandidateLists() {
     unhiredSheet.getRange(2, 1, unhiredData.length, unhiredHeaders.length).setValues(unhiredData);
   }
 
-  SpreadsheetApp.getUi().alert('リストの更新が完了しました。');
+  if (!silent) {
+    try {
+      SpreadsheetApp.getUi().alert('リストの更新が完了しました。');
+    } catch(e) {
+      // UIがない環境での実行時は無視する
+    }
+  }
 }
 
 /**
