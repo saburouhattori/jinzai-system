@@ -117,13 +117,13 @@ function addJob(formData) {
 
     const nextId = "JOB-" + (lastIdNum + 1).toString().padStart(4, '0');
     
-    // --- 日付処理 (案B: 純粋なDateオブジェクトを作成) ---
+    // --- 日付処理 ---
     const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()); // 時間を00:00:00に固定
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()); 
     
     let interviewDate = '';
     if (formData.interviewDate) {
-      const parts = formData.interviewDate.split('-'); // "yyyy-mm-dd"
+      const parts = formData.interviewDate.split('-'); 
       if (parts.length === 3) {
         interviewDate = new Date(parts[0], parts[1] - 1, parts[2]);
       }
@@ -136,24 +136,22 @@ function addJob(formData) {
     const rowData = [
       nextId,                           
       '未着手',                          
-      today,                            // Dateオブジェクト
+      today,                            
       companyName,                      
       formData.skill || '',             
       candidatesArr.join('\n'),         
-      interviewDate,                    // Dateオブジェクト
+      interviewDate,                    
       '',                               
       '',                               
       formData.memo || ''               
     ];
 
-    // データを書き込む
     sheet.getRange(targetRow, 1, 1, rowData.length).setValues([rowData]);
     
     try {
       if (fileUrlsText) {
         convertToSmartChips(sheet, targetRow, 9, fileUrlsText);
       }
-      // 書き込み完了後に見た目だけを装飾
       sheet.getRange(targetRow, 3).setNumberFormat('yyyy"年"m"月"d"日"');
       sheet.getRange(targetRow, 7).setNumberFormat('yyyy"年"m"月"d"日"');
     } catch(ex) {
@@ -201,11 +199,9 @@ function getJobDetails(jobId) {
         
         if (!rawUrls) rawUrls = String(data[i][8] || ""); 
 
-        // 取得時に確実に「yyyy-MM-dd」文字列に変換する
         const toIsoDate = (val) => {
           if (val instanceof Date) return Utilities.formatDate(val, "JST", "yyyy-MM-dd");
           if (typeof val === 'string' && val) {
-            // 文字列が混在している場合の置換
             return val.replace(/[年月]/g, '-').replace(/日/g, '').replace(/\//g, '-');
           }
           return '';
@@ -250,7 +246,6 @@ function updateJob(formData) {
     sheet.getRange(row, 5).setValue(formData.skill || '');
     sheet.getRange(row, 6).setValue(candidatesArr.join('\n'));
     
-    // 更新時もDateオブジェクトに変換して保存
     let interviewDate = '';
     if (formData.interviewDate) {
       const parts = formData.interviewDate.split('-');
@@ -321,7 +316,7 @@ function getJobCandidates(jobId) {
 }
 
 /**
- * 採用登録
+ * 採用登録（＋面接履歴の自動追記機能）
  */
 function registerHire(jobId, hiredIds) {
   try {
@@ -334,38 +329,90 @@ function registerHire(jobId, hiredIds) {
     const mData = mSheet.getDataRange().getValues();
     
     let companyName = "";
+    let rawInterviewDate = "";
+    let allCandidatesRaw = "";
     let targetJobRow = -1;
 
+    // 1. 案件管理シートから対象の案件情報を取得
     for (let i = 1; i < data.length; i++) {
       if (String(data[i][0]).trim() === String(jobId).trim()) {
-        companyName = data[i][3];
+        companyName = String(data[i][3]).trim();
+        allCandidatesRaw = String(data[i][5]); // 候補者名（F列）
+        rawInterviewDate = data[i][6];         // 面接日（G列）
         targetJobRow = i + 1;
         break;
       }
     }
     if (!companyName) throw new Error("案件が見つかりません。");
 
-    const hiredNames = [];
-    const candDict = getCandidateDict();
+    // 面接日のフォーマット処理（yyyy/MM/dd形式へ）
+    let formattedDate = "日付不明";
+    if (rawInterviewDate instanceof Date) {
+      formattedDate = Utilities.formatDate(rawInterviewDate, "JST", "yyyy/MM/dd");
+    } else if (rawInterviewDate) {
+      formattedDate = String(rawInterviewDate).replace(/[年月]/g, '/').replace(/日/g, '');
+    }
 
-    hiredIds.forEach(id => {
-      const name = candDict[id] || "";
-      const displayVal = name ? `${id}-${name}` : id;
-      hiredNames.push(displayVal);
+    const candDict = getCandidateDict();
+    
+    // --- ▽ ここから面接履歴の追記ロジック ▽ ---
+    
+    // 案件に紐づく「全候補者」のIDリストを抽出
+    const allCandidateIds = allCandidatesRaw.split(/\r?\n/)
+                                            .map(line => line.split('-').slice(0, 2).join('-').trim())
+                                            .filter(id => id !== "");
+    
+    // 採用者リスト（hiredIds）をSet化して判定を高速化
+    const hiredIdSet = new Set(hiredIds.map(id => String(id).trim()));
+
+    // 全候補者に対してループ処理
+    allCandidateIds.forEach(candId => {
+      // 採用か不採用かを判定
+      const isHired = hiredIdSet.has(candId);
+      const resultText = isHired ? "（採用）" : "（不採用）";
       
+      // 追記する履歴文字列の生成
+      const newHistoryLine = `${formattedDate}：${companyName}${resultText}`;
+
+      // 登録者マスタを検索して履歴を追記
       for (let j = 1; j < mData.length; j++) {
-        if (String(mData[j][0]).trim() === String(id).trim()) {
-          if (mCol['ステータス']) mSheet.getRange(j + 1, mCol['ステータス']).setValue('採用');
-          if (mCol['採用事業者']) mSheet.getRange(j + 1, mCol['採用事業者']).setValue(companyName);
-          break;
+        if (String(mData[j][0]).trim() === candId) {
+          const rowIdx = j + 1;
+          
+          // 採用者の場合はステータスと採用事業者も更新
+          if (isHired) {
+            if (mCol['ステータス']) mSheet.getRange(rowIdx, mCol['ステータス']).setValue('採用');
+            if (mCol['採用事業者']) mSheet.getRange(rowIdx, mCol['採用事業者']).setValue(companyName);
+          }
+          
+          // 面接履歴の更新（改行して追記）
+          if (mCol['面接履歴']) {
+            const historyCell = mSheet.getRange(rowIdx, mCol['面接履歴']);
+            const currentHistory = String(historyCell.getValue() || "").trim();
+            
+            // すでに履歴が入っている場合は改行を挟んで追加、空の場合はそのままセット
+            if (currentHistory) {
+              historyCell.setValue(currentHistory + "\n" + newHistoryLine);
+            } else {
+              historyCell.setValue(newHistoryLine);
+            }
+          }
+          break; // この候補者の処理を終えて次の候補者へ
         }
       }
+    });
+    // --- △ ここまで △ ---
+
+    // 案件管理シート側の更新（採用者名の書き込みとステータス変更）
+    const hiredNames = hiredIds.map(id => {
+      const name = candDict[id] || "";
+      return name ? `${id}-${name}` : id;
     });
 
     sheet.getRange(targetJobRow, 8).setValue(hiredNames.join('\n'));
     sheet.getRange(targetJobRow, 2).setValue('終了');
 
-    return `${hiredIds.length} 名の採用登録を完了しました。案件ステータスを「終了」にしました。`;
+    return `${hiredIds.length} 名の採用登録、および対象候補者全員の「面接履歴」への追記が完了しました。`;
   } catch(e) {
     throw new Error(e.message);
   }
