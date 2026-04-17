@@ -2,8 +2,13 @@
 // システム全体の設定値・共通関数・UI
 // =========================================
 
+// 外部連携スプレッドシートID（Funtoco支払い管理用）
+const EXTERNAL_SS_ID_FUNTOCO = "1Yo6Oz3iK6OlWjzl7BVUWeElO4__mPjJST3Jaaiys9yw";
+
 /**
  * シートを取得する共通関数
+ * @param {string} sheetName シート名
+ * @return {Sheet} シートオブジェクト
  */
 function getMasterSheet(sheetName) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -16,6 +21,8 @@ function getMasterSheet(sheetName) {
 
 /**
  * ヘッダー名から列番号を取得
+ * @param {Sheet} sheet 対象シート
+ * @return {Object} ヘッダー名と列番号のマップ
  */
 function getMasterColumnMap(sheet) {
   if (!sheet) return {};
@@ -24,6 +31,7 @@ function getMasterColumnMap(sheet) {
   const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
   const map = {};
   headers.forEach((h, i) => {
+    // スペースや改行を詰めて正規化
     const cleanHeader = String(h).replace(/\n/g, '').replace(/\s/g, '').trim();
     if (cleanHeader) map[cleanHeader] = i + 1;
   });
@@ -35,9 +43,10 @@ function getMasterColumnMap(sheet) {
  */
 function include(filename, mode) {
   const template = HtmlService.createTemplateFromFile(filename);
-  template.mode = mode; 
+  template.mode = mode; // フォームのモード（NEW/EDIT等）を渡す
   return template.evaluate().getContent();
 }
+
 
 // =========================================
 // メニューとUIの表示処理
@@ -58,6 +67,7 @@ function onOpen() {
     .addItem( '簡易リスト出力' , 'showSidebarList') 
     .addSeparator()
     .addItem('採用・未採用リストの同期', 'runSyncListSheets')
+    .addItem('支払い管理へ同期', 'runSyncPaymentManagement')
     .addToUi();
 
   ui.createMenu( '案件・採用管理' )
@@ -67,8 +77,11 @@ function onOpen() {
     .addToUi();
 }
 
+
 /**
  * サイドバー/ダイアログ表示の共通処理
+ * @param {string} mode フォームの動作モード
+ * @param {string} title ダイアログのタイトル
  */
 function showMainSidebar(mode, title) {
   const html = HtmlService.createTemplateFromFile('MainSidebar');
@@ -92,10 +105,17 @@ function showSidebarHire()    { showMainSidebar('HIRE', '採用者登録'); }
 function showSidebarList()    { showMainSidebar('LIST', '簡易リスト出力'); }
 
 /**
- * リスト同期の実行
+ * リスト同期の実行と結果表示
  */
 function runSyncListSheets() {
-  // 05_マスタ連携・その他.gs に定義されている関数を呼び出し
   const msg = syncListSheets();
+  SpreadsheetApp.getUi().alert(msg);
+}
+
+/**
+ * 支払い管理への同期実行と結果表示
+ */
+function runSyncPaymentManagement() {
+  const msg = syncToPaymentManagement();
   SpreadsheetApp.getUi().alert(msg);
 }
