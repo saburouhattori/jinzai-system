@@ -32,7 +32,13 @@
 </style>
 </head>
 <body>
-<div id="overlay"><div id="modal-message"><div id="modal-text" style="font-weight:bold; color:#1a73e8; margin-bottom:15px;"></div><button class="btn-primary" onclick="closeModal()" >閉じる</button></div></div>
+<div id="overlay">
+  <div id="modal-message">
+    <div id="modal-spinner" class="spinner"></div>
+    <div id="modal-text" style="font-weight:bold; color:#1a73e8; margin-bottom:15px;"></div>
+    <button class="btn-primary" onclick="closeModal()">閉じる</button>
+  </div>
+</div>
 
 <div id="picker-modal" class="picker-modal">
   <div style="font-weight:bold; font-size:16px; margin-bottom:15px;">Googleドライブからファイルを選択</div>

@@ -109,6 +109,9 @@ function showModal(msg, keepOpen) {
   document.getElementById('modal-text').innerText = msg;
   document.getElementById('overlay').style.display = 'flex';
   document.querySelector('#modal-message button').style.display = keepOpen ? 'none' : 'block';
+  // ★追加：keepOpen が true（待機中）の場合はスピナーを表示する
+  const spinner = document.getElementById('modal-spinner');
+  if (spinner) spinner.style.display = keepOpen ? 'block' : 'none';
 }
 function closeModal() { document.getElementById('overlay').style.display = 'none'; }
 </script>
