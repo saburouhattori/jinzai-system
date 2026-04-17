@@ -46,6 +46,7 @@ function searchDriveFiles(fileNameQuery) {
     if (fileNameQuery) {
       query += ' and title contains "' + fileNameQuery + '"';
     }
+    // 注意: DriveAppを使用するにはスコープの追加が必要な場合があります。
     const iter = DriveApp.searchFiles(query);
     let count = 0;
     while (iter.hasNext() && count < 15) {
@@ -59,6 +60,7 @@ function searchDriveFiles(fileNameQuery) {
   }
 }
 
+// 選択したIDでの簡易リスト生成機能
 function generateSimpleList(candIds) {
   try {
     const masterSheet = getMasterSheet('登録者マスタ');
@@ -66,6 +68,7 @@ function generateSimpleList(candIds) {
     const col = getMasterColumnMap(masterSheet);
     const listSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('簡易リスト');
     
+    // シートの初期化 (2行目以降のB~L列をクリア)
     const lastRowList = listSheet.getLastRow();
     if (lastRowList >= 2) {
       listSheet.getRange(2, 2, lastRowList, 11).clearContent();
@@ -85,15 +88,23 @@ function generateSimpleList(candIds) {
       if (rowData) {
         const getVal = (name) => col[name.replace(/\s/g, '')] ? rowData[col[name.replace(/\s/g, '')]-1] : "";
         result.push([
-          getVal('名前'), getVal('フリガナ'), getVal('満年齢'), getVal('性別'), 
-          getVal('学歴＞学校名'), getVal('学歴＞状況'), 
-          getVal('特定技能要件＞JLPTレベル') || "×", getVal('特定技能要件＞JFTBasicレベル') || "×", 
-          getVal('その他の日本語能力試験'), id
+          getVal('名前'),
+          getVal('フリガナ'),
+          getVal('満年齢'),
+          getVal('性別'),
+          getVal('学歴＞学校名'),
+          getVal('学歴＞状況'),
+          getVal('特定技能要件＞JLPTレベル') || "×",
+          getVal('特定技能要件＞JFTBasicレベル') || "×",
+          getVal('その他の日本語能力試験'),
+          id
         ]);
+        // 写真表示用のVLOOKUP関数を生成 (L列のIDを参照)
         formulas.push(['=IFERROR(VLOOKUP(L' + (result.length + 1) + ', \'登録者マスタ\'!$A:$C, 3, FALSE), "")']);
       }
     });
-    if (result.length) {
+
+    if (result.length > 0) {
       listSheet.getRange(2, 3, result.length, 10).setValues(result);
       listSheet.getRange(2, 2, formulas.length, 1).setFormulas(formulas);
     }
@@ -125,6 +136,11 @@ function buildRowByHeaders_(headers, dataMap) {
   });
 }
 
+/**
+ * 「登録者マスタ」を走査し、「採用者一覧」「未採用者一覧」へ振り分ける。
+ * 各シートの1行目（ヘッダー）と動的にマッピングする。
+ * @param {boolean} silent - trueなら完了アラートを出さない（スクリプト内からの呼び出し用）
+ */
 function updateCandidateLists(silent = false) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const masterSheet = ss.getSheetByName('登録者マスタ');
@@ -139,9 +155,11 @@ function updateCandidateLists(silent = false) {
   const masterData = masterSheet.getDataRange().getValues();
   const masterHeaders = masterData.shift();
 
+  // 各一覧シートのヘッダー取得
   const hiredHeaders = hiredSheet.getRange(1, 1, 1, hiredSheet.getLastColumn()).getValues()[0];
   const unhiredHeaders = unhiredSheet.getRange(1, 1, 1, unhiredSheet.getLastColumn()).getValues()[0];
   
+  // 案件管理データの事前取得とマッピング（高速化）
   const jobData = jobSheet.getDataRange().getValues();
   const jobHeaders = jobData.shift();
   const jobList = jobData.map(row => {
@@ -155,13 +173,13 @@ function updateCandidateLists(silent = false) {
   const hiredData = [];
   const unhiredData = [];
 
+  // マスタの「登録者ID」列インデックスを確認
   if (masterHeaders.findIndex(h => normalize_(h) === normalize_('登録者ID')) === -1) {
     throw new Error('登録者マスタに「登録者ID」列が見つかりません。');
   }
 
   for (let i = 0; i < masterData.length; i++) {
     const row = masterData[i];
-    
     const dataMap = {};
     for (let c = 0; c < masterHeaders.length; c++) {
       let val = row[c];
@@ -178,12 +196,12 @@ function updateCandidateLists(silent = false) {
 
     if (!candidateId) continue;
 
+    // 「特定技能要件」列の動的生成（未採用者一覧用）
     const jlpt = dataMap[normalize_('特定技能要件＞JLPTレベル')];
     const jft = dataMap[normalize_('特定技能要件＞JFT Basicレベル')];
     const kaigoGinou = dataMap[normalize_('特定技能要件＞介護技能評価試験')];
     const kaigoNihongo = dataMap[normalize_('特定技能要件＞介護日本語評価試験')];
     
-    // ▽ 未採用者一覧用「特定技能要件」の結合条件
     let reqs = [];
     if (jlpt && jlpt !== "-" && jlpt !== "×" && !jlpt.includes("予定") && !jlpt.includes("不合格")) reqs.push(jlpt);
     if (jft && jft !== "-" && jft !== "×" && !jft.includes("予定") && !jft.includes("不合格")) reqs.push(jft);
@@ -197,10 +215,10 @@ function updateCandidateLists(silent = false) {
     }
     dataMap[normalize_('特定技能要件')] = reqs.join(', ');
 
-    // ▽ ヘッダー名の揺れ（エイリアス）をマッピング
+    // ヘッダー名の揺れ（エイリアス）をマッピング
     dataMap[normalize_('JLPT')] = jlpt;
     dataMap[normalize_('JFT Basic')] = jft;
-    dataMap[normalize_('採用事業者名')] = companyName; 
+    dataMap[normalize_('採用事業者名')] = companyName; // マスタの「採用事業者」を「採用事業者名」にもマッピング
     dataMap[normalize_('在留資格交付申請の有無')] = dataMap[normalize_('在留資格交付申請の回数')];
 
     if (status === '採用' || status === '内定') {
@@ -215,7 +233,6 @@ function updateCandidateLists(silent = false) {
           const jHired = String(job[normalize_('採用者名')] || '');
           return jComp === companyName && (jCands.includes(candidateId) || jHired.includes(candidateId));
         });
-        
         if (matchedJob) {
           jobId = matchedJob[normalize_('案件ID')] || '';
           skillField = matchedJob[normalize_('技能分野')] || '';
@@ -226,10 +243,8 @@ function updateCandidateLists(silent = false) {
       dataMap[normalize_('案件ID')] = jobId;
       dataMap[normalize_('技能分野')] = skillField;
 
-      // ヘッダー名に基づいて動的に配列を組み立て
       const outRow = buildRowByHeaders_(hiredHeaders, dataMap);
       hiredData.push(outRow);
-
     } else if (status === '未採用' || status === '辞退' || status === '保留') {
       const outRow = buildRowByHeaders_(unhiredHeaders, dataMap);
       unhiredData.push(outRow);
@@ -251,5 +266,100 @@ function updateCandidateLists(silent = false) {
 
   if (!silent) {
     try { SpreadsheetApp.getUi().alert('リストの更新が完了しました。'); } catch(e) {}
+  }
+}
+
+// =========================================
+// 外部連携（支払い管理への同期）
+// =========================================
+
+/**
+ * 採用者一覧から外部の「支払い管理」シートへデータを同期する
+ */
+function syncToPaymentManagement() {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sourceSheet = ss.getSheetByName('採用者一覧');
+    if (!sourceSheet) throw new Error("「採用者一覧」シートが見つかりません。");
+
+    // 外部スプレッドシートを開く
+    const targetSS = SpreadsheetApp.openById(EXTERNAL_SS_ID_FUNTOCO);
+    const targetSheet = targetSS.getSheetByName("支払い管理");
+    if (!targetSheet) throw new Error("外部シートに「支払い管理」が見つかりません。");
+
+    const sourceData = sourceSheet.getDataRange().getValues();
+    const sourceMap = getMasterColumnMap(sourceSheet);
+    
+    const targetData = targetSheet.getDataRange().getValues();
+    const targetMap = getMasterColumnMap(targetSheet);
+
+    if (sourceData.length < 2) return "同期対象の採用者がいません。";
+
+    // Funtoco側のキー列インデックス
+    const tJobIdx = targetMap['案件ID'] - 1;
+    const tIdIdx = targetMap['登録者ID'] - 1;
+
+    let updateCount = 0;
+    let appendCount = 0;
+
+    // 支払い管理側の既存キーをマップ化（重複チェック用）
+    const targetKeys = {};
+    if (targetData.length > 1) {
+      for (let i = 1; i < targetData.length; i++) {
+        const key = String(targetData[i][tJobIdx] || "").trim() + "_" + String(targetData[i][tIdIdx] || "").trim();
+        targetKeys[key] = i + 1; // 行番号を保持
+      }
+    }
+
+    // 採用者一覧をループして同期
+    for (let i = 1; i < sourceData.length; i++) {
+      const row = sourceData[i];
+      const jobID = sourceMap['案件ID'] ? String(row[sourceMap['案件ID'] - 1] || "").trim() : "";
+      const candidateID = sourceMap['登録者ID'] ? String(row[sourceMap['登録者ID'] - 1] || "").trim() : "";
+      
+      if (!jobID || !candidateID) continue; // IDが揃っていない行はスキップ
+
+      const key = jobID + "_" + candidateID;
+
+      // 転記するデータのマッピング作成
+      const vals = {};
+      vals['案件ID'] = jobID;
+      vals['登録者ID'] = candidateID;
+      if (sourceMap['採用事業者名']) vals['採用事業者名'] = row[sourceMap['採用事業者名'] - 1];
+      if (sourceMap['技能分野']) vals['技能分野'] = row[sourceMap['技能分野'] - 1];
+      if (sourceMap['内定日']) vals['内定日'] = row[sourceMap['内定日'] - 1];
+      if (sourceMap['名前']) vals['名前'] = row[sourceMap['名前'] - 1];
+      if (sourceMap['直近の入国日']) vals['入国日'] = row[sourceMap['直近の入国日'] - 1];
+      if (sourceMap['備考・メモ']) vals['備考'] = row[sourceMap['備考・メモ'] - 1];
+
+      if (targetKeys[key]) {
+        // 更新処理（Funtoco側で入力する「金額」等は上書きしない）
+        const rowNum = targetKeys[key];
+        for (let headerName in vals) {
+          if (targetMap[headerName] !== undefined && vals[headerName] !== undefined) {
+            targetSheet.getRange(rowNum, targetMap[headerName]).setValue(vals[headerName]);
+          }
+        }
+        updateCount++;
+      } else {
+        // 新規追記処理
+        const numCols = targetSheet.getLastColumn() || Object.keys(targetMap).length;
+        const newRowValues = new Array(numCols).fill("");
+        
+        for (let headerName in vals) {
+          if (targetMap[headerName] !== undefined && vals[headerName] !== undefined) {
+            newRowValues[targetMap[headerName] - 1] = vals[headerName];
+          }
+        }
+        targetSheet.appendRow(newRowValues);
+        appendCount++;
+      }
+    }
+
+    return `支払い管理への同期が完了しました。\n新規追加: ${appendCount}件\n情報更新: ${updateCount}件`;
+
+  } catch (e) {
+    console.error("syncToPaymentManagement error: ", e);
+    throw new Error("外部同期エラー: " + e.message);
   }
 }
