@@ -8,15 +8,13 @@ function rirekisyo() {
   
   let targetId = response.getResponseText().trim();
   if (!targetId) return;
-
   // IDが数字だけの場合に「SD-」を付ける処理
   if (!targetId.startsWith('SD-')) {
     targetId = 'SD-' + targetId;
   }
 
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  
-  // ★修正1：外部IDを使わず、同じファイル内のマスタシートを取得する
+  // 同じファイル内のマスタシートを取得する
   const mSheet = ss.getSheetByName('登録者マスタ');
   const rSheet = ss.getSheetByName('履歴書');
 
@@ -30,11 +28,28 @@ function rirekisyo() {
   rSheet.getRange('M33').clearContent();
 
   const data = mSheet.getDataRange().getValues();
-  let targetData = null;
+  if (data.length < 2) {
+    ui.alert('エラー：登録者マスタにデータがありません。');
+    return;
+  }
 
+  // 1行目のヘッダーを取得して、各項目名が何列目(配列の何番目)にあるかのマッピングを作成
+  const headers = data[0];
+  const col = {};
+  headers.forEach((header, index) => {
+    col[header.trim()] = index;
+  });
+
+  // 必須の列が存在するか簡易チェック
+  if (col['登録者ID'] === undefined) {
+    ui.alert('エラー：登録者マスタに「登録者ID」の列が見つかりません。ヘッダー名を確認してください。');
+    return;
+  }
+
+  let targetData = null;
   // IDを検索
   for (let i = 1; i < data.length; i++) {
-    if (data[i][0] === targetId) {
+    if (data[i][col['登録者ID']] === targetId) {
       targetData = data[i];
       break;
     }
@@ -45,92 +60,135 @@ function rirekisyo() {
     return;
   }
 
+  // 値を取得するためのヘルパー関数（列が存在しない場合のundefined対策）
+  const getVal = (colName) => {
+    return col[colName] !== undefined ? targetData[col[colName]] : "";
+  };
+
   // --- 書き出し処理（お客様の元のセル配置をそのまま使用） ---
-  rSheet.getRange('B2').setValue(targetData[0]);  // ID
-  rSheet.getRange('D4').setValue(targetData[3]);  // フリガナ
-  rSheet.getRange('D5').setValue(targetData[4]);  // 呼び名
-  rSheet.getRange('D6').setValue(targetData[1]);  // 名前
+  rSheet.getRange('B2').setValue(getVal('登録者ID'));
+  rSheet.getRange('D4').setValue(getVal('フリガナ'));
+  rSheet.getRange('D5').setValue(getVal('呼び名'));
+  rSheet.getRange('D6').setValue(getVal('名前'));
   
   // 生年月日
-  if (targetData[5] instanceof Date) {
-    rSheet.getRange('D9').setValue(Utilities.formatDate(targetData[5], "JST", "yyyy/MM/dd"));
+  const birthday = getVal('生年月日');
+  if (birthday instanceof Date) {
+    rSheet.getRange('D9').setValue(Utilities.formatDate(birthday, "JST", "yyyy/MM/dd"));
   } else {
-    rSheet.getRange('D9').setValue(targetData[5]);
+    rSheet.getRange('D9').setValue(birthday);
   }
   
-  rSheet.getRange('G9').setValue(targetData[6] ? targetData[6] + '歳' : ''); //年齢
-  rSheet.getRange('D10').setValue(targetData[7]);//性別
-  rSheet.getRange('K9').setValue(targetData[8]); //配偶者
-  rSheet.getRange('K10').setValue(targetData[9] ? targetData[9] + 'cm' : ''); //身長
-  rSheet.getRange('K11').setValue(targetData[10] ? targetData[10] + 'kg' : ''); //体重
-  rSheet.getRange('E13').setValue(targetData[11]);//現住所
-  rSheet.getRange('K13').setValue(targetData[13]);//メールアドレス
-  rSheet.getRange('E14').setValue(targetData[12]);//出身地住所
+  const age = getVal('満年齢');
+  rSheet.getRange('G9').setValue(age ? age + '歳' : '');
+  rSheet.getRange('D10').setValue(getVal('性別'));
+  rSheet.getRange('K9').setValue(getVal('配偶者')); 
+  
+  const height = getVal('身長');
+  rSheet.getRange('K10').setValue(height ? height + 'cm' : '');
+  
+  const weight = getVal('体重');
+  rSheet.getRange('K11').setValue(weight ? weight + 'kg' : ''); 
+  
+  rSheet.getRange('E13').setValue(getVal('現住所'));
+  rSheet.getRange('K13').setValue(getVal('メールアドレス'));
+  rSheet.getRange('E14').setValue(getVal('住所（出身地）'));
 
   // 学歴
-  rSheet.getRange('B17').setValue(targetData[18]);//入学年月
-  rSheet.getRange('F17').setValue(targetData[15] ? targetData[15] + '　入学' : ''); //学校名
-  rSheet.getRange('B18').setValue(targetData[19]);//卒業または中退等の年月
-  rSheet.getRange('F18').setValue(targetData[17]);//学歴状況
-  rSheet.getRange('F20').setValue(targetData[20]);//学歴に関する補足
+  rSheet.getRange('B17').setValue(getVal('学歴＞入学年月'));
+  const schoolName = getVal('学歴＞学校名');
+  rSheet.getRange('F17').setValue(schoolName ? schoolName + '　入学' : '');
+  rSheet.getRange('B18').setValue(getVal('学歴＞卒業/中退年月'));
+  rSheet.getRange('F18').setValue(getVal('学歴＞状況'));
+  rSheet.getRange('F20').setValue(getVal('学歴＞補足'));
   
   // 職歴
-  rSheet.getRange('C23').setValue(targetData[21] + '　' + targetData[22]);//職歴①の期間と内容
-  rSheet.getRange('C24').setValue(targetData[23] + '　' + targetData[24]);//職歴②の期間と内容
-  rSheet.getRange('B25').setValue(targetData[25] + '　' + targetData[26]);//職歴③の期間と内容
+  rSheet.getRange('C23').setValue(getVal('職歴①＞期間') + '　' + getVal('職歴①＞内容'));
+  rSheet.getRange('C24').setValue(getVal('職歴②＞期間') + '　' + getVal('職歴②＞内容'));
+  rSheet.getRange('B25').setValue(getVal('職歴③＞期間') + '　' + getVal('職歴③＞内容'));
 
   // 資格・試験
-  if (!targetData[27]) {
+  const jlptLvl = getVal('特定技能要件＞JLPTレベル');
+  const jlptDate = getVal('特定技能要件＞JLPT取得年月');
+  if (!jlptLvl) {
     rSheet.getRange('E29').setValue('-');
   } else {
-    rSheet.getRange('E29').setValue(targetData[27] + '合格（' + (targetData[28] || '') + '）');
+    rSheet.getRange('E29').setValue(jlptLvl + '合格（' + jlptDate + '）');
   }
 
-  if (!targetData[29]) {
+  const jftLvl = getVal('特定技能要件＞JFT Basicレベル');
+  const jftDate = getVal('特定技能要件＞JFT取得年月');
+  if (!jftLvl) {
     rSheet.getRange('E30').setValue('-');
   } else {
-    rSheet.getRange('E30').setValue(targetData[29] + '合格（' + (targetData[30] || '') + '）');
+    rSheet.getRange('E30').setValue(jftLvl + '合格（' + jftDate + '）');
   }
 
-  if (!targetData[31]) {
+  const careSkill = getVal('特定技能要件＞介護技能評価試験');
+  const careSkillDate = getVal('特定技能要件＞介護技能 取得年月');
+  if (!careSkill) {
     rSheet.getRange('R28').setValue('-');
   } else {
-    rSheet.getRange('R28').setValue(targetData[31] + '（' + (targetData[32] || '') + '）');
+    rSheet.getRange('R28').setValue(careSkill + '（' + careSkillDate + '）');
   }
 
-  if (!targetData[33]) {
+  const careLang = getVal('特定技能要件＞介護日本語評価試験');
+  const careLangDate = getVal('特定技能要件＞介護日本語 取得年月');
+  if (!careLang) {
     rSheet.getRange('R29').setValue('-');
   } else {
-    rSheet.getRange('R29').setValue(targetData[33] + '（' + (targetData[34] || '') + '）');
+    rSheet.getRange('R29').setValue(careLang + '（' + careLangDate + '）');
   }
 
-  rSheet.getRange('J30').setValue(targetData[35]);
+  rSheet.getRange('J30').setValue(getVal('特定技能要件＞その他の評価試験'));
 
-  if (targetData[36]) {
-    rSheet.getRange('R30').setValue('合格（' + targetData[36] + '）');
+  const otherSkillDate = getVal('特定技能要件＞その他の評価試験の取得年月');
+  if (otherSkillDate) {
+    rSheet.getRange('R30').setValue('合格（' + otherSkillDate + '）');
   } else {
     rSheet.getRange('R30').clearContent();
   }
 
-  if (targetData[37]) {
-    rSheet.getRange('B33').setValue(targetData[37]);
+  const otherJlpt = getVal('その他の日本語能力試験');
+  if (otherJlpt) {
+    rSheet.getRange('B33').setValue(otherJlpt);
   } else {
     rSheet.getRange('B33').clearContent();
   }
 
-  if (targetData[38]) {
-    rSheet.getRange('F33').setValue('合格（' + targetData[38] + '）');
+  const otherJlptDate = getVal('取得年月');
+  if (otherJlptDate) {
+    rSheet.getRange('F33').setValue('合格（' + otherJlptDate + '）');
   } else {
     rSheet.getRange('F33').clearContent();
   }
 
   // コメント・備考
-  rSheet.getRange('C36').setValue(targetData[39]);
-  rSheet.getRange('C41').setValue(targetData[41]);
-  
-  // ★修正2：候補者写真シートが消えたため、登録者マスタのC列（顔写真）を参照するように修正
-  const photoFormula = '=IFERROR(VLOOKUP(B2, \'登録者マスタ\'!A:C, 3, FALSE), "")';
-  rSheet.getRange('Q3').setFormula(photoFormula);
+  rSheet.getRange('C36').setValue(getVal('コメント'));
+  rSheet.getRange('C41').setValue(getVal('日本在住の親族について'));
+
+  // 写真の取得
+  // 登録者IDの列文字と、顔写真の列文字を動的に取得してINDEXとMATCHを使った数式を生成
+  if (col['顔写真'] !== undefined && col['登録者ID'] !== undefined) {
+    const idColLetter = columnToLetter_(col['登録者ID'] + 1);
+    const photoColLetter = columnToLetter_(col['顔写真'] + 1);
+    // 例: =IFERROR(INDEX('登録者マスタ'!C:C, MATCH(B2, '登録者マスタ'!A:A, 0)), "")
+    const photoFormula = `=IFERROR(INDEX('登録者マスタ'!${photoColLetter}:${photoColLetter}, MATCH(B2, '登録者マスタ'!${idColLetter}:${idColLetter}, 0)), "")`;
+    rSheet.getRange('Q3').setFormula(photoFormula);
+  }
 
   ui.alert('ID: ' + targetId + ' の履歴書作成が完了しました。');
+}
+
+/**
+ * 列番号（1始まり）をアルファベット（A, B, C...）に変換する補助関数
+ */
+function columnToLetter_(column) {
+  let temp, letter = '';
+  while (column > 0) {
+    temp = (column - 1) % 26;
+    letter = String.fromCharCode(temp + 65) + letter;
+    column = (column - temp - 1) / 26;
+  }
+  return letter;
 }
