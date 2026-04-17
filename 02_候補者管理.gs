@@ -58,8 +58,7 @@ function safeSearchByAdminId(id) {
       }
     }
     return null;
-  } catch(e) { throw new Error("検索エラー: " + e.message);
-  }
+  } catch(e) { throw new Error("検索エラー: " + e.message); }
 }
 
 function addNewRow(formData) {
@@ -78,10 +77,8 @@ function addNewRow(formData) {
     if (match) nextNumber = parseInt(match[0], 10) + 1;
   }
   const nextId = "SD-" + nextNumber.toString().padStart(4, '0');
-  
   const safeMaxCol = Math.max(masterSheet.getLastColumn(), ...Object.values(col));
   const rowValues = new Array(safeMaxCol).fill("");
-  
   const mapping = {
     '登録者ID': nextId, '名前': formData.name, 'フリガナ': formData.furigana, '呼び名': formData.nickname,
     '生年月日': formData.birthday, '性別': formData.gender, '配偶者': formData.spouse, 
@@ -106,11 +103,30 @@ function addNewRow(formData) {
     if (col[h]) rowValues[col[h]-1] = mapping[header];
   }
 
-  masterSheet.appendRow(rowValues);
-  const newRow = masterSheet.getLastRow();
+  const newRow = lastRow + 1;
+  
+  // ARRAYFORMULA破壊を防ぐため、特定列（顔写真、満年齢）をスキップして分割書き込み
+  const skipIndices = [];
+  if (col['満年齢']) skipIndices.push(col['満年齢'] - 1);
+  if (col['顔写真']) skipIndices.push(col['顔写真'] - 1);
+  
+  skipIndices.sort((a, b) => a - b);
+  
+  let startCol = 0;
+  skipIndices.forEach(skipIdx => {
+    if (skipIdx > startCol) {
+      const length = skipIdx - startCol;
+      masterSheet.getRange(newRow, startCol + 1, 1, length).setValues([rowValues.slice(startCol, skipIdx)]);
+    }
+    startCol = skipIdx + 1;
+  });
+  
+  if (startCol < safeMaxCol) {
+    const length = safeMaxCol - startCol;
+    masterSheet.getRange(newRow, startCol + 1, 1, length).setValues([rowValues.slice(startCol)]);
+  }
 
   if (col['生年月日']) masterSheet.getRange(newRow, col['生年月日']).setNumberFormat('yyyy"年"m"月"d"日"');
-  
   if (formData.imageFile && col['顔写真']) {
     try {
       const dataUri = `data:${formData.imageFile.mimeType};base64,${formData.imageFile.contents}`;
@@ -120,7 +136,6 @@ function addNewRow(formData) {
     } catch (e) {}
   }
   
-  updateAges(newRow);
   return `登録完了: ${nextId}`;
 }
 
@@ -133,7 +148,6 @@ function updateRow(formData) {
   const col = getMasterColumnMap(masterSheet);
   const row = Number(formData.row);
   if (!row) return "エラー：行が不明です。";
-  
   const mapping = {
     '名前': formData.name, 'フリガナ': formData.furigana, '呼び名': formData.nickname, '生年月日': formData.birthday,
     '性別': formData.gender, '配偶者': formData.spouse, '身長': formData.height, '体重': formData.weight,
@@ -152,11 +166,9 @@ function updateRow(formData) {
     '日本在住の親族について': formData.relative
   };
 
-  const photoIdx = col['顔写真'] ? col['顔写真'] - 1 : -1;
   const safeMaxCol = Math.max(masterSheet.getLastColumn(), ...Object.values(col));
   const currentRowRange = masterSheet.getRange(row, 1, 1, safeMaxCol);
   const currentRowData = currentRowRange.getValues()[0];
-
   for (let header in mapping) {
     const h = header.replace(/\s/g, '');
     if (col[h] && mapping[header] !== undefined) {
@@ -164,19 +176,27 @@ function updateRow(formData) {
     }
   }
   
-  if (photoIdx !== -1 && photoIdx < safeMaxCol) {
-    if (photoIdx > 0) {
-      masterSheet.getRange(row, 1, 1, photoIdx).setValues([currentRowData.slice(0, photoIdx)]);
+  const skipIndices = [];
+  if (col['顔写真']) skipIndices.push(col['顔写真'] - 1);
+  if (col['満年齢']) skipIndices.push(col['満年齢'] - 1); // ARRAYFORMULA破壊防止
+  
+  skipIndices.sort((a, b) => a - b);
+  
+  let startCol = 0;
+  skipIndices.forEach(skipIdx => {
+    if (skipIdx > startCol) {
+      const length = skipIdx - startCol;
+      masterSheet.getRange(row, startCol + 1, 1, length).setValues([currentRowData.slice(startCol, skipIdx)]);
     }
-    if (photoIdx < safeMaxCol - 1) {
-      masterSheet.getRange(row, photoIdx + 2, 1, safeMaxCol - (photoIdx + 1)).setValues([currentRowData.slice(photoIdx + 1)]);
-    }
-  } else {
-    currentRowRange.setValues([currentRowData]);
+    startCol = skipIdx + 1;
+  });
+  
+  if (startCol < safeMaxCol) {
+    const length = safeMaxCol - startCol;
+    masterSheet.getRange(row, startCol + 1, 1, length).setValues([currentRowData.slice(startCol)]);
   }
 
   if (col['生年月日']) masterSheet.getRange(row, col['生年月日']).setNumberFormat('yyyy"年"m"月"d"日"');
-
   if (formData.imageFile && col['顔写真']) {
     try {
       const dataUri = `data:${formData.imageFile.mimeType};base64,${formData.imageFile.contents}`;
@@ -186,7 +206,6 @@ function updateRow(formData) {
     } catch (e) {}
   }
   
-  updateAges(row); 
   return `更新が完了しました。`;
 }
 
@@ -208,11 +227,9 @@ function updateAddInfoRow(formData) {
       relCard2: '日本在住の親族情報親族の在留カード番号', memo: '備考・メモ'
     };
 
-    const photoIdx = col['顔写真'] ? col['顔写真'] - 1 : -1;
     const safeMaxCol = Math.max(sheet.getLastColumn(), ...Object.values(col));
     const currentRowRange = sheet.getRange(row, 1, 1, safeMaxCol);
     const currentRowData = currentRowRange.getValues()[0];
-
     for (let key in mapping) {
       const h = mapping[key].replace(/\s/g, '');
       if (col[h] && formData[key] !== undefined) {
@@ -220,15 +237,24 @@ function updateAddInfoRow(formData) {
       }
     }
     
-    if (photoIdx !== -1 && photoIdx < safeMaxCol) {
-      if (photoIdx > 0) {
-        sheet.getRange(row, 1, 1, photoIdx).setValues([currentRowData.slice(0, photoIdx)]);
+    const skipIndices = [];
+    if (col['顔写真']) skipIndices.push(col['顔写真'] - 1);
+    if (col['満年齢']) skipIndices.push(col['満年齢'] - 1); // ARRAYFORMULA破壊防止
+    
+    skipIndices.sort((a, b) => a - b);
+    
+    let startCol = 0;
+    skipIndices.forEach(skipIdx => {
+      if (skipIdx > startCol) {
+        const length = skipIdx - startCol;
+        sheet.getRange(row, startCol + 1, 1, length).setValues([currentRowData.slice(startCol, skipIdx)]);
       }
-      if (photoIdx < safeMaxCol - 1) {
-        sheet.getRange(row, photoIdx + 2, 1, safeMaxCol - (photoIdx + 1)).setValues([currentRowData.slice(photoIdx + 1)]);
-      }
-    } else {
-      currentRowRange.setValues([currentRowData]);
+      startCol = skipIdx + 1;
+    });
+    
+    if (startCol < safeMaxCol) {
+      const length = safeMaxCol - startCol;
+      sheet.getRange(row, startCol + 1, 1, length).setValues([currentRowData.slice(startCol)]);
     }
 
     return `追加情報の登録が完了しました。`;
@@ -249,20 +275,6 @@ function deleteCandidate(id) {
     }
     return "エラー: 指定されたIDが見つかりませんでした。";
   } catch (e) { return "エラー: " + e.toString(); }
-}
-
-function updateAges(targetRow) {
-  const sheet = getMasterSheet('登録者マスタ');
-  const col = getMasterColumnMap(sheet);
-  if (!col['生年月日'] || !col['満年齢']) return;
-  const today = new Date();
-  const birthday = sheet.getRange(targetRow, col['生年月日']).getValue();
-  if (birthday instanceof Date) {
-    let age = today.getFullYear() - birthday.getFullYear();
-    const m = today.getMonth() - birthday.getMonth();
-    if (m < 0 || (m === 0 && today.getDate() < birthday.getDate())) age--;
-    sheet.getRange(targetRow, col['満年齢']).setValue(age);
-  }
 }
 
 function normalizeYearMonth(val) {
