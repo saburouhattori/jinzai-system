@@ -46,7 +46,6 @@ function searchDriveFiles(fileNameQuery) {
     if (fileNameQuery) {
       query += ' and title contains "' + fileNameQuery + '"';
     }
-    // 注意: DriveAppを使用するにはスコープの追加が必要な場合があります。
     const iter = DriveApp.searchFiles(query);
     let count = 0;
     while (iter.hasNext() && count < 15) {
@@ -356,7 +355,20 @@ function syncToPaymentManagement() {
       }
     }
 
-    return `支払い管理への同期が完了しました。\n新規追加: ${appendCount}件\n情報更新: ${updateCount}件`;
+    // ----------------------------------------------------
+    // 案件ID順に並べ替え (ソート)
+    // ----------------------------------------------------
+    const finalLastRow = targetSheet.getLastRow();
+    const finalLastCol = targetSheet.getLastColumn();
+    // 2行以上データがあり、案件IDの列が存在する場合のみソートを実行
+    if (finalLastRow >= 2 && targetMap['案件ID']) {
+      // 2行目以降のデータ領域全体を取得
+      const dataRange = targetSheet.getRange(2, 1, finalLastRow - 1, finalLastCol);
+      // 案件IDの列番号（1始まり）を基準に昇順(ascending: true)でソート
+      dataRange.sort({column: targetMap['案件ID'], ascending: true});
+    }
+
+    return `支払い管理への同期が完了しました。\n新規追加: ${appendCount}件\n情報更新: ${updateCount}件\n※案件ID順に並べ替えました。`;
 
   } catch (e) {
     console.error("syncToPaymentManagement error: ", e);
