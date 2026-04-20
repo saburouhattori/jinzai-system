@@ -4,17 +4,20 @@
 
 function getAgentList() {
   const sheet = getMasterSheet('送り出し機関マスタ');
-  return sheet ? [...new Set(sheet.getDataRange().getValues().slice(1).map(row => row[1]).filter(n => n))].sort() : [];
+  return sheet ?
+    [...new Set(sheet.getDataRange().getValues().slice(1).map(row => row[1]).filter(n => n))].sort() : [];
 }
 
 function getSchoolList() {
   const sheet = getMasterSheet('日本語学校マスタ');
-  return sheet ? [...new Set(sheet.getDataRange().getValues().slice(1).map(row => row[1]).filter(n => n))].sort() : [];
+  return sheet ?
+    [...new Set(sheet.getDataRange().getValues().slice(1).map(row => row[1]).filter(n => n))].sort() : [];
 }
 
 function getCompanyList() {
   const sheet = getMasterSheet('事業者マスタ');
-  return sheet ? [...new Set(sheet.getDataRange().getValues().slice(1).map(row => row[1]).filter(n => n))].sort() : [];
+  return sheet ?
+    [...new Set(sheet.getDataRange().getValues().slice(1).map(row => row[1]).filter(n => n))].sort() : [];
 }
 
 function getCandidateDict() {
@@ -66,7 +69,6 @@ function generateSimpleList(candIds) {
     const masterData = masterSheet.getDataRange().getValues();
     const col = getMasterColumnMap(masterSheet);
     const listSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('簡易リスト');
-    
     // シートの初期化 (2行目以降のB~L列をクリア)
     const lastRowList = listSheet.getLastRow();
     if (lastRowList >= 2) {
@@ -85,6 +87,7 @@ function generateSimpleList(candIds) {
         } 
       }
       if (rowData) {
+    
         const getVal = (name) => col[name.replace(/\s/g, '')] ? rowData[col[name.replace(/\s/g, '')]-1] : "";
         result.push([
           getVal('名前'),
@@ -94,6 +97,7 @@ function generateSimpleList(candIds) {
           getVal('学歴＞学校名'),
           getVal('学歴＞状況'),
           getVal('特定技能要件＞JLPTレベル') || "×",
+     
           getVal('特定技能要件＞JFTBasicレベル') || "×",
           getVal('その他の日本語能力試験'),
           id
@@ -102,7 +106,6 @@ function generateSimpleList(candIds) {
         formulas.push(['=IFERROR(VLOOKUP(L' + (result.length + 1) + ', \'登録者マスタ\'!$A:$C, 3, FALSE), "")']);
       }
     });
-
     if (result.length > 0) {
       listSheet.getRange(2, 3, result.length, 10).setValues(result);
       listSheet.getRange(2, 2, formulas.length, 1).setFormulas(formulas);
@@ -146,7 +149,6 @@ function updateCandidateLists(silent = false) {
   const hiredSheet = ss.getSheetByName('採用者一覧');
   const unhiredSheet = ss.getSheetByName('未採用者一覧');
   const jobSheet = ss.getSheetByName('案件管理');
-
   if (!masterSheet || !hiredSheet || !unhiredSheet || !jobSheet) {
     throw new Error('必要なシートが見つかりません。');
   }
@@ -168,7 +170,6 @@ function updateCandidateLists(silent = false) {
     }
     return jobMap;
   });
-
   const hiredData = [];
   const unhiredData = [];
 
@@ -219,19 +220,26 @@ function updateCandidateLists(silent = false) {
     dataMap[normalize_('JFT Basic')] = jft;
     dataMap[normalize_('採用事業者名')] = companyName; // マスタの「採用事業者」を「採用事業者名」にもマッピング
     dataMap[normalize_('在留資格交付申請の有無')] = dataMap[normalize_('在留資格交付申請の回数')];
-
     if (status === '採用' || status === '内定') {
       let jobId = '';
       let skillField = '';
       
       // 案件管理から「案件ID」と「技能分野」を取得
       if (companyName) {
+        const compNameNorm = normalize_(companyName);
         const matchedJob = jobList.find(job => {
-          const jComp = job[normalize_('事業者名')];
-          const jCands = String(job[normalize_('候補者名')] || '');
-          const jHired = String(job[normalize_('採用者名')] || '');
-          return jComp === companyName && (jCands.includes(candidateId) || jHired.includes(candidateId));
+          const jComp = normalize_(job[normalize_('事業者名')]);
+          if (jComp !== compNameNorm) return false;
+          
+          const jCandsStr = String(job[normalize_('候補者名')] || '');
+          const jHiredStr = String(job[normalize_('採用者名')] || '');
+          
+          // IDの部分一致を防止するため、行ごとに分割して正確に比較
+          const extractIds = (str) => str.split(/\r?\n/).map(line => line.split('-').slice(0, 2).join('-').trim());
+          
+          return extractIds(jCandsStr).includes(candidateId) || extractIds(jHiredStr).includes(candidateId);
         });
+        
         if (matchedJob) {
           jobId = matchedJob[normalize_('案件ID')] || '';
           skillField = matchedJob[normalize_('技能分野')] || '';
@@ -264,7 +272,8 @@ function updateCandidateLists(silent = false) {
   }
 
   if (!silent) {
-    try { SpreadsheetApp.getUi().alert('リストの更新が完了しました。'); } catch(e) {}
+    try { SpreadsheetApp.getUi().alert('リストの更新が完了しました。');
+    } catch(e) {}
   }
 }
 
@@ -288,16 +297,13 @@ function syncToPaymentManagement() {
 
     const sourceData = sourceSheet.getDataRange().getValues();
     const sourceMap = getMasterColumnMap(sourceSheet);
-    
     const targetData = targetSheet.getDataRange().getValues();
     const targetMap = getMasterColumnMap(targetSheet);
 
     if (sourceData.length < 2) return "同期対象の採用者がいません。";
-
     // Funtoco側のキー列インデックス
     const tJobIdx = targetMap['案件ID'] - 1;
     const tIdIdx = targetMap['登録者ID'] - 1;
-
     let updateCount = 0;
     let appendCount = 0;
 
@@ -310,24 +316,25 @@ function syncToPaymentManagement() {
       }
     }
 
-    const numCols = targetSheet.getLastColumn() || Object.keys(targetMap).length;
-    const newRows = []; // 新規追加データをまとめてストックする配列
-
-    // 採用者一覧をループして同期用データを作成
+    // 採用者一覧をループして同期
     for (let i = 1; i < sourceData.length; i++) {
       const row = sourceData[i];
       const jobID = sourceMap['案件ID'] ? String(row[sourceMap['案件ID'] - 1] || "").trim() : "";
-      const candidateID = sourceMap['登録者ID'] ? String(row[sourceMap['登録者ID'] - 1] || "").trim() : "";
+      const candidateID = sourceMap['登録者ID'] ?
+        String(row[sourceMap['登録者ID'] - 1] || "").trim() : "";
       
-      if (!jobID || !candidateID) continue; // IDが揃っていない行はスキップ
+      if (!jobID || !candidateID) continue;
+      // IDが揃っていない行はスキップ
 
       const key = jobID + "_" + candidateID;
-
       // 転記するデータのマッピング作成
       const vals = {};
       vals['案件ID'] = jobID;
       vals['登録者ID'] = candidateID;
-      if (sourceMap['採用事業者名']) vals['採用事業者名'] = row[sourceMap['採用事業者名'] - 1];
+      
+      // 修正: 採用事業者名 は支払い管理側の「事業者名」列に転記するようマッピングを修正
+      if (sourceMap['採用事業者名']) vals['事業者名'] = row[sourceMap['採用事業者名'] - 1];
+      
       if (sourceMap['技能分野']) vals['技能分野'] = row[sourceMap['技能分野'] - 1];
       if (sourceMap['内定日']) vals['内定日'] = row[sourceMap['内定日'] - 1];
       if (sourceMap['名前']) vals['名前'] = row[sourceMap['名前'] - 1];
@@ -335,7 +342,7 @@ function syncToPaymentManagement() {
       if (sourceMap['備考・メモ']) vals['備考'] = row[sourceMap['備考・メモ'] - 1];
 
       if (targetKeys[key]) {
-        // 既存データの更新処理（Funtoco側で入力する「金額」等は上書きしない）
+        // 更新処理（Funtoco側で入力する「金額」等は上書きしない）
         const rowNum = targetKeys[key];
         for (let headerName in vals) {
           if (targetMap[headerName] !== undefined && vals[headerName] !== undefined) {
@@ -344,33 +351,18 @@ function syncToPaymentManagement() {
         }
         updateCount++;
       } else {
-        // 新規追記データを配列にストックする（1件ずつappendRowしない）
+        // 新規追記処理
+        const numCols = targetSheet.getLastColumn() || Object.keys(targetMap).length;
         const newRowValues = new Array(numCols).fill("");
+        
         for (let headerName in vals) {
           if (targetMap[headerName] !== undefined && vals[headerName] !== undefined) {
             newRowValues[targetMap[headerName] - 1] = vals[headerName];
           }
         }
-        newRows.push(newRowValues);
+        targetSheet.appendRow(newRowValues);
         appendCount++;
       }
-    }
-
-    // ----------------------------------------------------
-    // 新規データを一括で書き込む（行不足時は自動で挿入）
-    // ----------------------------------------------------
-    if (newRows.length > 0) {
-      const lastRow = targetSheet.getLastRow();
-      const maxRows = targetSheet.getMaxRows();
-      const requiredRows = lastRow + newRows.length;
-      
-      // シートの物理的な最大行数が足りない場合、必要な行数を一気に追加する
-      if (requiredRows > maxRows) {
-        targetSheet.insertRowsAfter(lastRow, requiredRows - maxRows);
-      }
-      
-      // 用意した空き領域へ一括でデータをセットする
-      targetSheet.getRange(lastRow + 1, 1, newRows.length, numCols).setValues(newRows);
     }
 
     // ----------------------------------------------------
@@ -386,8 +378,7 @@ function syncToPaymentManagement() {
       dataRange.sort({column: targetMap['案件ID'], ascending: true});
     }
 
-    return `支払い管理への同期が完了しました。\n新規追加: ${appendCount}件\n情報更新: ${updateCount}件\n※案件ID順に並べ替えを行いました。`;
-
+    return `支払い管理への同期が完了しました。\n新規追加: ${appendCount}件\n情報更新: ${updateCount}件\n※案件ID順に並べ替えました。`;
   } catch (e) {
     console.error("syncToPaymentManagement error: ", e);
     throw new Error("外部同期エラー: " + e.message);
