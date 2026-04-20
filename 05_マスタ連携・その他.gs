@@ -46,7 +46,6 @@ function searchDriveFiles(fileNameQuery) {
     if (fileNameQuery) {
       query += ' and title contains "' + fileNameQuery + '"';
     }
-    // 注意: DriveAppを使用するにはスコープの追加が必要な場合があります。
     const iter = DriveApp.searchFiles(query);
     let count = 0;
     while (iter.hasNext() && count < 15) {
@@ -311,7 +310,10 @@ function syncToPaymentManagement() {
       }
     }
 
-    // 採用者一覧をループして同期
+    const numCols = targetSheet.getLastColumn() || Object.keys(targetMap).length;
+    const newRows = []; // 新規追加データをまとめてストックする配列
+
+    // 採用者一覧をループして同期用データを作成
     for (let i = 1; i < sourceData.length; i++) {
       const row = sourceData[i];
       const jobID = sourceMap['案件ID'] ? String(row[sourceMap['案件ID'] - 1] || "").trim() : "";
@@ -333,7 +335,7 @@ function syncToPaymentManagement() {
       if (sourceMap['備考・メモ']) vals['備考'] = row[sourceMap['備考・メモ'] - 1];
 
       if (targetKeys[key]) {
-        // 更新処理（Funtoco側で入力する「金額」等は上書きしない）
+        // 既存データの更新処理（Funtoco側で入力する「金額」等は上書きしない）
         const rowNum = targetKeys[key];
         for (let headerName in vals) {
           if (targetMap[headerName] !== undefined && vals[headerName] !== undefined) {
@@ -342,21 +344,49 @@ function syncToPaymentManagement() {
         }
         updateCount++;
       } else {
-        // 新規追記処理
-        const numCols = targetSheet.getLastColumn() || Object.keys(targetMap).length;
+        // 新規追記データを配列にストックする（1件ずつappendRowしない）
         const newRowValues = new Array(numCols).fill("");
-        
         for (let headerName in vals) {
           if (targetMap[headerName] !== undefined && vals[headerName] !== undefined) {
             newRowValues[targetMap[headerName] - 1] = vals[headerName];
           }
         }
-        targetSheet.appendRow(newRowValues);
+        newRows.push(newRowValues);
         appendCount++;
       }
     }
 
-    return `支払い管理への同期が完了しました。\n新規追加: ${appendCount}件\n情報更新: ${updateCount}件`;
+    // ----------------------------------------------------
+    // 新規データを一括で書き込む（行不足時は自動で挿入）
+    // ----------------------------------------------------
+    if (newRows.length > 0) {
+      const lastRow = targetSheet.getLastRow();
+      const maxRows = targetSheet.getMaxRows();
+      const requiredRows = lastRow + newRows.length;
+      
+      // シートの物理的な最大行数が足りない場合、必要な行数を一気に追加する
+      if (requiredRows > maxRows) {
+        targetSheet.insertRowsAfter(lastRow, requiredRows - maxRows);
+      }
+      
+      // 用意した空き領域へ一括でデータをセットする
+      targetSheet.getRange(lastRow + 1, 1, newRows.length, numCols).setValues(newRows);
+    }
+
+    // ----------------------------------------------------
+    // 案件ID順に並べ替え (ソート)
+    // ----------------------------------------------------
+    const finalLastRow = targetSheet.getLastRow();
+    const finalLastCol = targetSheet.getLastColumn();
+    // 2行以上データがあり、案件IDの列が存在する場合のみソートを実行
+    if (finalLastRow >= 2 && targetMap['案件ID']) {
+      // 2行目以降のデータ領域全体を取得
+      const dataRange = targetSheet.getRange(2, 1, finalLastRow - 1, finalLastCol);
+      // 案件IDの列番号（1始まり）を基準に昇順(ascending: true)でソート
+      dataRange.sort({column: targetMap['案件ID'], ascending: true});
+    }
+
+    return `支払い管理への同期が完了しました。\n新規追加: ${appendCount}件\n情報更新: ${updateCount}件\n※案件ID順に並べ替えを行いました。`;
 
   } catch (e) {
     console.error("syncToPaymentManagement error: ", e);
