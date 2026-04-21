@@ -2,8 +2,6 @@
 // システム全体の設定値・共通関数・UI
 // =========================================
 
-// 外部連携スプレッドシートID（Funtoco支払い管理用）
-const EXTERNAL_SS_ID_FUNTOCO = "1Yo6Oz3iK6OlWjzl7BVUWeElO4__mPjJST3Jaaiys9yw";
 
 /**
  * シートを取得する共通関数
