@@ -36,10 +36,27 @@ function syncToPaymentManagement() {
 
     // 支払い管理側の既存キーをマップ化（重複チェック用）
     const targetKeys = {};
+    const existingCandidateMap = new Map(); // 登録者ID -> [案件IDの配列] (重複チェック用)
+
     if (targetData.length > 1) {
       for (let i = 1; i < targetData.length; i++) {
-        const key = String(targetData[i][tJobIdx] || "").trim() + "_" + String(targetData[i][tIdIdx] || "").trim();
-        targetKeys[key] = i + 1; // 行番号を保持
+        const jId = String(targetData[i][tJobIdx] || "").trim();
+        const cId = String(targetData[i][tIdIdx] || "").trim();
+        
+        if (jId && cId) {
+          const key = jId + "_" + cId;
+          targetKeys[key] = i + 1; // 行番号を保持
+        }
+        
+        // 重複警告用に、登録者IDに紐づく案件IDを記録しておく
+        if (cId) {
+          if (!existingCandidateMap.has(cId)) {
+            existingCandidateMap.set(cId, []);
+          }
+          if (jId && !existingCandidateMap.get(cId).includes(jId)) {
+            existingCandidateMap.get(cId).push(jId);
+          }
+        }
       }
     }
 
@@ -57,7 +74,6 @@ function syncToPaymentManagement() {
 
       const companyName = sourceMap['事業者名'] ? row[sourceMap['事業者名'] - 1] : "";
       const fieldName = sourceMap['技能分野'] ? row[sourceMap['技能分野'] - 1] : "";
-      const interviewDate = sourceMap['面接日'] ? row[sourceMap['面接日'] - 1] : ""; // 内定日として利用
 
       // "SD-0064-HNIN EI HLAING" などをパースして複数人の配列にする
       const hiredList = hiredText.split(/\r?\n/).filter(line => line.trim() !== "");
@@ -80,8 +96,7 @@ function syncToPaymentManagement() {
              candidateID: candidateID,
              companyName: companyName,
              fieldName: fieldName,
-             candidateName: candidateName,
-             interviewDate: interviewDate
+             candidateName: candidateName
            });
         }
       }
@@ -89,6 +104,7 @@ function syncToPaymentManagement() {
 
     // 展開したリストを支払い管理へ同期
     const numCols = targetSheet.getLastColumn() || Object.keys(targetMap).length;
+    const warnings = new Set(); // 重複登録者の警告用セット
 
     for (const record of syncRecords) {
       const key = record.jobID + "_" + record.candidateID;
@@ -99,7 +115,6 @@ function syncToPaymentManagement() {
       vals['登録者ID'] = record.candidateID;
       vals['事業者名'] = record.companyName;
       vals['技能分野'] = record.fieldName;
-      vals['内定日'] = record.interviewDate;
       vals['名前'] = record.candidateName;
 
       if (targetKeys[key]) {
@@ -113,6 +128,13 @@ function syncToPaymentManagement() {
         updateCount++;
       } else {
         // 新規追記処理
+        
+        // 重複チェック：異なる案件IDで既に存在するか
+        if (existingCandidateMap.has(record.candidateID)) {
+           const oldJobs = existingCandidateMap.get(record.candidateID).join(", ");
+           warnings.add(`・${record.candidateID} ${record.candidateName} (既存案件ID: ${oldJobs})`);
+        }
+
         const newRowValues = new Array(numCols).fill("");
         for (let headerName in vals) {
           if (targetMap[headerName] !== undefined && vals[headerName] !== undefined) {
@@ -135,7 +157,15 @@ function syncToPaymentManagement() {
       dataRange.sort({column: targetMap['案件ID'], ascending: true});
     }
 
-    return `支払い管理への同期が完了しました。\n新規追加: ${appendCount}件\n情報更新: ${updateCount}件\n※案件ID順に並べ替えました。`;
+    let resultMessage = `支払い管理への同期が完了しました。\n新規追加: ${appendCount}件\n情報更新: ${updateCount}件\n※案件ID順に並べ替えました。`;
+    
+    // 警告メッセージがある場合は追加
+    if (warnings.size > 0) {
+      resultMessage += `\n\n【⚠️警告】\n以下の登録者は別の案件IDで既に登録されていましたが、新たに重複して書き込まれました。\n不要なデータが残っていないか「支払い管理」シートを確認してください。\n`;
+      resultMessage += Array.from(warnings).join("\n");
+    }
+
+    return resultMessage;
 
   } catch (e) {
     console.error("syncToPaymentManagement error: ", e);
