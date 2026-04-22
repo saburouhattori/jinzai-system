@@ -412,7 +412,12 @@ function registerHire(jobId, hiredIds) {
     sheet.getRange(targetJobRow, 8).setValue(hiredNames.join('\n'));
     sheet.getRange(targetJobRow, 2).setValue('終了');
 
-    return `${hiredIds.length} 名の採用登録、および対象候補者全員の「面接履歴」への追記が完了しました。`;
+    // ★修正：完了メッセージを分岐
+    if (hiredIds.length > 0) {
+      return `${hiredIds.length} 名の面接結果、および対象候補者全員の「面接履歴」への追記が完了しました。`;
+    } else {
+      return `「採用者なし」として案件を終了し、対象候補者全員の「面接履歴」への追記が完了しました。`;
+    }
   } catch(e) {
     throw new Error(e.message);
   }

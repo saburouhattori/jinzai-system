@@ -309,6 +309,21 @@ function submitJobDelete() {
 }
 
 // --- 採用登録 ---
+
+// ★追加：採用者なしチェック時のリスト無効化
+function toggleHireNone(checkbox) {
+  let listDiv = document.getElementById('hire_cand_list');
+  if (checkbox.checked) {
+    listDiv.style.opacity = '0.5';
+    listDiv.style.pointerEvents = 'none';
+    let checkboxes = document.querySelectorAll('.hire-cand-checkbox');
+    checkboxes.forEach(cb => cb.checked = false);
+  } else {
+    listDiv.style.opacity = '1';
+    listDiv.style.pointerEvents = 'auto';
+  }
+}
+
 function fetchJobCandidates(mode) {
   let idEl = document.getElementById(mode + '_job_id');
   if(!idEl) return;
@@ -336,6 +351,13 @@ function fetchJobCandidates(mode) {
                  </label>`;
       });
       container.innerHTML = html;
+
+      // ★追加：候補者を再検索した時は「採用者なし」のチェックをリセットする
+      let noneCb = document.getElementById('hire_none');
+      if (noneCb) {
+        noneCb.checked = false;
+        toggleHireNone(noneCb);
+      }
     })
     .withFailureHandler(function(err) {
       showModal('候補者取得エラー: ' + err.message);
@@ -353,13 +375,25 @@ function submitHire() {
   let checkboxes = document.querySelectorAll('.hire-cand-checkbox');
   if (checkboxes.length === 0) { showModal('先に「候補者検索」を行ってください。'); return; }
   
-  let hiredIds = []; checkboxes.forEach(cb => { if (cb.checked) hiredIds.push(cb.value); });
-  if (!confirm(`選択した ${hiredIds.length} 名を「採用」として登録します。よろしいですか？`)) return;
+  // ★追加：採用者なしチェックの判定
+  let isNone = document.getElementById('hire_none') && document.getElementById('hire_none').checked;
+  let hiredIds = []; 
+
+  if (!isNone) {
+    checkboxes.forEach(cb => { if (cb.checked) hiredIds.push(cb.value); });
+    if (hiredIds.length === 0) { 
+      showModal('採用者がいる場合は候補者を選択してください。いない場合は「採用者なし」にチェックを入れてください。'); 
+      return; 
+    }
+    if (!confirm(`選択した ${hiredIds.length} 名を「採用」として結果を登録します。よろしいですか？`)) return;
+  } else {
+    if (!confirm(`「採用者なし」として面接結果を登録します。よろしいですか？\n（候補者全員の履歴に不採用として記録されます）`)) return;
+  }
   
   let btnEl = document.getElementById('hireBtn');
   if(btnEl) btnEl.disabled = true; 
   
-  showModal('採用登録を実行中...', true);
+  showModal('登録を実行中...', true);
   google.script.run
     .withSuccessHandler(function(msg) {
       try {
@@ -371,15 +405,19 @@ function submitHire() {
         if(dispEl) dispEl.innerText = '';
         if(listEl) listEl.innerHTML = '<div style="font-size: 12px; color: #888;">-- 上の検索ボタンを押してください --</div>';
         
+        // ★追加：チェックボックスのリセット
+        let noneCb = document.getElementById('hire_none');
+        if(noneCb) { noneCb.checked = false; toggleHireNone(noneCb); }
+
         // バックグラウンドで同期を実行
         google.script.run.syncListSheets();
       } catch(e) {
-        showModal('採用登録は完了しましたが、画面の更新に失敗しました: ' + e.message);
+        showModal('登録は完了しましたが、画面の更新に失敗しました: ' + e.message);
       }
     })
     .withFailureHandler(function(err) {
       if(btnEl) btnEl.disabled = false; 
-      showModal('採用登録エラー: ' + err.message);
+      showModal('登録エラー: ' + err.message);
     })
     .registerHire(jobId, hiredIds);
 }
