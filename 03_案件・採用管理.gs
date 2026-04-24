@@ -404,12 +404,16 @@ function registerHire(jobId, hiredIds) {
     // --- △ ここまで △ ---
 
     // 案件管理シート側の更新（採用者名の書き込みとステータス変更）
-    const hiredNames = hiredIds.map(id => {
-      const name = candDict[id] || "";
-      return name ? `${id}-${name}` : id;
-    });
+    let hiredNamesText = "採用者なし";
+    if (hiredIds.length > 0) {
+      const hiredNames = hiredIds.map(id => {
+        const name = candDict[id] || "";
+        return name ? `${id}-${name}` : id;
+      });
+      hiredNamesText = hiredNames.join('\n');
+    }
 
-    sheet.getRange(targetJobRow, 8).setValue(hiredNames.join('\n'));
+    sheet.getRange(targetJobRow, 8).setValue(hiredNamesText);
     sheet.getRange(targetJobRow, 2).setValue('終了');
 
     // ★修正：完了メッセージを分岐
