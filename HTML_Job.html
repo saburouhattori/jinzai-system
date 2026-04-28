@@ -1,5 +1,14 @@
 <div id="form-job" style="display: <?= mode === 'JOB' ? 'block' : 'none' ?>;">
 <div class="section-title" >案件登録</div>
+
+<div class="field">
+  <label>ステータス</label>
+  <select id="job_status">
+    <option value="未着手">未着手</option>
+    <option value="面接準備">面接準備</option>
+  </select>
+</div>
+
 <div class="field">
   <label>事業者名（文字を入力すると候補が出ます）</label>
   <input type="text" id="job_company" list="company_list" placeholder="例：株式会社〇〇（新規も可）">

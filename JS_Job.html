@@ -95,11 +95,13 @@ function submitJob() {
   });
 
   let skillEl = document.getElementById('job_skill');
+  let statusEl = document.getElementById('job_status'); // ★追加
   let interviewDateEl = document.getElementById('job_interviewDate');
   let memoEl = document.getElementById('job_memo');
 
   let formData = {
     company: company,
+    status: statusEl ? statusEl.value : '未着手', // ★追加
     skill: skillEl ? skillEl.value : '',
     candidates: candidates,
     interviewDate: interviewDateEl ? interviewDateEl.value : '',
@@ -121,6 +123,7 @@ function submitJob() {
         showModal(msg);
         
         // フォームのクリア処理（要素が存在するかチェックしながら安全に実行）
+        if(statusEl) statusEl.value = '未着手'; // ★追加
         if(companyEl) companyEl.value = ''; 
         if(skillEl) skillEl.value = '';
         if(interviewDateEl) interviewDateEl.value = '';

@@ -135,7 +135,7 @@ function addJob(formData) {
 
     const rowData = [
       nextId,                           
-      '未着手',                          
+      formData.status || '未着手', // ★修正：formDataから取得                     
       today,                            
       companyName,                      
       formData.skill || '',             
@@ -414,11 +414,14 @@ function registerHire(jobId, hiredIds) {
     }
 
     sheet.getRange(targetJobRow, 8).setValue(hiredNamesText);
-    sheet.getRange(targetJobRow, 2).setValue('終了');
+
+    // ★修正：面接結果に応じたステータス更新
+    const finalJobStatus = hiredIds.length > 0 ? '入国準備' : '終了';
+    sheet.getRange(targetJobRow, 2).setValue(finalJobStatus);
 
     // ★修正：完了メッセージを分岐
     if (hiredIds.length > 0) {
-      return `${hiredIds.length} 名の面接結果、および対象候補者全員の「面接履歴」への追記が完了しました。`;
+      return `${hiredIds.length} 名の面接結果（ステータス：入国準備）、および対象候補者全員の「面接履歴」への追記が完了しました。`;
     } else {
       return `「採用者なし」として案件を終了し、対象候補者全員の「面接履歴」への追記が完了しました。`;
     }
