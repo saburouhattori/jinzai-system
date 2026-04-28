@@ -135,7 +135,7 @@ function addJob(formData) {
 
     const rowData = [
       nextId,                           
-      formData.status || '未着手', // ★修正：formDataから取得                     
+      formData.status || '未着手',                      
       today,                            
       companyName,                      
       formData.skill || '',             
@@ -298,7 +298,14 @@ function deleteJobRow(jobId) {
 function getJobCandidates(jobId) {
   try {
     const details = getJobDetails(jobId);
-    if (!details || !details.candidates) return [];
+    if (!details) {
+      throw new Error("該当する案件が見つかりません。");
+    }
+    // ★追加：面接日が設定されていない場合の警告
+    if (!details.interviewDate) {
+      throw new Error("面接日が設定されていません。\n先に「案件更新/削除」から面接日を登録してください。");
+    }
+    if (!details.candidates) return [];
 
     const candDict = getCandidateDict(); 
     const ids = details.candidates.split(/\r?\n/).filter(id => id.trim());
@@ -344,6 +351,11 @@ function registerHire(jobId, hiredIds) {
       }
     }
     if (!companyName) throw new Error("案件が見つかりません。");
+
+    // ★追加：登録実行時にも念のため面接日をチェック
+    if (!rawInterviewDate) {
+      throw new Error("面接日が設定されていません。\n先に「案件更新/削除」から面接日を登録してください。");
+    }
 
     // 面接日のフォーマット処理（yyyy/MM/dd形式へ）
     let formattedDate = "日付不明";
@@ -414,12 +426,10 @@ function registerHire(jobId, hiredIds) {
     }
 
     sheet.getRange(targetJobRow, 8).setValue(hiredNamesText);
-
-    // ★修正：面接結果に応じたステータス更新
+    
     const finalJobStatus = hiredIds.length > 0 ? '入国準備' : '終了';
     sheet.getRange(targetJobRow, 2).setValue(finalJobStatus);
 
-    // ★修正：完了メッセージを分岐
     if (hiredIds.length > 0) {
       return `${hiredIds.length} 名の面接結果（ステータス：入国準備）、および対象候補者全員の「面接履歴」への追記が完了しました。`;
     } else {
