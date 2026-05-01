@@ -58,7 +58,8 @@ function safeSearchByAdminId(id) {
       }
     }
     return null;
-  } catch(e) { throw new Error("検索エラー: " + e.message); }
+  } catch(e) { throw new Error("検索エラー: " + e.message);
+  }
 }
 
 function addNewRow(formData) {
@@ -79,6 +80,9 @@ function addNewRow(formData) {
   const nextId = "SD-" + nextNumber.toString().padStart(4, '0');
   const safeMaxCol = Math.max(masterSheet.getLastColumn(), ...Object.values(col));
   const rowValues = new Array(safeMaxCol).fill("");
+  
+  const today = new Date(); // 今日の日付を取得
+
   const mapping = {
     '登録者ID': nextId, '名前': formData.name, 'フリガナ': formData.furigana, '呼び名': formData.nickname,
     '生年月日': formData.birthday, '性別': formData.gender, '配偶者': formData.spouse, 
@@ -96,8 +100,10 @@ function addNewRow(formData) {
     '特定技能要件＞介護日本語評価試験': formData.kaigoLang, '特定技能要件＞介護日本語取得年月': formData.kaigoLangDate,
     'その他の日本語能力試験': formData.otherJapanese, '取得年月': formData.otherJapaneseDate,
     '修正前コメント': formData.comment, 
-    '日本在住の親族について': formData.relative, 'ステータス': '未採用'
+    '日本在住の親族について': formData.relative, 'ステータス': '未採用',
+    '登録日': today // 新規追加：登録日をセット
   };
+
   for (let header in mapping) {
     const h = header.replace(/\s/g, '');
     if (col[h]) rowValues[col[h]-1] = mapping[header];
@@ -120,13 +126,16 @@ function addNewRow(formData) {
     }
     startCol = skipIdx + 1;
   });
-  
+
   if (startCol < safeMaxCol) {
     const length = safeMaxCol - startCol;
     masterSheet.getRange(newRow, startCol + 1, 1, length).setValues([rowValues.slice(startCol)]);
   }
 
+  // 表示形式の設定
   if (col['生年月日']) masterSheet.getRange(newRow, col['生年月日']).setNumberFormat('yyyy"年"m"月"d"日"');
+  if (col['登録日']) masterSheet.getRange(newRow, col['登録日']).setNumberFormat('yyyy/MM/dd');
+
   if (formData.imageFile && col['顔写真']) {
     try {
       const dataUri = `data:${formData.imageFile.mimeType};base64,${formData.imageFile.contents}`;
@@ -148,6 +157,7 @@ function updateRow(formData) {
   const col = getMasterColumnMap(masterSheet);
   const row = Number(formData.row);
   if (!row) return "エラー：行が不明です。";
+
   const mapping = {
     '名前': formData.name, 'フリガナ': formData.furigana, '呼び名': formData.nickname, '生年月日': formData.birthday,
     '性別': formData.gender, '配偶者': formData.spouse, '身長': formData.height, '体重': formData.weight,
@@ -169,6 +179,7 @@ function updateRow(formData) {
   const safeMaxCol = Math.max(masterSheet.getLastColumn(), ...Object.values(col));
   const currentRowRange = masterSheet.getRange(row, 1, 1, safeMaxCol);
   const currentRowData = currentRowRange.getValues()[0];
+
   for (let header in mapping) {
     const h = header.replace(/\s/g, '');
     if (col[h] && mapping[header] !== undefined) {
@@ -178,7 +189,8 @@ function updateRow(formData) {
   
   const skipIndices = [];
   if (col['顔写真']) skipIndices.push(col['顔写真'] - 1);
-  if (col['満年齢']) skipIndices.push(col['満年齢'] - 1); // ARRAYFORMULA破壊防止
+  if (col['満年齢']) skipIndices.push(col['満年齢'] - 1);
+  // ARRAYFORMULA破壊防止
   
   skipIndices.sort((a, b) => a - b);
   
@@ -190,7 +202,7 @@ function updateRow(formData) {
     }
     startCol = skipIdx + 1;
   });
-  
+
   if (startCol < safeMaxCol) {
     const length = safeMaxCol - startCol;
     masterSheet.getRange(row, startCol + 1, 1, length).setValues([currentRowData.slice(startCol)]);
@@ -230,6 +242,7 @@ function updateAddInfoRow(formData) {
     const safeMaxCol = Math.max(sheet.getLastColumn(), ...Object.values(col));
     const currentRowRange = sheet.getRange(row, 1, 1, safeMaxCol);
     const currentRowData = currentRowRange.getValues()[0];
+
     for (let key in mapping) {
       const h = mapping[key].replace(/\s/g, '');
       if (col[h] && formData[key] !== undefined) {
@@ -239,7 +252,8 @@ function updateAddInfoRow(formData) {
     
     const skipIndices = [];
     if (col['顔写真']) skipIndices.push(col['顔写真'] - 1);
-    if (col['満年齢']) skipIndices.push(col['満年齢'] - 1); // ARRAYFORMULA破壊防止
+    if (col['満年齢']) skipIndices.push(col['満年齢'] - 1);
+    // ARRAYFORMULA破壊防止
     
     skipIndices.sort((a, b) => a - b);
     
@@ -251,7 +265,7 @@ function updateAddInfoRow(formData) {
       }
       startCol = skipIdx + 1;
     });
-    
+
     if (startCol < safeMaxCol) {
       const length = safeMaxCol - startCol;
       sheet.getRange(row, startCol + 1, 1, length).setValues([currentRowData.slice(startCol)]);
@@ -281,5 +295,6 @@ function normalizeYearMonth(val) {
   if (!val) return "";
   let str = val.toString().trim().replace(/[０-９]/g, s => String.fromCharCode(s.charCodeAt(0) - 0xFEE0));
   let match = str.match(/(\d{4})[-\/年](\d{1,2})/);
-  return match ? "'" + match[1] + "年" + parseInt(match[2], 10) + "月" : str;
+  return match ?
+    "'" + match[1] + "年" + parseInt(match[2], 10) + "月" : str;
 }
