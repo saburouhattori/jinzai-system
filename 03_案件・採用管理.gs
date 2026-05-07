@@ -3,7 +3,7 @@
 // =========================================
 
 /**
- * 補助：指定したセル内の複数のURLを「実際のファイル名」のリンクに変換する（疑似スマートチップ）
+ * 補助：指定したセル内の複数のURLを「実際のファイル/フォルダ名」のリンクに変換する（疑似スマートチップ）
  */
 function convertToSmartChips(sheet, row, col, urlText) {
   if (!urlText) {
@@ -23,25 +23,53 @@ function convertToSmartChips(sheet, row, col, urlText) {
   let currentPos = 0;
 
   urls.forEach((url, i) => {
-    let fileName = url;
+    let itemName = url;
+    let icon = "📄"; // デフォルトはファイルアイコン
+    
     try {
-      let fileId = "";
-      const idMatch = url.match(/\/d\/([-\w]{25,})/);
-      if (idMatch) {
-        fileId = idMatch[1];
-      } else {
-        const queryMatch = url.match(/id=([-\w]{25,})/);
-        if (queryMatch) fileId = queryMatch[1];
+      let itemId = "";
+      let isFolder = false;
+      
+      // 1. フォルダのURL判定 (/folders/ID)
+      const folderMatch = url.match(/\/folders\/([-\w]{25,})/);
+      // 2. ファイルのURL判定 (/d/ID)
+      const fileMatch = url.match(/\/d\/([-\w]{25,})/);
+      // 3. 汎用パラメータ判定 (id=ID)
+      const queryMatch = url.match(/id=([-\w]{25,})/);
+
+      if (folderMatch) {
+        itemId = folderMatch[1];
+        isFolder = true;
+      } else if (fileMatch) {
+        itemId = fileMatch[1];
+        isFolder = false;
+      } else if (queryMatch) {
+        itemId = queryMatch[1];
+        // id=形式の場合はファイルかフォルダか不明なため、とりあえずファイルとして扱う（エラーならフォルダへフォールバック）
+        isFolder = false;
       }
 
-      if (fileId) {
-        fileName = DriveApp.getFileById(fileId).getName();
+      if (itemId) {
+        if (isFolder) {
+          itemName = DriveApp.getFolderById(itemId).getName();
+          icon = "📁";
+        } else {
+          try {
+            itemName = DriveApp.getFileById(itemId).getName();
+            icon = "📄";
+          } catch (fileEx) {
+            // ファイルとして取得できなかった場合、フォルダとして再試行
+            itemName = DriveApp.getFolderById(itemId).getName();
+            icon = "📁";
+          }
+        }
       }
     } catch(ex) {
-      fileName = "関連ファイル " + (i + 1);
+      itemName = "関連リンク " + (i + 1);
+      icon = "🔗"; // 取得失敗時は汎用リンクアイコン
     }
     
-    const textPart = "📄 " + fileName;
+    const textPart = icon + " " + itemName;
     fullText += (i > 0 ? "\n" : "") + textPart;
     
     linkData.push({
@@ -95,7 +123,6 @@ function addJob(formData) {
     const aVals = dataRange.getValues().map(r => r[0]); 
     let lastIdNum = 0;
     let targetRow = -1;
-
     for (let i = 1; i < aVals.length; i++) { 
       let val = String(aVals[i]).trim();
       let match = val.match(/\d+/);
@@ -116,14 +143,12 @@ function addJob(formData) {
     }
 
     const nextId = "JOB-" + (lastIdNum + 1).toString().padStart(4, '0');
-    
     // --- 日付処理 ---
     const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()); 
-    
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     let interviewDate = '';
     if (formData.interviewDate) {
-      const parts = formData.interviewDate.split('-'); 
+      const parts = formData.interviewDate.split('-');
       if (parts.length === 3) {
         interviewDate = new Date(parts[0], parts[1] - 1, parts[2]);
       }
@@ -132,7 +157,6 @@ function addJob(formData) {
     const candidatesArr = Array.isArray(formData.candidates) ? formData.candidates : [];
     const fileUrlsArr = Array.isArray(formData.relatedFiles) ? formData.relatedFiles : [];
     const fileUrlsText = fileUrlsArr.join('\n');
-
     const rowData = [
       nextId,                           
       formData.status || '未着手',                      
@@ -142,10 +166,9 @@ function addJob(formData) {
       candidatesArr.join('\n'),         
       interviewDate,                    
       '',                               
-      '',                               
+      '',   
       formData.memo || ''               
     ];
-
     sheet.getRange(targetRow, 1, 1, rowData.length).setValues([rowData]);
     
     try {
@@ -159,7 +182,6 @@ function addJob(formData) {
     }
 
     return `案件登録が完了しました: ${nextId}`;
-
   } catch(e) {
     throw new Error("登録に失敗しました: " + e.message);
   }
@@ -172,7 +194,6 @@ function getJobDetails(jobId) {
   try {
     const sheet = getMasterSheet('案件管理');
     if (!sheet) return null;
-    
     const lastRow = sheet.getLastRow();
     if (lastRow < 2) return null;
 
@@ -197,8 +218,7 @@ function getJobDetails(jobId) {
           console.error("URL抽出エラー: " + e);
         }
         
-        if (!rawUrls) rawUrls = String(data[i][8] || ""); 
-
+        if (!rawUrls) rawUrls = String(data[i][8] || "");
         const toIsoDate = (val) => {
           if (val instanceof Date) return Utilities.formatDate(val, "JST", "yyyy-MM-dd");
           if (typeof val === 'string' && val) {
@@ -206,7 +226,6 @@ function getJobDetails(jobId) {
           }
           return '';
         };
-
         return {
           row: i + 1,
           id: data[i][0],
@@ -256,7 +275,6 @@ function updateJob(formData) {
     
     const cell = sheet.getRange(row, 7);
     cell.setValue(interviewDate).setNumberFormat('yyyy"年"m"月"d"日"');
-    
     sheet.getRange(row, 10).setValue(formData.memo || '');
     
     try {
@@ -309,7 +327,6 @@ function getJobCandidates(jobId) {
 
     const candDict = getCandidateDict(); 
     const ids = details.candidates.split(/\r?\n/).filter(id => id.trim());
-
     return ids.map(id => {
       const cleanId = id.split('-').slice(0, 2).join('-').trim();
       return { 
@@ -339,19 +356,17 @@ function registerHire(jobId, hiredIds) {
     let rawInterviewDate = "";
     let allCandidatesRaw = "";
     let targetJobRow = -1;
-
     // 1. 案件管理シートから対象の案件情報を取得
     for (let i = 1; i < data.length; i++) {
       if (String(data[i][0]).trim() === String(jobId).trim()) {
         companyName = String(data[i][3]).trim();
         allCandidatesRaw = String(data[i][5]); // 候補者名（F列）
-        rawInterviewDate = data[i][6];         // 面接日（G列）
+        rawInterviewDate = data[i][6]; // 面接日（G列）
         targetJobRow = i + 1;
         break;
       }
     }
     if (!companyName) throw new Error("案件が見つかりません。");
-
     // ★追加：登録実行時にも念のため面接日をチェック
     if (!rawInterviewDate) {
       throw new Error("面接日が設定されていません。\n先に「案件更新/削除」から面接日を登録してください。");
@@ -373,10 +388,8 @@ function registerHire(jobId, hiredIds) {
     const allCandidateIds = allCandidatesRaw.split(/\r?\n/)
                                             .map(line => line.split('-').slice(0, 2).join('-').trim())
                                             .filter(id => id !== "");
-    
     // 採用者リスト（hiredIds）をSet化して判定を高速化
     const hiredIdSet = new Set(hiredIds.map(id => String(id).trim()));
-
     // 全候補者に対してループ処理
     allCandidateIds.forEach(candId => {
       // 採用か不採用かを判定

@@ -4,17 +4,20 @@
 
 function getAgentList() {
   const sheet = getMasterSheet('送り出し機関マスタ');
-  return sheet ? [...new Set(sheet.getDataRange().getValues().slice(1).map(row => row[1]).filter(n => n))].sort() : [];
+  return sheet ?
+    [...new Set(sheet.getDataRange().getValues().slice(1).map(row => row[1]).filter(n => n))].sort() : [];
 }
 
 function getSchoolList() {
   const sheet = getMasterSheet('日本語学校マスタ');
-  return sheet ? [...new Set(sheet.getDataRange().getValues().slice(1).map(row => row[1]).filter(n => n))].sort() : [];
+  return sheet ?
+    [...new Set(sheet.getDataRange().getValues().slice(1).map(row => row[1]).filter(n => n))].sort() : [];
 }
 
 function getCompanyList() {
   const sheet = getMasterSheet('事業者マスタ');
-  return sheet ? [...new Set(sheet.getDataRange().getValues().slice(1).map(row => row[1]).filter(n => n))].sort() : [];
+  return sheet ?
+    [...new Set(sheet.getDataRange().getValues().slice(1).map(row => row[1]).filter(n => n))].sort() : [];
 }
 
 function getCandidateDict() {
@@ -41,19 +44,35 @@ function getJobDict() {
 
 function searchDriveFiles(fileNameQuery) {
   try {
-    const files = [];
+    const results = [];
     let query = 'trashed = false';
     if (fileNameQuery) {
       query += ' and title contains "' + fileNameQuery + '"';
     }
-    const iter = DriveApp.searchFiles(query);
+    
+    // フォルダの検索を先に実行してリストの上部に表示させる
     let count = 0;
-    while (iter.hasNext() && count < 15) {
-      const file = iter.next();
-      files.push({ name: file.getName(), url: file.getUrl(), type: file.getMimeType() });
-      count++;
-    }
-    return files;
+    try {
+      const folderIter = DriveApp.searchFolders(query);
+      while (folderIter.hasNext() && count < 10) {
+        const folder = folderIter.next();
+        results.push({ name: "📁 " + folder.getName(), url: folder.getUrl(), type: "folder" });
+        count++;
+      }
+    } catch(e) {}
+    
+    // ファイルの検索
+    count = 0;
+    try {
+      const fileIter = DriveApp.searchFiles(query);
+      while (fileIter.hasNext() && count < 15) {
+        const file = fileIter.next();
+        results.push({ name: "📄 " + file.getName(), url: file.getUrl(), type: file.getMimeType() });
+        count++;
+      }
+    } catch(e) {}
+    
+    return results;
   } catch (e) {
     return [];
   }
@@ -66,7 +85,6 @@ function generateSimpleList(candIds) {
     const masterData = masterSheet.getDataRange().getValues();
     const col = getMasterColumnMap(masterSheet);
     const listSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('簡易リスト');
-    
     // シートの初期化 (2行目以降のB~L列をクリア)
     const lastRowList = listSheet.getLastRow();
     if (lastRowList >= 2) {
@@ -102,7 +120,6 @@ function generateSimpleList(candIds) {
         formulas.push(['=IFERROR(VLOOKUP(L' + (result.length + 1) + ', \'登録者マスタ\'!$A:$C, 3, FALSE), "")']);
       }
     });
-
     if (result.length > 0) {
       listSheet.getRange(2, 3, result.length, 10).setValues(result);
       listSheet.getRange(2, 2, formulas.length, 1).setFormulas(formulas);
@@ -146,7 +163,6 @@ function updateCandidateLists(silent = false) {
   const hiredSheet = ss.getSheetByName('採用者一覧');
   const unhiredSheet = ss.getSheetByName('未採用者一覧');
   const jobSheet = ss.getSheetByName('案件管理');
-
   if (!masterSheet || !hiredSheet || !unhiredSheet || !jobSheet) {
     throw new Error('必要なシートが見つかりません。');
   }
@@ -168,7 +184,6 @@ function updateCandidateLists(silent = false) {
     }
     return jobMap;
   });
-
   const hiredData = [];
   const unhiredData = [];
 
@@ -219,7 +234,6 @@ function updateCandidateLists(silent = false) {
     dataMap[normalize_('JFT Basic')] = jft;
     dataMap[normalize_('採用事業者名')] = companyName; // マスタの「採用事業者」を「採用事業者名」にもマッピング
     dataMap[normalize_('在留資格交付申請の有無')] = dataMap[normalize_('在留資格交付申請の回数')];
-
     if (status === '採用' || status === '内定') {
       let jobId = '';
       let skillField = '';
