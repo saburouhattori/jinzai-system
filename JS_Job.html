@@ -64,7 +64,7 @@ function addJobCandRow() {
   if(listEl) listEl.insertAdjacentHTML('beforeend', createCandRowHTML('job-cand-id'));
 }
 
-function submitJob() {
+async function submitJob() {
   let companyEl = document.getElementById('job_company');
   let company = companyEl ? companyEl.value.trim() : '';
   if (!company) { showModal('事業者名を入力してください。'); return; }
@@ -94,40 +94,67 @@ function submitJob() {
     if(val) relatedFiles.push(val);
   });
 
+  // --- ファイルアップロード処理 ---
+  let uploadFiles = [];
+  let fileInputEl = document.getElementById('job_upload_files');
+  if (fileInputEl && fileInputEl.files.length > 0) {
+    showModal('ファイルを読み込み中...', true);
+    for (let i = 0; i < fileInputEl.files.length; i++) {
+      let file = fileInputEl.files[i];
+      try {
+        let base64 = await new Promise((resolve, reject) => {
+          let reader = new FileReader();
+          reader.onload = (e) => resolve(e.target.result.split(',')[1]);
+          reader.onerror = (e) => reject(e);
+          reader.readAsDataURL(file);
+        });
+        uploadFiles.push({
+          name: file.name,
+          mimeType: file.type,
+          data: base64
+        });
+      } catch (err) {
+        showModal('ファイルの読み込みに失敗しました: ' + file.name);
+        return;
+      }
+    }
+  }
+
   let skillEl = document.getElementById('job_skill');
-  let statusEl = document.getElementById('job_status'); // ★追加
+  let statusEl = document.getElementById('job_status');
   let interviewDateEl = document.getElementById('job_interviewDate');
   let memoEl = document.getElementById('job_memo');
 
   let formData = {
     company: company,
-    status: statusEl ? statusEl.value : '未着手', // ★追加
+    status: statusEl ? statusEl.value : '未着手',
     skill: skillEl ? skillEl.value : '',
     candidates: candidates,
     interviewDate: interviewDateEl ? interviewDateEl.value : '',
     relatedFiles: relatedFiles,
+    uploadFiles: uploadFiles,
     memo: memoEl ? memoEl.value : ''
   };
   
   let btnEl = document.getElementById('jobBtn');
   if(btnEl) btnEl.disabled = true; 
   
-  showModal('案件を登録中...', true);
+  showModal('案件を登録し、フォルダを作成中...', true);
   
   google.script.run
     .withSuccessHandler(function(msg) {
       try {
         if(btnEl) btnEl.disabled = false; 
         
-        // ★ エラーが起きてもメッセージが出るように確実に表示
         showModal(msg);
         
-        // フォームのクリア処理（要素が存在するかチェックしながら安全に実行）
-        if(statusEl) statusEl.value = '未着手'; // ★追加
+        // フォームのクリア処理
+        if(statusEl) statusEl.value = '未着手';
         if(companyEl) companyEl.value = ''; 
         if(skillEl) skillEl.value = '';
         if(interviewDateEl) interviewDateEl.value = '';
         if(memoEl) memoEl.value = '';
+        if(fileInputEl) fileInputEl.value = '';
         
         let fileListEl = document.getElementById('job_file_list');
         if(fileListEl) {
@@ -203,6 +230,10 @@ function searchJobData() {
             }
             if(fileContainer.innerHTML === '') addJobFileRow('edit_job');
           }
+          
+          // ファイルアップロードの初期化
+          let fileInputEl = document.getElementById('edit_job_upload_files');
+          if(fileInputEl) fileInputEl.value = '';
 
         } else {
           showModal('該当する案件が見つかりません。');
@@ -229,7 +260,7 @@ function addJobEditCandRow(val = '', nameVal = '') {
   }
 }
 
-function submitJobEdit() {
+async function submitJobEdit() {
   let rowEl = document.getElementById('edit_job_row');
   if (!rowEl || !rowEl.value) return;
   let row = rowEl.value;
@@ -262,6 +293,32 @@ function submitJobEdit() {
     if(val) relatedFiles.push(val);
   });
 
+  // --- ファイルアップロード処理の追加 ---
+  let uploadFiles = [];
+  let fileInputEl = document.getElementById('edit_job_upload_files');
+  if (fileInputEl && fileInputEl.files.length > 0) {
+    showModal('ファイルを読み込み中...', true);
+    for (let i = 0; i < fileInputEl.files.length; i++) {
+      let file = fileInputEl.files[i];
+      try {
+        let base64 = await new Promise((resolve, reject) => {
+          let reader = new FileReader();
+          reader.onload = (e) => resolve(e.target.result.split(',')[1]);
+          reader.onerror = (e) => reject(e);
+          reader.readAsDataURL(file);
+        });
+        uploadFiles.push({
+          name: file.name,
+          mimeType: file.type,
+          data: base64
+        });
+      } catch (err) {
+        showModal('ファイルの読み込みに失敗しました: ' + file.name);
+        return;
+      }
+    }
+  }
+
   let getVal = (id) => { let el = document.getElementById(id); return el ? el.value : ''; };
 
   let formData = {
@@ -273,15 +330,22 @@ function submitJobEdit() {
     candidates: candidates,
     interviewDate: getVal('edit_job_interviewDate'),
     relatedFiles: relatedFiles,
+    uploadFiles: uploadFiles,
     memo: getVal('edit_job_memo')
   };
+
+  let btnEl = document.getElementById('jobEditBtn');
+  if(btnEl) btnEl.disabled = true;
 
   showModal('更新中...', true);
   google.script.run
     .withSuccessHandler(function(msg) {
+      if(btnEl) btnEl.disabled = false;
       showModal(msg);
+      if(fileInputEl) fileInputEl.value = '';
     })
     .withFailureHandler(function(err) {
+      if(btnEl) btnEl.disabled = false;
       showModal('更新エラー: ' + err.message);
     })
     .updateJob(formData);
@@ -313,7 +377,6 @@ function submitJobDelete() {
 
 // --- 採用登録 ---
 
-// ★追加：採用者なしチェック時のリスト無効化
 function toggleHireNone(checkbox) {
   let listDiv = document.getElementById('hire_cand_list');
   if (checkbox.checked) {
@@ -355,7 +418,6 @@ function fetchJobCandidates(mode) {
       });
       container.innerHTML = html;
 
-      // ★追加：候補者を再検索した時は「採用者なし」のチェックをリセットする
       let noneCb = document.getElementById('hire_none');
       if (noneCb) {
         noneCb.checked = false;
@@ -378,7 +440,6 @@ function submitHire() {
   let checkboxes = document.querySelectorAll('.hire-cand-checkbox');
   if (checkboxes.length === 0) { showModal('先に「候補者検索」を行ってください。'); return; }
   
-  // ★追加：採用者なしチェックの判定
   let isNone = document.getElementById('hire_none') && document.getElementById('hire_none').checked;
   let hiredIds = []; 
 
@@ -408,11 +469,9 @@ function submitHire() {
         if(dispEl) dispEl.innerText = '';
         if(listEl) listEl.innerHTML = '<div style="font-size: 12px; color: #888;">-- 上の検索ボタンを押してください --</div>';
         
-        // ★追加：チェックボックスのリセット
         let noneCb = document.getElementById('hire_none');
         if(noneCb) { noneCb.checked = false; toggleHireNone(noneCb); }
 
-        // バックグラウンドで同期を実行
         google.script.run.syncListSheets();
       } catch(e) {
         showModal('登録は完了しましたが、画面の更新に失敗しました: ' + e.message);

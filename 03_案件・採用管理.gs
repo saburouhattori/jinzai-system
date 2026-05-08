@@ -88,7 +88,7 @@ function convertToSmartChips(sheet, row, col, urlText) {
 }
 
 /**
- * 案件登録（新規事業者の自動マスタ登録付き）
+ * 案件登録（新規事業者の自動マスタ登録付き ＋ 自動フォルダ作成・ファイルアップロード機能）
  */
 function addJob(formData) {
   try {
@@ -156,6 +156,27 @@ function addJob(formData) {
     
     const candidatesArr = Array.isArray(formData.candidates) ? formData.candidates : [];
     const fileUrlsArr = Array.isArray(formData.relatedFiles) ? formData.relatedFiles : [];
+
+    // --- フォルダ作成とファイルアップロード処理 ---
+    if (formData.uploadFiles && formData.uploadFiles.length > 0) {
+      try {
+        const parentFolderId = '1UuwRUPmldGgBR6dVUjldMI0vwZOjab0t'; // 指定された親フォルダID
+        const parentFolder = DriveApp.getFolderById(parentFolderId);
+        const folderName = `${nextId}_${companyName || '名称未設定'}`;
+        const newFolder = parentFolder.createFolder(folderName);
+        
+        formData.uploadFiles.forEach(f => {
+          const blob = Utilities.newBlob(Utilities.base64Decode(f.data), f.mimeType || 'application/octet-stream', f.name);
+          newFolder.createFile(blob);
+        });
+        
+        // 作成したフォルダのURLを関連ファイル一覧に追加
+        fileUrlsArr.push(newFolder.getUrl());
+      } catch (uploadEx) {
+        console.warn("ファイルアップロードエラー: " + uploadEx.message);
+      }
+    }
+
     const fileUrlsText = fileUrlsArr.join('\n');
     const rowData = [
       nextId,                           
@@ -166,7 +187,7 @@ function addJob(formData) {
       candidatesArr.join('\n'),         
       interviewDate,                    
       '',                               
-      '',   
+      fileUrlsText,   
       formData.memo || ''               
     ];
     sheet.getRange(targetRow, 1, 1, rowData.length).setValues([rowData]);
@@ -248,7 +269,7 @@ function getJobDetails(jobId) {
 }
 
 /**
- * 案件情報の更新
+ * 案件情報の更新 (自動フォルダ作成・ファイルアップロード機能付き)
  */
 function updateJob(formData) {
   try {
@@ -256,12 +277,50 @@ function updateJob(formData) {
     const row = Number(formData.row);
     if (!row || row < 2) throw new Error("無効な行番号です。");
 
+    const companyName = String(formData.company || "").trim();
     const candidatesArr = Array.isArray(formData.candidates) ? formData.candidates : [];
     const fileUrlsArr = Array.isArray(formData.relatedFiles) ? formData.relatedFiles : [];
+
+    // --- フォルダ作成とファイル追加アップロード処理 ---
+    if (formData.uploadFiles && formData.uploadFiles.length > 0) {
+      try {
+        const parentFolderId = '1UuwRUPmldGgBR6dVUjldMI0vwZOjab0t';
+        let targetFolder = null;
+        
+        // 既存の関連ファイルURLの中に、このシステムで作成したと思われるフォルダ（/folders/）があるか確認
+        const existingFolderUrl = fileUrlsArr.find(u => u.includes('/folders/'));
+        
+        if (existingFolderUrl) {
+          const folderIdMatch = existingFolderUrl.match(/\/folders\/([-\w]{25,})/);
+          if (folderIdMatch) {
+            try {
+              targetFolder = DriveApp.getFolderById(folderIdMatch[1]);
+            } catch(e) {}
+          }
+        }
+        
+        // フォルダが見つからない場合は新規作成
+        if (!targetFolder) {
+          const parentFolder = DriveApp.getFolderById(parentFolderId);
+          const jobId = formData.id || 'JOB-UNKNOWN';
+          const folderName = `${jobId}_${companyName || '名称未設定'}`;
+          targetFolder = parentFolder.createFolder(folderName);
+          fileUrlsArr.push(targetFolder.getUrl());
+        }
+        
+        formData.uploadFiles.forEach(f => {
+          const blob = Utilities.newBlob(Utilities.base64Decode(f.data), f.mimeType || 'application/octet-stream', f.name);
+          targetFolder.createFile(blob);
+        });
+      } catch (uploadEx) {
+        console.warn("ファイルアップロードエラー: " + uploadEx.message);
+      }
+    }
+
     const fileUrlsText = fileUrlsArr.join('\n');
     
     sheet.getRange(row, 2).setValue(formData.status || '未着手');
-    sheet.getRange(row, 4).setValue(formData.company || '');
+    sheet.getRange(row, 4).setValue(companyName);
     sheet.getRange(row, 5).setValue(formData.skill || '');
     sheet.getRange(row, 6).setValue(candidatesArr.join('\n'));
     
@@ -319,7 +378,6 @@ function getJobCandidates(jobId) {
     if (!details) {
       throw new Error("該当する案件が見つかりません。");
     }
-    // ★追加：面接日が設定されていない場合の警告
     if (!details.interviewDate) {
       throw new Error("面接日が設定されていません。\n先に「案件更新/削除」から面接日を登録してください。");
     }

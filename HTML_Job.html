@@ -45,6 +45,12 @@
   <div id="job_file_list">
     </div>
   <button class="btn-secondary" onclick="addJobFileRow('job')" style="margin-top:5px; font-size:11px; padding: 6px; width: auto;">+ 関連ファイルを追加</button>
+  
+  <div style="margin-top: 15px; border-top: 1px dashed #ccc; padding-top: 10px;">
+    <label style="font-weight: bold; color: #333;">PCからファイルをアップロードして自動保存する場合</label>
+    <input type="file" id="job_upload_files" multiple style="font-size: 12px; margin-top: 5px; display: block;">
+    <p style="font-size: 11px; color: #555; margin-top: 5px;">※案件登録時に「<span style="font-weight:bold;">案件ID_事業者名</span>」のフォルダが自動作成され、ファイルが保存されます。</p>
+  </div>
 </div>
 
 <div class="field">
@@ -117,6 +123,12 @@
       <div id="edit_job_file_list">
         </div>
       <button class="btn-secondary" onclick="addJobFileRow('edit_job')" style="margin-top:5px; font-size:11px; padding: 6px; width: auto;">+ 関連ファイルを追加</button>
+      
+      <div style="margin-top: 15px; border-top: 1px dashed #ccc; padding-top: 10px;">
+        <label style="font-weight: bold; color: #333;">PCからファイルをアップロードして追加する場合</label>
+        <input type="file" id="edit_job_upload_files" multiple style="font-size: 12px; margin-top: 5px; display: block;">
+        <p style="font-size: 11px; color: #555; margin-top: 5px;">※案件フォルダにファイルが保存されます。フォルダがない場合は自動作成されます。</p>
+      </div>
     </div>
 
     <div class="field">
@@ -125,7 +137,7 @@
     </div>
 
     <div style="display: flex; gap: 15px; margin-top: 20px;">
-      <button class="btn-primary" onclick="submitJobEdit()" style="flex: 2;">更新を保存</button>
+      <button class="btn-primary" id="jobEditBtn" onclick="submitJobEdit()" style="flex: 2;">更新を保存</button>
       <button class="btn-primary" onclick="submitJobDelete()" style="flex: 1; background: #d93025;">案件を削除</button>
     </div>
   </div>
