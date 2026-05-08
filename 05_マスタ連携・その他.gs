@@ -42,42 +42,6 @@ function getJobDict() {
   return dict;
 }
 
-function searchDriveFiles(fileNameQuery) {
-  try {
-    const results = [];
-    let query = 'trashed = false';
-    if (fileNameQuery) {
-      query += ' and title contains "' + fileNameQuery + '"';
-    }
-    
-    // フォルダの検索を先に実行してリストの上部に表示させる
-    let count = 0;
-    try {
-      const folderIter = DriveApp.searchFolders(query);
-      while (folderIter.hasNext() && count < 10) {
-        const folder = folderIter.next();
-        results.push({ name: "📁 " + folder.getName(), url: folder.getUrl(), type: "folder" });
-        count++;
-      }
-    } catch(e) {}
-    
-    // ファイルの検索
-    count = 0;
-    try {
-      const fileIter = DriveApp.searchFiles(query);
-      while (fileIter.hasNext() && count < 15) {
-        const file = fileIter.next();
-        results.push({ name: "📄 " + file.getName(), url: file.getUrl(), type: file.getMimeType() });
-        count++;
-      }
-    } catch(e) {}
-    
-    return results;
-  } catch (e) {
-    return [];
-  }
-}
-
 // 選択したIDでの簡易リスト生成機能
 function generateSimpleList(candIds) {
   try {
@@ -132,9 +96,6 @@ function generateSimpleList(candIds) {
 
 // ====== マスタ連携・リスト同期処理 (列非依存・動的マッピング版) ======
 
-/**
- * 登録や更新後に各一覧シートを同期する統合関数
- */
 function syncListSheets() {
   updateCandidateLists(true);
   return 'リストの同期が完了しました。';
@@ -152,42 +113,29 @@ function buildRowByHeaders_(headers, dataMap) {
   });
 }
 
-/**
- * 「登録者マスタ」を走査し、「採用者一覧」「未採用者一覧」へ振り分ける。
- * 各シートの1行目（ヘッダー）と動的にマッピングする。
- * @param {boolean} silent - trueなら完了アラートを出さない（スクリプト内からの呼び出し用）
- */
 function updateCandidateLists(silent = false) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const masterSheet = ss.getSheetByName('登録者マスタ');
   const hiredSheet = ss.getSheetByName('採用者一覧');
   const unhiredSheet = ss.getSheetByName('未採用者一覧');
   const jobSheet = ss.getSheetByName('案件管理');
-  if (!masterSheet || !hiredSheet || !unhiredSheet || !jobSheet) {
-    throw new Error('必要なシートが見つかりません。');
-  }
+  if (!masterSheet || !hiredSheet || !unhiredSheet || !jobSheet) throw new Error('必要なシートが見つかりません。');
 
   const masterData = masterSheet.getDataRange().getValues();
   const masterHeaders = masterData.shift();
-
-  // 各一覧シートのヘッダー取得
   const hiredHeaders = hiredSheet.getRange(1, 1, 1, hiredSheet.getLastColumn()).getValues()[0];
   const unhiredHeaders = unhiredSheet.getRange(1, 1, 1, unhiredSheet.getLastColumn()).getValues()[0];
   
-  // 案件管理データの事前取得とマッピング（高速化）
   const jobData = jobSheet.getDataRange().getValues();
   const jobHeaders = jobData.shift();
   const jobList = jobData.map(row => {
     const jobMap = {};
-    for (let i = 0; i < jobHeaders.length; i++) {
-      jobMap[normalize_(jobHeaders[i])] = row[i];
-    }
+    for (let i = 0; i < jobHeaders.length; i++) jobMap[normalize_(jobHeaders[i])] = row[i];
     return jobMap;
   });
-  const hiredData = [];
-  const unhiredData = [];
+  
+  const hiredData = [], unhiredData = [];
 
-  // マスタの「登録者ID」列インデックスを確認
   if (masterHeaders.findIndex(h => normalize_(h) === normalize_('登録者ID')) === -1) {
     throw new Error('登録者マスタに「登録者ID」列が見つかりません。');
   }
@@ -197,10 +145,7 @@ function updateCandidateLists(silent = false) {
     const dataMap = {};
     for (let c = 0; c < masterHeaders.length; c++) {
       let val = row[c];
-      // 日付オブジェクトの場合はフォーマットを整える
-      if (val instanceof Date) {
-        val = Utilities.formatDate(val, "JST", "yyyy/MM/dd");
-      }
+      if (val instanceof Date) val = Utilities.formatDate(val, "JST", "yyyy/MM/dd");
       dataMap[normalize_(masterHeaders[c])] = val;
     }
 
@@ -210,7 +155,6 @@ function updateCandidateLists(silent = false) {
 
     if (!candidateId) continue;
 
-    // 「特定技能要件」列の動的生成（未採用者一覧用）
     const jlpt = dataMap[normalize_('特定技能要件＞JLPTレベル')];
     const jft = dataMap[normalize_('特定技能要件＞JFT Basicレベル')];
     const kaigoGinou = dataMap[normalize_('特定技能要件＞介護技能評価試験')];
@@ -229,16 +173,13 @@ function updateCandidateLists(silent = false) {
     }
     dataMap[normalize_('特定技能要件')] = reqs.join(', ');
 
-    // ヘッダー名の揺れ（エイリアス）をマッピング
     dataMap[normalize_('JLPT')] = jlpt;
     dataMap[normalize_('JFT Basic')] = jft;
-    dataMap[normalize_('採用事業者名')] = companyName; // マスタの「採用事業者」を「採用事業者名」にもマッピング
+    dataMap[normalize_('採用事業者名')] = companyName; 
     dataMap[normalize_('在留資格交付申請の有無')] = dataMap[normalize_('在留資格交付申請の回数')];
+    
     if (status === '採用' || status === '内定') {
-      let jobId = '';
-      let skillField = '';
-      
-      // 案件管理から「案件ID」と「技能分野」を取得
+      let jobId = '', skillField = '';
       if (companyName) {
         const matchedJob = jobList.find(job => {
           const jComp = job[normalize_('事業者名')];
@@ -251,20 +192,14 @@ function updateCandidateLists(silent = false) {
           skillField = matchedJob[normalize_('技能分野')] || '';
         }
       }
-      
-      // 取得した案件情報をdataMapに追加
       dataMap[normalize_('案件ID')] = jobId;
       dataMap[normalize_('技能分野')] = skillField;
-
-      const outRow = buildRowByHeaders_(hiredHeaders, dataMap);
-      hiredData.push(outRow);
+      hiredData.push(buildRowByHeaders_(hiredHeaders, dataMap));
     } else if (status === '未採用' || status === '辞退' || status === '保留') {
-      const outRow = buildRowByHeaders_(unhiredHeaders, dataMap);
-      unhiredData.push(outRow);
+      unhiredData.push(buildRowByHeaders_(unhiredHeaders, dataMap));
     }
   }
 
-  // シートへの書き込み処理
   if (hiredData.length > 0) {
     const lastRow = hiredSheet.getLastRow();
     if (lastRow > 1) hiredSheet.getRange(2, 1, lastRow - 1, hiredHeaders.length).clearContent();
