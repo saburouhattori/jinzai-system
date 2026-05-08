@@ -3,7 +3,7 @@
 // =========================================
 
 /**
- * 補助：指定したセル内の複数のURLを「実際のファイル名」のリンクに変換する（疑似スマートチップ）
+ * 補助：指定したセル内の複数のURLを「実際のファイル/フォルダ名」のリンクに変換する（疑似スマートチップ）
  */
 function convertToSmartChips(sheet, row, col, urlText) {
   if (!urlText) {
@@ -23,25 +23,53 @@ function convertToSmartChips(sheet, row, col, urlText) {
   let currentPos = 0;
 
   urls.forEach((url, i) => {
-    let fileName = url;
+    let itemName = url;
+    let icon = "📄"; // デフォルトはファイルアイコン
+    
     try {
-      let fileId = "";
-      const idMatch = url.match(/\/d\/([-\w]{25,})/);
-      if (idMatch) {
-        fileId = idMatch[1];
-      } else {
-        const queryMatch = url.match(/id=([-\w]{25,})/);
-        if (queryMatch) fileId = queryMatch[1];
+      let itemId = "";
+      let isFolder = false;
+      
+      // 1. フォルダのURL判定 (/folders/ID)
+      const folderMatch = url.match(/\/folders\/([-\w]{25,})/);
+      // 2. ファイルのURL判定 (/d/ID)
+      const fileMatch = url.match(/\/d\/([-\w]{25,})/);
+      // 3. 汎用パラメータ判定 (id=ID)
+      const queryMatch = url.match(/id=([-\w]{25,})/);
+
+      if (folderMatch) {
+        itemId = folderMatch[1];
+        isFolder = true;
+      } else if (fileMatch) {
+        itemId = fileMatch[1];
+        isFolder = false;
+      } else if (queryMatch) {
+        itemId = queryMatch[1];
+        // id=形式の場合はファイルかフォルダか不明なため、とりあえずファイルとして扱う（エラーならフォルダへフォールバック）
+        isFolder = false;
       }
 
-      if (fileId) {
-        fileName = DriveApp.getFileById(fileId).getName();
+      if (itemId) {
+        if (isFolder) {
+          itemName = DriveApp.getFolderById(itemId).getName();
+          icon = "📁";
+        } else {
+          try {
+            itemName = DriveApp.getFileById(itemId).getName();
+            icon = "📄";
+          } catch (fileEx) {
+            // ファイルとして取得できなかった場合、フォルダとして再試行
+            itemName = DriveApp.getFolderById(itemId).getName();
+            icon = "📁";
+          }
+        }
       }
     } catch(ex) {
-      fileName = "関連ファイル " + (i + 1);
+      itemName = "関連リンク " + (i + 1);
+      icon = "🔗"; // 取得失敗時は汎用リンクアイコン
     }
     
-    const textPart = "📄 " + fileName;
+    const textPart = icon + " " + itemName;
     fullText += (i > 0 ? "\n" : "") + textPart;
     
     linkData.push({
@@ -60,7 +88,7 @@ function convertToSmartChips(sheet, row, col, urlText) {
 }
 
 /**
- * 案件登録（新規事業者の自動マスタ登録付き）
+ * 案件登録（新規事業者の自動マスタ登録付き ＋ 自動フォルダ作成・ファイルアップロード機能）
  */
 function addJob(formData) {
   try {
@@ -95,7 +123,6 @@ function addJob(formData) {
     const aVals = dataRange.getValues().map(r => r[0]); 
     let lastIdNum = 0;
     let targetRow = -1;
-
     for (let i = 1; i < aVals.length; i++) { 
       let val = String(aVals[i]).trim();
       let match = val.match(/\d+/);
@@ -116,14 +143,12 @@ function addJob(formData) {
     }
 
     const nextId = "JOB-" + (lastIdNum + 1).toString().padStart(4, '0');
-    
     // --- 日付処理 ---
     const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()); 
-    
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     let interviewDate = '';
     if (formData.interviewDate) {
-      const parts = formData.interviewDate.split('-'); 
+      const parts = formData.interviewDate.split('-');
       if (parts.length === 3) {
         interviewDate = new Date(parts[0], parts[1] - 1, parts[2]);
       }
@@ -131,21 +156,40 @@ function addJob(formData) {
     
     const candidatesArr = Array.isArray(formData.candidates) ? formData.candidates : [];
     const fileUrlsArr = Array.isArray(formData.relatedFiles) ? formData.relatedFiles : [];
-    const fileUrlsText = fileUrlsArr.join('\n');
 
+    // --- フォルダ作成とファイルアップロード処理 ---
+    if (formData.uploadFiles && formData.uploadFiles.length > 0) {
+      try {
+        const parentFolderId = '1UuwRUPmldGgBR6dVUjldMI0vwZOjab0t'; // 指定された親フォルダID
+        const parentFolder = DriveApp.getFolderById(parentFolderId);
+        const folderName = `${nextId}_${companyName || '名称未設定'}`;
+        const newFolder = parentFolder.createFolder(folderName);
+        
+        formData.uploadFiles.forEach(f => {
+          const blob = Utilities.newBlob(Utilities.base64Decode(f.data), f.mimeType || 'application/octet-stream', f.name);
+          newFolder.createFile(blob);
+        });
+        
+        // 作成したフォルダのURLを関連ファイル一覧に追加
+        fileUrlsArr.push(newFolder.getUrl());
+      } catch (uploadEx) {
+        console.warn("ファイルアップロードエラー: " + uploadEx.message);
+      }
+    }
+
+    const fileUrlsText = fileUrlsArr.join('\n');
     const rowData = [
       nextId,                           
-      '未着手',                          
+      formData.status || '未着手',                      
       today,                            
       companyName,                      
       formData.skill || '',             
       candidatesArr.join('\n'),         
       interviewDate,                    
       '',                               
-      '',                               
+      fileUrlsText,   
       formData.memo || ''               
     ];
-
     sheet.getRange(targetRow, 1, 1, rowData.length).setValues([rowData]);
     
     try {
@@ -159,7 +203,6 @@ function addJob(formData) {
     }
 
     return `案件登録が完了しました: ${nextId}`;
-
   } catch(e) {
     throw new Error("登録に失敗しました: " + e.message);
   }
@@ -172,7 +215,6 @@ function getJobDetails(jobId) {
   try {
     const sheet = getMasterSheet('案件管理');
     if (!sheet) return null;
-    
     const lastRow = sheet.getLastRow();
     if (lastRow < 2) return null;
 
@@ -197,8 +239,7 @@ function getJobDetails(jobId) {
           console.error("URL抽出エラー: " + e);
         }
         
-        if (!rawUrls) rawUrls = String(data[i][8] || ""); 
-
+        if (!rawUrls) rawUrls = String(data[i][8] || "");
         const toIsoDate = (val) => {
           if (val instanceof Date) return Utilities.formatDate(val, "JST", "yyyy-MM-dd");
           if (typeof val === 'string' && val) {
@@ -206,7 +247,6 @@ function getJobDetails(jobId) {
           }
           return '';
         };
-
         return {
           row: i + 1,
           id: data[i][0],
@@ -229,7 +269,7 @@ function getJobDetails(jobId) {
 }
 
 /**
- * 案件情報の更新
+ * 案件情報の更新 (自動フォルダ作成・ファイルアップロード機能付き)
  */
 function updateJob(formData) {
   try {
@@ -237,12 +277,50 @@ function updateJob(formData) {
     const row = Number(formData.row);
     if (!row || row < 2) throw new Error("無効な行番号です。");
 
+    const companyName = String(formData.company || "").trim();
     const candidatesArr = Array.isArray(formData.candidates) ? formData.candidates : [];
     const fileUrlsArr = Array.isArray(formData.relatedFiles) ? formData.relatedFiles : [];
+
+    // --- フォルダ作成とファイル追加アップロード処理 ---
+    if (formData.uploadFiles && formData.uploadFiles.length > 0) {
+      try {
+        const parentFolderId = '1UuwRUPmldGgBR6dVUjldMI0vwZOjab0t';
+        let targetFolder = null;
+        
+        // 既存の関連ファイルURLの中に、このシステムで作成したと思われるフォルダ（/folders/）があるか確認
+        const existingFolderUrl = fileUrlsArr.find(u => u.includes('/folders/'));
+        
+        if (existingFolderUrl) {
+          const folderIdMatch = existingFolderUrl.match(/\/folders\/([-\w]{25,})/);
+          if (folderIdMatch) {
+            try {
+              targetFolder = DriveApp.getFolderById(folderIdMatch[1]);
+            } catch(e) {}
+          }
+        }
+        
+        // フォルダが見つからない場合は新規作成
+        if (!targetFolder) {
+          const parentFolder = DriveApp.getFolderById(parentFolderId);
+          const jobId = formData.id || 'JOB-UNKNOWN';
+          const folderName = `${jobId}_${companyName || '名称未設定'}`;
+          targetFolder = parentFolder.createFolder(folderName);
+          fileUrlsArr.push(targetFolder.getUrl());
+        }
+        
+        formData.uploadFiles.forEach(f => {
+          const blob = Utilities.newBlob(Utilities.base64Decode(f.data), f.mimeType || 'application/octet-stream', f.name);
+          targetFolder.createFile(blob);
+        });
+      } catch (uploadEx) {
+        console.warn("ファイルアップロードエラー: " + uploadEx.message);
+      }
+    }
+
     const fileUrlsText = fileUrlsArr.join('\n');
     
     sheet.getRange(row, 2).setValue(formData.status || '未着手');
-    sheet.getRange(row, 4).setValue(formData.company || '');
+    sheet.getRange(row, 4).setValue(companyName);
     sheet.getRange(row, 5).setValue(formData.skill || '');
     sheet.getRange(row, 6).setValue(candidatesArr.join('\n'));
     
@@ -256,7 +334,6 @@ function updateJob(formData) {
     
     const cell = sheet.getRange(row, 7);
     cell.setValue(interviewDate).setNumberFormat('yyyy"年"m"月"d"日"');
-    
     sheet.getRange(row, 10).setValue(formData.memo || '');
     
     try {
@@ -298,11 +375,16 @@ function deleteJobRow(jobId) {
 function getJobCandidates(jobId) {
   try {
     const details = getJobDetails(jobId);
-    if (!details || !details.candidates) return [];
+    if (!details) {
+      throw new Error("該当する案件が見つかりません。");
+    }
+    if (!details.interviewDate) {
+      throw new Error("面接日が設定されていません。\n先に「案件更新/削除」から面接日を登録してください。");
+    }
+    if (!details.candidates) return [];
 
     const candDict = getCandidateDict(); 
     const ids = details.candidates.split(/\r?\n/).filter(id => id.trim());
-
     return ids.map(id => {
       const cleanId = id.split('-').slice(0, 2).join('-').trim();
       return { 
@@ -332,18 +414,21 @@ function registerHire(jobId, hiredIds) {
     let rawInterviewDate = "";
     let allCandidatesRaw = "";
     let targetJobRow = -1;
-
     // 1. 案件管理シートから対象の案件情報を取得
     for (let i = 1; i < data.length; i++) {
       if (String(data[i][0]).trim() === String(jobId).trim()) {
         companyName = String(data[i][3]).trim();
         allCandidatesRaw = String(data[i][5]); // 候補者名（F列）
-        rawInterviewDate = data[i][6];         // 面接日（G列）
+        rawInterviewDate = data[i][6]; // 面接日（G列）
         targetJobRow = i + 1;
         break;
       }
     }
     if (!companyName) throw new Error("案件が見つかりません。");
+    // ★追加：登録実行時にも念のため面接日をチェック
+    if (!rawInterviewDate) {
+      throw new Error("面接日が設定されていません。\n先に「案件更新/削除」から面接日を登録してください。");
+    }
 
     // 面接日のフォーマット処理（yyyy/MM/dd形式へ）
     let formattedDate = "日付不明";
@@ -361,10 +446,8 @@ function registerHire(jobId, hiredIds) {
     const allCandidateIds = allCandidatesRaw.split(/\r?\n/)
                                             .map(line => line.split('-').slice(0, 2).join('-').trim())
                                             .filter(id => id !== "");
-    
     // 採用者リスト（hiredIds）をSet化して判定を高速化
     const hiredIdSet = new Set(hiredIds.map(id => String(id).trim()));
-
     // 全候補者に対してループ処理
     allCandidateIds.forEach(candId => {
       // 採用か不採用かを判定
@@ -404,15 +487,25 @@ function registerHire(jobId, hiredIds) {
     // --- △ ここまで △ ---
 
     // 案件管理シート側の更新（採用者名の書き込みとステータス変更）
-    const hiredNames = hiredIds.map(id => {
-      const name = candDict[id] || "";
-      return name ? `${id}-${name}` : id;
-    });
+    let hiredNamesText = "採用者なし";
+    if (hiredIds.length > 0) {
+      const hiredNames = hiredIds.map(id => {
+        const name = candDict[id] || "";
+        return name ? `${id}-${name}` : id;
+      });
+      hiredNamesText = hiredNames.join('\n');
+    }
 
-    sheet.getRange(targetJobRow, 8).setValue(hiredNames.join('\n'));
-    sheet.getRange(targetJobRow, 2).setValue('終了');
+    sheet.getRange(targetJobRow, 8).setValue(hiredNamesText);
+    
+    const finalJobStatus = hiredIds.length > 0 ? '入国準備' : '終了';
+    sheet.getRange(targetJobRow, 2).setValue(finalJobStatus);
 
-    return `${hiredIds.length} 名の採用登録、および対象候補者全員の「面接履歴」への追記が完了しました。`;
+    if (hiredIds.length > 0) {
+      return `${hiredIds.length} 名の面接結果（ステータス：入国準備）、および対象候補者全員の「面接履歴」への追記が完了しました。`;
+    } else {
+      return `「採用者なし」として案件を終了し、対象候補者全員の「面接履歴」への追記が完了しました。`;
+    }
   } catch(e) {
     throw new Error(e.message);
   }
