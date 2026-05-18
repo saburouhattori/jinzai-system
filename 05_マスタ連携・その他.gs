@@ -195,21 +195,29 @@ function updateCandidateLists(silent = false) {
       dataMap[normalize_('案件ID')] = jobId;
       dataMap[normalize_('技能分野')] = skillField;
       hiredData.push(buildRowByHeaders_(hiredHeaders, dataMap));
-    } else if (status === '未採用' || status === '辞退' || status === '保留') {
+    } else if (status === '未採用') {
+      // ★変更箇所：ステータスが「未採用」の候補者のみを対象にする
       unhiredData.push(buildRowByHeaders_(unhiredHeaders, dataMap));
     }
   }
 
+  // シートへの書き込み処理
   if (hiredData.length > 0) {
     const lastRow = hiredSheet.getLastRow();
     if (lastRow > 1) hiredSheet.getRange(2, 1, lastRow - 1, hiredHeaders.length).clearContent();
     hiredSheet.getRange(2, 1, hiredData.length, hiredHeaders.length).setValues(hiredData);
+  } else {
+    const lastRow = hiredSheet.getLastRow();
+    if (lastRow > 1) hiredSheet.getRange(2, 1, lastRow - 1, hiredHeaders.length).clearContent();
   }
 
   if (unhiredData.length > 0) {
     const lastRow = unhiredSheet.getLastRow();
     if (lastRow > 1) unhiredSheet.getRange(2, 1, lastRow - 1, unhiredHeaders.length).clearContent();
     unhiredSheet.getRange(2, 1, unhiredData.length, unhiredHeaders.length).setValues(unhiredData);
+  } else {
+    const lastRow = unhiredSheet.getLastRow();
+    if (lastRow > 1) unhiredSheet.getRange(2, 1, lastRow - 1, unhiredHeaders.length).clearContent();
   }
 
   if (!silent) {
