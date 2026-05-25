@@ -200,6 +200,7 @@ function updateCandidateLists(silent = false) {
       unhiredData.push(buildRowByHeaders_(unhiredHeaders, dataMap));
     }
   }
+    ///JoJo!貴様、見ているな！///
 
   // シートへの書き込み処理
   if (hiredData.length > 0) {

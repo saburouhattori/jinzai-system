@@ -137,7 +137,6 @@ function convertToSmartChips(sheet, row, col, urlText) {
       itemName = "関連リンク " + (i + 1);
       icon = "🔗";
     }
-    ///JoJo!貴様、見ているな！///
     const textPart = icon + " " + itemName;
     fullText += (i > 0 ? "\n" : "") + textPart;
     linkData.push({ url: url, start: currentPos + (i > 0 ? 1 : 0), end: currentPos + (i > 0 ? 1 : 0) + textPart.length });
