@@ -1,0 +1,36 @@
+<script>
+// --- 事業者登録 ---
+function submitCompany() {
+  let name = document.getElementById('comp_name').value.trim();
+  if (!name) { showModal('事業者名称は必須です。'); return; }
+  let formData = { name: name, yomi: document.getElementById('comp_yomi').value, address: document.getElementById('comp_address').value, url: document.getElementById('comp_url').value, note: document.getElementById('comp_note').value };
+  
+  document.getElementById('compBtn').disabled = true; 
+  showModal('登録中...', true);
+  
+  google.script.run
+    .withSuccessHandler(function(msg) {
+      try {
+        document.getElementById('compBtn').disabled = false; 
+        showModal(msg);
+        document.querySelectorAll('#form-company input, #form-company textarea').forEach(el => el.value = '');
+        let warningEl = document.getElementById('comp_warning');
+        if(warningEl) warningEl.style.display = 'none';
+      } catch(e) {
+        showModal('登録は完了しましたが、画面のクリアに失敗しました: ' + e.message);
+      }
+    })
+    .withFailureHandler(function(err) {
+      document.getElementById('compBtn').disabled = false; 
+      showModal('サーバーエラー: ' + err.message);
+    })
+    .addCompany(formData);
+}
+
+function liveCheckDuplicate(name) {
+  let warningBox = document.getElementById('comp_warning');
+  if (!warningBox) return;
+  if (!name.trim()) { warningBox.style.display = 'none'; return; }
+  google.script.run.withSuccessHandler(function(isDup) { warningBox.style.display = isDup ? 'block' : 'none'; }).checkCompanyDuplicate(name);
+}
+</script>

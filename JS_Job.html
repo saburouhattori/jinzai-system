@@ -1,39 +1,4 @@
 <script>
-// --- 事業者登録 ---
-function submitCompany() {
-  let name = document.getElementById('comp_name').value.trim();
-  if (!name) { showModal('事業者名称は必須です。'); return; }
-  let formData = { name: name, yomi: document.getElementById('comp_yomi').value, address: document.getElementById('comp_address').value, url: document.getElementById('comp_url').value, note: document.getElementById('comp_note').value };
-  
-  document.getElementById('compBtn').disabled = true; 
-  showModal('登録中...', true);
-  
-  google.script.run
-    .withSuccessHandler(function(msg) {
-      try {
-        document.getElementById('compBtn').disabled = false; 
-        showModal(msg);
-        document.querySelectorAll('#form-company input, #form-company textarea').forEach(el => el.value = '');
-        let warningEl = document.getElementById('comp_warning');
-        if(warningEl) warningEl.style.display = 'none';
-      } catch(e) {
-        showModal('登録は完了しましたが、画面のクリアに失敗しました: ' + e.message);
-      }
-    })
-    .withFailureHandler(function(err) {
-      document.getElementById('compBtn').disabled = false; 
-      showModal('サーバーエラー: ' + err.message);
-    })
-    .addCompany(formData);
-}
-
-function liveCheckDuplicate(name) {
-  let warningBox = document.getElementById('comp_warning');
-  if (!warningBox) return;
-  if (!name.trim()) { warningBox.style.display = 'none'; return; }
-  google.script.run.withSuccessHandler(function(isDup) { warningBox.style.display = isDup ? 'block' : 'none'; }).checkCompanyDuplicate(name);
-}
-
 // 関連ファイルの入力行に「検索ボタン」を追加
 function addJobFileRow(prefix, urlVal = '') {
   const containerId = prefix + '_file_list';
@@ -131,7 +96,12 @@ async function submitJob() {
   let btnEl = document.getElementById('jobBtn');
   if(btnEl) btnEl.disabled = true; 
   
-  showModal('案件を登録し、フォルダを作成中...', true);
+  // 【課題8修正】アップロードファイルの有無でローディングメッセージを適切に切り替え
+  if (uploadFiles.length > 0) {
+    showModal('案件を登録し、フォルダを作成中...', true);
+  } else {
+    showModal('案件を登録中...', true);
+  }
   
   google.script.run
     .withSuccessHandler(function(msg) {
@@ -329,7 +299,13 @@ async function submitJobEdit() {
   let btnEl = document.getElementById('jobEditBtn');
   if(btnEl) btnEl.disabled = true;
 
-  showModal('更新中...', true);
+  // 【課題8修正】更新時もアップロードファイルの有無でメッセージを切り替え
+  if (uploadFiles.length > 0) {
+    showModal('更新し、ファイルを保存中...', true);
+  } else {
+    showModal('更新中...', true);
+  }
+
   google.script.run
     .withSuccessHandler(function(msg) {
       if(btnEl) btnEl.disabled = false;
