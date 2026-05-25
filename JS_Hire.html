@@ -1,0 +1,110 @@
+<script>
+// --- 採用登録 ---
+
+function toggleHireNone(checkbox) {
+  let listDiv = document.getElementById('hire_cand_list');
+  if (checkbox.checked) {
+    listDiv.style.opacity = '0.5';
+    listDiv.style.pointerEvents = 'none';
+    let checkboxes = document.querySelectorAll('.hire-cand-checkbox');
+    checkboxes.forEach(cb => cb.checked = false);
+  } else {
+    listDiv.style.opacity = '1';
+    listDiv.style.pointerEvents = 'auto';
+  }
+}
+
+function fetchJobCandidates(mode) {
+  let idEl = document.getElementById(mode + '_job_id');
+  if(!idEl) return;
+  let rawId = idEl.value.trim();
+  if (!rawId) { showModal('案件IDを入力してください。'); return; }
+  let jobId = formatJobId(rawId); 
+  idEl.value = jobId;
+  
+  showModal('候補者を取得中...', true);
+  
+  google.script.run
+    .withSuccessHandler(function(candidates) {
+      closeModal(); 
+      let container = document.getElementById(mode + '_cand_list');
+      if(!container) return;
+      if (!candidates || candidates.length === 0) { 
+        container.innerHTML = '<div style="color:#d93025; font-size:12px;">候補者が見つかりません。案件IDを確認してください。</div>'; 
+        return; 
+      }
+      let html = '';
+      candidates.forEach(c => {
+        html += `<label style="display:flex; align-items:center; margin-bottom:8px; font-size:14px; cursor:pointer;">
+                   <input type="checkbox" class="${mode}-cand-checkbox" value="${c.id}" style="margin:0 8px 0 0; width:16px; height:16px; flex-shrink:0;">
+                   <span style="line-height:1.2;">${c.display}</span>
+                 </label>`;
+      });
+      container.innerHTML = html;
+
+      let noneCb = document.getElementById('hire_none');
+      if (noneCb) {
+        noneCb.checked = false;
+        toggleHireNone(noneCb);
+      }
+    })
+    .withFailureHandler(function(err) {
+      showModal('候補者取得エラー: ' + err.message);
+    })
+    .getJobCandidates(jobId);
+}
+
+function submitHire() {
+  let idEl = document.getElementById('hire_job_id');
+  if(!idEl) return;
+  let rawId = idEl.value.trim();
+  if (!rawId) { showModal('案件IDを入力してください。'); return; }
+  let jobId = formatJobId(rawId);
+  
+  let checkboxes = document.querySelectorAll('.hire-cand-checkbox');
+  if (checkboxes.length === 0) { showModal('先に「候補者検索」を行ってください。'); return; }
+  
+  let isNone = document.getElementById('hire_none') && document.getElementById('hire_none').checked;
+  let hiredIds = []; 
+
+  if (!isNone) {
+    checkboxes.forEach(cb => { if (cb.checked) hiredIds.push(cb.value); });
+    if (hiredIds.length === 0) { 
+      showModal('採用者がいる場合は候補者を選択してください。いない場合は「採用者なし」にチェックを入れてください。'); 
+      return; 
+    }
+    if (!confirm(`選択した ${hiredIds.length} 名を「採用」として結果を登録します。よろしいですか？`)) return;
+  } else {
+    if (!confirm(`「採用者なし」として面接結果を登録します。よろしいですか？\n（候補者全員の履歴に不採用として記録されます）`)) return;
+  }
+  
+  let btnEl = document.getElementById('hireBtn');
+  if(btnEl) btnEl.disabled = true; 
+  
+  showModal('登録を実行中...', true);
+  google.script.run
+    .withSuccessHandler(function(msg) {
+      try {
+        if(btnEl) btnEl.disabled = false; 
+        showModal(msg);
+        idEl.value = ''; 
+        let dispEl = document.getElementById('hireJobDisplay');
+        let listEl = document.getElementById('hire_cand_list');
+        if(dispEl) dispEl.innerText = '';
+        if(listEl) listEl.innerHTML = '<div style="font-size: 12px; color: #888;">-- 上の検索ボタンを押してください --</div>';
+        
+        let noneCb = document.getElementById('hire_none');
+        if(noneCb) { noneCb.checked = false; toggleHireNone(noneCb); }
+
+        google.script.run.syncListSheets();
+      } catch(e) {
+        showModal('登録は完了しましたが、画面の更新に失敗しました: ' + e.message);
+      }
+    })
+    .withFailureHandler(function(err) {
+      if(btnEl) btnEl.disabled = false; 
+      showModal('登録エラー: ' + err.message);
+    })
+    .registerHire(jobId, hiredIds);
+}
+</script>
