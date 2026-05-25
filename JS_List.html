@@ -1,0 +1,33 @@
+<script>
+// --- 簡易リスト作成 ---
+function addListCandRow() {
+  let inputsEl = document.getElementById('list_cand_inputs');
+  if(inputsEl) inputsEl.insertAdjacentHTML('beforeend', createCandRowHTML('list-cand-id'));
+}
+
+function submitList() {
+  let candInputs = document.querySelectorAll('.list-cand-id'); 
+  let candidates = [];
+  candInputs.forEach(input => { let val = input.value.trim(); if (val) candidates.push(formatId(val)); });
+  if (candidates.length === 0) { showModal('候補者を少なくとも1名入力してください。'); return; }
+  
+  let btnEl = document.getElementById('listBtn');
+  if(btnEl) btnEl.disabled = true; 
+  
+  showModal('簡易リストを作成中...', true);
+  google.script.run
+    .withSuccessHandler(function(msg) { 
+      if(btnEl) btnEl.disabled = false; 
+      showModal(msg); 
+    })
+    .withFailureHandler(function(err) { 
+      if(btnEl) btnEl.disabled = false; 
+      showModal('リスト作成エラー: ' + err.message); 
+    })
+    .generateSimpleList(candidates);
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  if (MODE === 'LIST') addListCandRow();
+});
+</script>

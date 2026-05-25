@@ -114,4 +114,13 @@ function showModal(msg, keepOpen) {
   if (spinner) spinner.style.display = keepOpen ? 'block' : 'none';
 }
 function closeModal() { document.getElementById('overlay').style.display = 'none'; }
+
+// ▼ ここへ JS_Job.html から移動 ▼
+function createCandRowHTML(className, val = '', nameVal = '') {
+  return `<div style="display: flex; gap: 10px; align-items: center; margin-bottom: 8px;">
+    <input type="text" class="${className}" placeholder="例: 1" value="${val}" oninput="checkCandId(this)" onblur="applyFormat(this)" style="width: 100px; flex-shrink: 0; padding: 6px; box-sizing: border-box; height: 30px; margin: 0;">
+    <span class="cand-name-display" style="flex: 1;">${nameVal}</span>
+    <button type="button" class="btn-delete-small" onclick="this.parentElement.remove()">削除</button>
+  </div>`;
+}
 </script>

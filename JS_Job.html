@@ -34,14 +34,6 @@ function liveCheckDuplicate(name) {
   google.script.run.withSuccessHandler(function(isDup) { warningBox.style.display = isDup ? 'block' : 'none'; }).checkCompanyDuplicate(name);
 }
 
-function createCandRowHTML(className, val = '', nameVal = '') {
-  return `<div style="display: flex; gap: 10px; align-items: center; margin-bottom: 8px;">
-    <input type="text" class="${className}" placeholder="例: 1" value="${val}" oninput="checkCandId(this)" onblur="applyFormat(this)" style="width: 100px; flex-shrink: 0; padding: 6px; box-sizing: border-box; height: 30px; margin: 0;">
-    <span class="cand-name-display" style="flex: 1;">${nameVal}</span>
-    <button type="button" class="btn-delete-small" onclick="this.parentElement.remove()">削除</button>
-  </div>`;
-}
-
 // 関連ファイルの入力行に「検索ボタン」を追加
 function addJobFileRow(prefix, urlVal = '') {
   const containerId = prefix + '_file_list';
@@ -484,31 +476,10 @@ function submitHire() {
     .registerHire(jobId, hiredIds);
 }
 
-// --- 簡易リスト作成 ---
-function addListCandRow() {
-  let inputsEl = document.getElementById('list_cand_inputs');
-  if(inputsEl) inputsEl.insertAdjacentHTML('beforeend', createCandRowHTML('list-cand-id'));
-}
-
-function submitList() {
-  let candInputs = document.querySelectorAll('.list-cand-id'); 
-  let candidates = [];
-  candInputs.forEach(input => { let val = input.value.trim(); if (val) candidates.push(formatId(val)); });
-  if (candidates.length === 0) { showModal('候補者を少なくとも1名入力してください。'); return; }
-  
-  let btnEl = document.getElementById('listBtn');
-  if(btnEl) btnEl.disabled = true; 
-  
-  showModal('簡易リストを作成中...', true);
-  google.script.run
-    .withSuccessHandler(function(msg) { 
-      if(btnEl) btnEl.disabled = false; 
-      showModal(msg); 
-    })
-    .withFailureHandler(function(err) { 
-      if(btnEl) btnEl.disabled = false; 
-      showModal('リスト作成エラー: ' + err.message); 
-    })
-    .generateSimpleList(candidates);
-}
+window.addEventListener('DOMContentLoaded', () => {
+  if (MODE === 'JOB') {
+    addJobCandRow();
+    addJobFileRow('job');
+  }
+});
 </script>
