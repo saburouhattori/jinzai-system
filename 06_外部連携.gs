@@ -21,7 +21,6 @@ function syncToPaymentManagement() {
 
     const sourceData = sourceSheet.getDataRange().getValues();
     const sourceMap = getMasterColumnMap(sourceSheet);
-    
     const targetData = targetSheet.getDataRange().getValues();
     const targetMap = getMasterColumnMap(targetSheet);
 
@@ -45,7 +44,7 @@ function syncToPaymentManagement() {
         
         if (jId && cId) {
           const key = jId + "_" + cId;
-          targetKeys[key] = i + 1; // 行番号を保持
+          targetKeys[key] = i; // 配列のインデックス（0始まり）として保持する
         }
         
         // 重複警告用に、登録者IDに紐づく案件IDを記録しておく
@@ -67,15 +66,22 @@ function syncToPaymentManagement() {
     for (let i = 1; i < sourceData.length; i++) {
       const row = sourceData[i];
       const jobID = sourceMap['案件ID'] ? String(row[sourceMap['案件ID'] - 1] || "").trim() : "";
-      if (!jobID) continue; // 案件IDがない行はスキップ
+      if (!jobID) continue;
 
       const hiredText = sourceMap['採用者名'] ? String(row[sourceMap['採用者名'] - 1] || "").trim() : "";
-      if (!hiredText) continue; // 採用者がいない場合はスキップ
+      if (!hiredText) continue;
 
       const companyName = sourceMap['事業者名'] ? row[sourceMap['事業者名'] - 1] : "";
       const fieldName = sourceMap['技能分野'] ? row[sourceMap['技能分野'] - 1] : "";
-
-      // "SD-0064-HNIN EI HLAING" などをパースして複数人の配列にする
+      
+      // ★面接日の取得と日付フォーマットの安全な処理
+      let interviewDate = sourceMap['面接日'] ? row[sourceMap['面接日'] - 1] : "";
+      if (interviewDate instanceof Date) {
+        interviewDate = Utilities.formatDate(interviewDate, "JST", "yyyy/MM/dd");
+      } else if (interviewDate) {
+        interviewDate = String(interviewDate).trim();
+      }
+      
       const hiredList = hiredText.split(/\r?\n/).filter(line => line.trim() !== "");
       for (const line of hiredList) {
         const match = line.match(/^(SD-\d+)-(.*)$/);
@@ -86,7 +92,6 @@ function syncToPaymentManagement() {
           candidateID = match[1].trim();
           candidateName = match[2].trim();
         } else {
-          // フォーマット外の場合、そのままIDとして扱うなどのフェールセーフ
           candidateID = line.trim();
         }
 
@@ -96,40 +101,43 @@ function syncToPaymentManagement() {
              candidateID: candidateID,
              companyName: companyName,
              fieldName: fieldName,
-             candidateName: candidateName
+             candidateName: candidateName,
+             interviewDate: interviewDate // ★レコードに面接日を追加
            });
         }
       }
     }
 
-    // 展開したリストを支払い管理へ同期
     const numCols = targetSheet.getLastColumn() || Object.keys(targetMap).length;
-    const warnings = new Set(); // 重複登録者の警告用セット
+    const warnings = new Set();
+    
+    let hasUpdates = false;
+    const newRowsToAppend = [];
 
+    // メモリ上で配列データを更新・追加
     for (const record of syncRecords) {
       const key = record.jobID + "_" + record.candidateID;
-
-      // 転記するデータのマッピング作成
+      
       const vals = {};
       vals['案件ID'] = record.jobID;
       vals['登録者ID'] = record.candidateID;
       vals['事業者名'] = record.companyName;
       vals['技能分野'] = record.fieldName;
       vals['名前'] = record.candidateName;
+      vals['面接日'] = record.interviewDate; // ★Valsに面接日を設定
 
-      if (targetKeys[key]) {
-        // 更新処理（Funtoco側で入力する「金額」等は上書きしない）
-        const rowNum = targetKeys[key];
+      if (targetKeys[key] !== undefined) {
+        // メモリ上の targetData を更新
+        const rowIdx = targetKeys[key];
         for (let headerName in vals) {
           if (targetMap[headerName] !== undefined && vals[headerName] !== undefined) {
-            targetSheet.getRange(rowNum, targetMap[headerName]).setValue(vals[headerName]);
+            targetData[rowIdx][targetMap[headerName] - 1] = vals[headerName];
+            hasUpdates = true;
           }
         }
         updateCount++;
       } else {
-        // 新規追記処理
-        
-        // 重複チェック：異なる案件IDで既に存在するか
+        // 新規追加用の配列にストック
         if (existingCandidateMap.has(record.candidateID)) {
            const oldJobs = existingCandidateMap.get(record.candidateID).join(", ");
            warnings.add(`・${record.candidateID} ${record.candidateName} (既存案件ID: ${oldJobs})`);
@@ -141,25 +149,31 @@ function syncToPaymentManagement() {
             newRowValues[targetMap[headerName] - 1] = vals[headerName];
           }
         }
-        targetSheet.appendRow(newRowValues);
+        newRowsToAppend.push(newRowValues);
         appendCount++;
       }
+    }
+
+    // 最後に1回だけシートへ一括書き込み
+    if (hasUpdates) {
+      targetSheet.getRange(1, 1, targetData.length, targetData[0].length).setValues(targetData);
+    }
+    if (newRowsToAppend.length > 0) {
+      targetSheet.getRange(targetData.length + 1, 1, newRowsToAppend.length, numCols).setValues(newRowsToAppend);
     }
 
     // ----------------------------------------------------
     // 案件ID順に並べ替え (ソート)
     // ----------------------------------------------------
-    const finalLastRow = targetSheet.getLastRow();
-    const finalLastCol = targetSheet.getLastColumn();
-    // 2行以上データがあり、案件IDの列が存在する場合のみソートを実行
+    const finalLastRow = targetData.length + newRowsToAppend.length;
+    const finalLastCol = numCols;
+    
     if (finalLastRow >= 2 && targetMap['案件ID']) {
       const dataRange = targetSheet.getRange(2, 1, finalLastRow - 1, finalLastCol);
       dataRange.sort({column: targetMap['案件ID'], ascending: true});
     }
 
-    let resultMessage = `支払い管理への同期が完了しました。\n新規追加: ${appendCount}件\n情報更新: ${updateCount}件\n※案件ID順に並べ替えました。`;
-    
-    // 警告メッセージがある場合は追加
+    let resultMessage = `支払い管理への同期が完了しました。\n新規追加: ${appendCount}件\n情報更新: ${updateCount}件\n※「面接日」も含めて案件ID順に並べ替えました。`;
     if (warnings.size > 0) {
       resultMessage += `\n\n【⚠️警告】\n以下の登録者は別の案件IDで既に登録されていましたが、新たに重複して書き込まれました。\n不要なデータが残っていないか「支払い管理」シートを確認してください。\n`;
       resultMessage += Array.from(warnings).join("\n");
