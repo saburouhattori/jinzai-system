@@ -7,6 +7,7 @@ const EXTERNAL_SS_ID_FUNTOCO = "1Yo6Oz3iK6OlWjzl7BVUWeElO4__mPjJST3Jaaiys9yw";
 
 /**
  * 案件管理シートから外部の「支払い管理」シートへ未登録の新規データのみを安全に同期する
+ * スマートテーブルのフッター（集計行）を自動検知し、その直前にテーブル行を挿入して美しく格納する
  */
 function syncToPaymentManagement() {
   try {
@@ -37,11 +38,20 @@ function syncToPaymentManagement() {
     const targetKeys = {};
     const existingCandidateMap = new Map(); // 登録者ID -> [案件IDの配列] (重複チェック用)
 
+    // ★修正1: 罫線だけの空行やフッターに騙されないよう、「真のテーブルフッター行（空行）」を自動判定する
+    let footerRowIndex = targetData.length + 1; // デフォルトは最終行の次
+
     if (targetData.length > 1) {
       for (let i = 1; i < targetData.length; i++) {
         const jId = String(targetData[i][tJobIdx] || "").trim();
         const cId = String(targetData[i][tIdIdx] || "").trim();
         
+        // 案件IDも登録者IDも空の行を見つけたら、そこを「フッター行」として記録してブレイク
+        if (!jId && !cId) {
+          footerRowIndex = i + 1; // 1-basedの行番号
+          break;
+        }
+
         if (jId && cId) {
           const key = jId + "_" + cId;
           targetKeys[key] = i; // 既存の存在を示すインデックスを保持
@@ -68,18 +78,16 @@ function syncToPaymentManagement() {
       if (!jobID) continue;
 
       const hiredText = sourceMap['採用者名'] ? String(row[sourceMap['採用者名'] - 1] || "").trim() : "";
-      // ★修正: 空欄のみスキップし、「採用者なし」は通す
+      // 空欄のみスキップし、「採用者なし」は通す
       if (!hiredText) continue;
 
       const companyName = sourceMap['事業者名'] ? row[sourceMap['事業者名'] - 1] : "";
       const fieldName = sourceMap['技能分野'] ? row[sourceMap['技能分野'] - 1] : "";
       
-      // 面接日の取得と日付フォーマット処理
+      // 面接日はスマートテーブルの日付書式と連動させるため、Dateオブジェクトのまま（または元の値のまま）扱う
       let interviewDate = sourceMap['面接日'] ? row[sourceMap['面接日'] - 1] : "";
-      if (interviewDate instanceof Date) {
-        interviewDate = Utilities.formatDate(interviewDate, "JST", "yyyy/MM/dd");
-      } else if (interviewDate) {
-        interviewDate = String(interviewDate).trim();
+      if (typeof interviewDate === "string") {
+        interviewDate = interviewDate.trim();
       }
       
       const hiredList = hiredText.split(/\r?\n/).filter(line => line.trim() !== "");
@@ -92,13 +100,12 @@ function syncToPaymentManagement() {
           candidateID = match[1].trim();
           candidateName = match[2].trim();
         } else {
-          // ★修正: 「採用者なし」または「SD-」から始まる文字列を許可
           const rawId = line.trim();
           if (rawId.startsWith("SD-")) {
             candidateID = rawId;
           } else if (rawId === "採用者なし") {
             candidateID = "採用者なし";
-            candidateName = "採用者なし"; // Funtoco側で分かりやすいよう名前にもセット
+            candidateName = "採用者なし";
           } else {
             continue; 
           }
@@ -157,19 +164,17 @@ function syncToPaymentManagement() {
 
     // 完全に「新しく追加された採用者データ」のみをシートへ一括書き込み
     if (newRowsToAppend.length > 0) {
-      targetSheet.getRange(targetData.length + 1, 1, newRowsToAppend.length, numCols).setValues(newRowsToAppend);
+      // ★修正2: フッター行の「真上」に、足りない件数分の行を一括挿入する
+      // これによりスマートテーブルが壊れず内部に自動拡張され、既存のデザインや交互背景色が完璧に連動します。
+      targetSheet.insertRowsBefore(footerRowIndex, newRowsToAppend.length);
+
+      // 確保されたテーブル内の新しい空行（開始位置は元のfooterRowIndex）にデータを流し込む
+      targetSheet.getRange(footerRowIndex, 1, newRowsToAppend.length, numCols).setValues(newRowsToAppend);
       
-      // 新規追加があった場合のみ、案件ID順に並べ替え (ソート)
-      const finalLastRow = targetData.length + newRowsToAppend.length;
-      const finalLastCol = numCols;
-      
-      if (finalLastRow >= 2 && targetMap['案件ID']) {
-        const dataRange = targetSheet.getRange(2, 1, finalLastRow - 1, finalLastCol);
-        dataRange.sort({column: targetMap['案件ID'], ascending: true});
-      }
+      // ※スマートテーブル自体の持つソート・集計の崩壊を防ぐため、GASによる強制並び替え（.sort()）は安全のために撤廃しています。
     }
 
-    let resultMessage = `支払い管理への同期が完了しました。\n新規追加: ${appendCount}件\nスキップ（既存）: ${skipCount}件\n\n※既存データの上書きは行わず、手入力情報は完全に保護されました。`;
+    let resultMessage = `支払い管理への同期が完了しました。\n新規追加: ${appendCount}件\nスキップ（既存）: ${skipCount}件\n\n※スマートテーブルのフッターを自動で押し下げ、枠内へ美しくデータが格納されました。`;
     if (warnings.size > 0) {
       resultMessage += `\n\n【⚠️重複警告】\n以下の登録者は、今回の案件とは別の案件IDで既に過去に登録されています。今回の新しい案件情報も重複して追記されましたので、問題がないか「支払い管理」シートをご確認ください。\n`;
       resultMessage += Array.from(warnings).join("\n");
