@@ -1,9 +1,10 @@
 <script>
 let candidateDict = {};
 let jobDict = {};
-let currentFileInput = null; // ★追加：現在フォーカスしているファイル入力欄を記憶
+let currentFileInput = null; 
 
-window.onload = function() {
+// ★修正: window.onload から、より早く発火する DOMContentLoaded に変更
+window.addEventListener('DOMContentLoaded', () => {
   google.script.run.withSuccessHandler(function(dict) { candidateDict = dict; }).getCandidateDict();
 
   if (MODE === 'NEW' || MODE === 'EDIT') {
@@ -14,9 +15,19 @@ window.onload = function() {
   }
 
   if (MODE === 'JOB' || MODE === 'JOB_EDIT') {
+    // ★修正: 取得中は「読み込み中」であることをユーザーに知らせる
+    let jobCompInput = document.getElementById('job_company');
+    let editCompInput = document.getElementById('edit_job_company');
+    if (jobCompInput) jobCompInput.placeholder = "事業者リストを読み込み中...";
+    if (editCompInput) editCompInput.placeholder = "読み込み中...";
+
     google.script.run.withSuccessHandler(function(companies) {
       let datalist = document.getElementById('company_list');
       if(datalist) companies.forEach(function(company) { let opt = document.createElement('option'); opt.value = company; datalist.appendChild(opt); });
+      
+      // ★修正: 取得が完了したら本来のプレースホルダーに戻す
+      if (jobCompInput) jobCompInput.placeholder = "例：株式会社〇〇（新規も可）";
+      if (editCompInput) editCompInput.placeholder = "";
     }).getCompanyList();
   }
 
@@ -30,9 +41,8 @@ window.onload = function() {
   if (MODE === 'HIRE') {
     google.script.run.withSuccessHandler(function(dict) { jobDict = dict; }).getJobDict();
   }
-};
+});
 
-// ★修正：押されたボタンの隣にある入力欄を記憶してモーダルを開く
 function openDrivePicker(btnElement) { 
   if (btnElement) {
     currentFileInput = btnElement.parentElement.querySelector('input[type="text"]');
@@ -62,7 +72,6 @@ function searchDrive() {
   }).searchDriveFiles(query);
 }
 
-// ★修正：記憶した入力欄にURLをセットする
 function selectDriveFile(url, name) {
   if (currentFileInput) {
     currentFileInput.value = url;
@@ -109,13 +118,11 @@ function showModal(msg, keepOpen) {
   document.getElementById('modal-text').innerText = msg;
   document.getElementById('overlay').style.display = 'flex';
   document.querySelector('#modal-message button').style.display = keepOpen ? 'none' : 'block';
-  // ★追加：keepOpen が true（待機中）の場合はスピナーを表示する
   const spinner = document.getElementById('modal-spinner');
   if (spinner) spinner.style.display = keepOpen ? 'block' : 'none';
 }
 function closeModal() { document.getElementById('overlay').style.display = 'none'; }
 
-// ▼ ここへ JS_Job.html から移動 ▼
 function createCandRowHTML(className, val = '', nameVal = '') {
   return `<div style="display: flex; gap: 10px; align-items: center; margin-bottom: 8px;">
     <input type="text" class="${className}" placeholder="例: 1" value="${val}" oninput="checkCandId(this)" onblur="applyFormat(this)" style="width: 100px; flex-shrink: 0; padding: 6px; box-sizing: border-box; height: 30px; margin: 0;">
