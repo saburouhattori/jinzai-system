@@ -55,7 +55,6 @@ function addJob(formData) {
     }
 
     const nextId = "JOB-" + (lastIdNum + 1).toString().padStart(4, '0');
-    
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     let interviewDate = '';
@@ -91,7 +90,13 @@ function addJob(formData) {
       sheet.getRange(targetRow, 7).setNumberFormat('yyyy"年"m"月"d"日"');
     } catch(ex) { console.warn("装飾処理でエラー: " + ex.message); }
 
-    return `案件登録が完了しました: ${nextId}`;
+    // ★修正箇所：アップロードファイルの有無で完了メッセージを切り替え
+    let resultMsg = `案件登録が完了しました: ${nextId}`;
+    if (formData.uploadFiles && formData.uploadFiles.length > 0) {
+      resultMsg += "\n（専用フォルダを作成・特定し、ファイルを保存しました）";
+    }
+    return resultMsg;
+
   } catch(e) { throw new Error("登録に失敗しました: " + e.message); }
 }
 
@@ -104,10 +109,8 @@ function getJobDetails(jobId) {
     if (!sheet) return null;
     const lastRow = sheet.getLastRow();
     if (lastRow < 2) return null;
-
     const data = sheet.getRange(1, 1, lastRow, 10).getValues();
     const searchId = String(jobId).trim().toUpperCase();
-
     for (let i = 1; i < data.length; i++) {
       if (String(data[i][0]).trim().toUpperCase() === searchId) {
         let rawUrls = "";
@@ -153,7 +156,7 @@ function updateJob(formData) {
     const companyName = String(formData.company || "").trim();
     const candidatesArr = Array.isArray(formData.candidates) ? formData.candidates : [];
     let fileUrlsArr = Array.isArray(formData.relatedFiles) ? formData.relatedFiles : [];
-
+    
     // 08_ドライブ連携.gs の共通処理を呼び出し
     fileUrlsArr = handleDriveUploads(formData.id, companyName, fileUrlsArr, formData.uploadFiles);
     const fileUrlsText = fileUrlsArr.join('\n');
@@ -172,9 +175,16 @@ function updateJob(formData) {
     sheet.getRange(row, 7).setValue(interviewDate).setNumberFormat('yyyy"年"m"月"d"日"');
     sheet.getRange(row, 10).setValue(formData.memo || '');
     
-    try { convertToSmartChips(sheet, row, 9, fileUrlsText); } catch(ex) {}
+    try { convertToSmartChips(sheet, row, 9, fileUrlsText);
+    } catch(ex) {}
     
-    return "案件情報を更新しました。";
+    // ★修正箇所：アップロードファイルの有無で完了メッセージを切り替え
+    let resultMsg = "案件情報を更新しました。";
+    if (formData.uploadFiles && formData.uploadFiles.length > 0) {
+      resultMsg += "\n（専用フォルダを特定・作成し、ファイルを保存しました）";
+    }
+    return resultMsg;
+
   } catch(e) { throw new Error(e.message); }
 }
 
