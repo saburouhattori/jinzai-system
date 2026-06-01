@@ -3,50 +3,91 @@ let candidateDict = {};
 let jobDict = {};
 let currentFileInput = null; 
 
-// ★追加: 画面を再読み込み（開き直す）関数
-function reloadDialog() {
-  if (!confirm("画面を再読み込みします。\n※入力中の内容はすべてクリアされますがよろしいですか？")) {
-    return;
-  }
-  showModal('画面を再読み込みしています...', true);
-  google.script.run
-    .withFailureHandler(function(err) {
-      showModal('再読み込みに失敗しました: ' + err.message);
-    })
-    .reloadCurrentDialog(MODE);
-}
+let companyListArray = [];
 
-// 初期ロード用の事業者リスト取得
+// ★修正: 独自のサジェストシステム用のデータ取得関数
 function loadCompanyList() {
   let jobCompInput = document.getElementById('job_company');
   let editCompInput = document.getElementById('edit_job_company');
-  let jobDatalist = document.getElementById('job_company_list');
-  let editDatalist = document.getElementById('edit_job_company_list');
 
-  if (jobCompInput) jobCompInput.placeholder = "事業者リストを読み込み中...";
-  if (editCompInput) editCompInput.placeholder = "読み込み中...";
+  if (jobCompInput) {
+    jobCompInput.disabled = true;
+    jobCompInput.placeholder = "事業者辞書を取得中...";
+  }
+  if (editCompInput) {
+    editCompInput.disabled = true;
+    editCompInput.placeholder = "取得中...";
+  }
   
   google.script.run
     .withSuccessHandler(function(companies) {
-      let optionsHtml = '';
-      companies.forEach(function(company) { 
-        let safeVal = company.replace(/"/g, '&quot;');
-        optionsHtml += `<option value="${safeVal}">${safeVal}</option>`; 
-      });
+      companyListArray = companies;
       
-      if (jobDatalist) jobDatalist.innerHTML = optionsHtml;
-      if (editDatalist) editDatalist.innerHTML = optionsHtml;
-      
-      if (jobCompInput) jobCompInput.placeholder = "例：株式会社〇〇（新規も可）";
-      if (editCompInput) editCompInput.placeholder = "";
+      if (jobCompInput) {
+        jobCompInput.disabled = false;
+        jobCompInput.placeholder = "例：株式会社〇〇（新規も可）";
+      }
+      if (editCompInput) {
+        editCompInput.disabled = false;
+        editCompInput.placeholder = "";
+      }
     })
     .withFailureHandler(function(err) {
       console.error("事業者リスト取得エラー: " + err.message);
-      if (jobCompInput) jobCompInput.placeholder = "例：株式会社〇〇（新規も可）";
-      if (editCompInput) editCompInput.placeholder = "";
+      if (jobCompInput) {
+        jobCompInput.disabled = false;
+        jobCompInput.placeholder = "例：株式会社〇〇（新規も可）";
+      }
+      if (editCompInput) {
+        editCompInput.disabled = false;
+        editCompInput.placeholder = "";
+      }
     })
     .getCompanyList();
 }
+
+// 入力内容に応じて独自のサジェストボックスを表示する関数
+function showCompanySuggest(inputId, suggestId) {
+  const inputEl = document.getElementById(inputId);
+  const suggestEl = document.getElementById(suggestId);
+  if (!inputEl || !suggestEl) return;
+
+  const val = inputEl.value.trim().toLowerCase();
+  
+  const filtered = companyListArray.filter(comp => comp.toLowerCase().includes(val));
+  
+  if (filtered.length === 0) {
+    suggestEl.style.display = 'none';
+    return;
+  }
+
+  let html = '';
+  filtered.forEach(comp => {
+    const safeComp = comp.replace(/'/g, "\\'").replace(/"/g, "&quot;");
+    html += `<div class="suggest-item" onclick="selectCompany('${inputId}', '${suggestId}', '${safeComp}')">${comp}</div>`;
+  });
+  
+  suggestEl.innerHTML = html;
+  suggestEl.style.display = 'block';
+}
+
+// サジェストをクリックして選択した時の処理
+function selectCompany(inputId, suggestId, val) {
+  const inputEl = document.getElementById(inputId);
+  const suggestEl = document.getElementById(suggestId);
+  if (inputEl) {
+    inputEl.value = val;
+  }
+  if (suggestEl) suggestEl.style.display = 'none';
+}
+
+// 画面のどこか関係ない場所をクリックしたらサジェストを閉じる
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.field')) {
+    document.querySelectorAll('.suggest-box').forEach(el => el.style.display = 'none');
+  }
+});
+
 
 window.addEventListener('DOMContentLoaded', () => {
   google.script.run.withSuccessHandler(function(dict) { candidateDict = dict; }).getCandidateDict();
