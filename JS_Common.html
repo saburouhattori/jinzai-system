@@ -3,7 +3,33 @@ let candidateDict = {};
 let jobDict = {};
 let currentFileInput = null; 
 
-// ★修正: window.onload から、より早く発火する DOMContentLoaded に変更
+// ★追加: 事業者リスト（辞書）を取得・再構築する関数
+function loadCompanyList() {
+  let jobCompInput = document.getElementById('job_company');
+  let editCompInput = document.getElementById('edit_job_company');
+  let datalist = document.getElementById('company_list');
+
+  // 取得中はプレースホルダーを変更してユーザーに知らせる
+  if (jobCompInput) jobCompInput.placeholder = "事業者リストを読み込み中...";
+  if (editCompInput) editCompInput.placeholder = "読み込み中...";
+  
+  // 既存のリストをクリア（再読込時の重複防止）
+  if (datalist) datalist.innerHTML = ''; 
+
+  google.script.run.withSuccessHandler(function(companies) {
+    if(datalist) {
+      companies.forEach(function(company) { 
+        let opt = document.createElement('option'); 
+        opt.value = company; 
+        datalist.appendChild(opt); 
+      });
+    }
+    // 取得が完了したら本来のプレースホルダーに戻す
+    if (jobCompInput) jobCompInput.placeholder = "例：株式会社〇〇（新規も可）";
+    if (editCompInput) editCompInput.placeholder = "";
+  }).getCompanyList();
+}
+
 window.addEventListener('DOMContentLoaded', () => {
   google.script.run.withSuccessHandler(function(dict) { candidateDict = dict; }).getCandidateDict();
 
@@ -15,20 +41,8 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   if (MODE === 'JOB' || MODE === 'JOB_EDIT') {
-    // ★修正: 取得中は「読み込み中」であることをユーザーに知らせる
-    let jobCompInput = document.getElementById('job_company');
-    let editCompInput = document.getElementById('edit_job_company');
-    if (jobCompInput) jobCompInput.placeholder = "事業者リストを読み込み中...";
-    if (editCompInput) editCompInput.placeholder = "読み込み中...";
-
-    google.script.run.withSuccessHandler(function(companies) {
-      let datalist = document.getElementById('company_list');
-      if(datalist) companies.forEach(function(company) { let opt = document.createElement('option'); opt.value = company; datalist.appendChild(opt); });
-      
-      // ★修正: 取得が完了したら本来のプレースホルダーに戻す
-      if (jobCompInput) jobCompInput.placeholder = "例：株式会社〇〇（新規も可）";
-      if (editCompInput) editCompInput.placeholder = "";
-    }).getCompanyList();
+    // ★変更: 切り出した関数を呼び出す
+    loadCompanyList();
   }
 
   if (MODE === 'ADDINFO') {
