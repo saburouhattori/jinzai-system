@@ -68,7 +68,6 @@ function onOpen() {
     .addItem('採用・未採用リストの同期', 'runSyncListSheets')
     .addItem('支払い管理へ同期', 'runSyncPaymentManagement')
     .addToUi();
-
   ui.createMenu( '案件・採用管理' )
     .addItem( '案件登録' , 'showSidebarJobNew')
     .addItem( '案件更新/削除' , 'showSidebarJobEdit')
@@ -117,4 +116,25 @@ function runSyncListSheets() {
 function runSyncPaymentManagement() {
   const msg = syncToPaymentManagement();
   SpreadsheetApp.getUi().alert(msg);
+}
+
+/**
+ * 現在のダイアログを再読み込み（開き直す）
+ * @param {string} mode 現在のモード
+ */
+function reloadCurrentDialog(mode) {
+  let title = '';
+  switch(mode) {
+    case 'NEW': title = '候補者登録'; break;
+    case 'EDIT': title = 'データ更新'; break;
+    case 'ADDINFO': title = '採用者情報登録'; break;
+    case 'COMPANY': title = '事業者マスタ登録'; break;
+    case 'JOB': title = '案件登録'; break;
+    case 'JOB_EDIT': title = '案件更新/削除'; break;
+    case 'DELETE': title = '登録者削除'; break;
+    case 'HIRE': title = '面接結果登録'; break;
+    case 'LIST': title = '簡易リスト出力'; break;
+    default: title = '人材事業システム';
+  }
+  showMainSidebar(mode, title);
 }

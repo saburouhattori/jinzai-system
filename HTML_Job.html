@@ -13,7 +13,7 @@
   <label>事業者名（特定技能所属機関名を入力してください）</label>
   <div style="display: flex; gap: 10px;">
     <input type="text" id="job_company" list="job_company_list" placeholder="例：株式会社〇〇（新規も可）" style="flex: 2;">
-    <button type="button" class="btn-secondary" onclick="loadCompanyList()" style="flex: 1; margin-top: 0; padding: 8px; width: auto; max-width: 100px;">辞書再読込</button>
+    <button type="button" class="btn-secondary" onclick="reloadDialog()" style="flex: 1; margin-top: 0; padding: 8px; width: auto; max-width: 100px;">画面を再読込</button>
   </div>
   <datalist id="job_company_list"></datalist>
 </div>
@@ -94,7 +94,7 @@
         <label>事業者名</label>
         <div style="display: flex; gap: 10px;">
           <input type="text" id="edit_job_company" list="edit_job_company_list" style="flex: 2;">
-          <button type="button" class="btn-secondary" onclick="loadCompanyList()" style="flex: 1; margin-top: 0; padding: 8px; width: auto; max-width: 100px;">辞書再読込</button>
+          <button type="button" class="btn-secondary" onclick="reloadDialog()" style="flex: 1; margin-top: 0; padding: 8px; width: auto; max-width: 100px;">画面を再読込</button>
         </div>
         <datalist id="edit_job_company_list"></datalist>
       </div>
