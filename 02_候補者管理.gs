@@ -40,6 +40,7 @@ function safeSearchByAdminId(id) {
         res.jftLevel = getVal('特定技能要件＞JFTBasicレベル'); res.jftDate = getVal('特定技能要件＞JFT取得年月');
         res.kaigoSkill = getVal('特定技能要件＞介護技能評価試験'); res.kaigoSkillDate = getVal('特定技能要件＞介護技能取得年月');
         res.kaigoLang = getVal('特定技能要件＞介護日本語評価試験'); res.kaigoLangDate = getVal('特定技能要件＞介護日本語取得年月');
+        res.otherExam = getVal('特定技能要件＞その他の評価試験'); res.otherExamDate = getVal('特定技能要件＞その他の評価試験の取得年月');
         res.otherJapanese = getVal('その他の日本語能力試験'); res.otherJapaneseDate = getVal('取得年月');
         res.comment = getVal('修正前コメント'); 
         res.relative = getVal('日本在住の親族について');
@@ -58,12 +59,11 @@ function safeSearchByAdminId(id) {
       }
     }
     return null;
-  } catch(e) { throw new Error("検索エラー: " + e.message);
-  }
+  } catch(e) { throw new Error("検索エラー: " + e.message); }
 }
 
 function addNewRow(formData) {
-  const monthFields = ['eduStart', 'eduEnd', 'jlptDate', 'jftDate', 'kaigoSkillDate', 'kaigoLangDate', 'otherJapaneseDate'];
+  const monthFields = ['eduStart', 'eduEnd', 'jlptDate', 'jftDate', 'kaigoSkillDate', 'kaigoLangDate', 'otherExamDate', 'otherJapaneseDate'];
   monthFields.forEach(f => { if (formData[f]) formData[f] = normalizeYearMonth(formData[f]); });
   if (formData.birthday) formData.birthday = new Date(formData.birthday.replace(/-/g, '/'));
 
@@ -81,7 +81,7 @@ function addNewRow(formData) {
   const safeMaxCol = Math.max(masterSheet.getLastColumn(), ...Object.values(col));
   const rowValues = new Array(safeMaxCol).fill("");
   
-  const today = new Date(); // 今日の日付を取得
+  const today = new Date();
 
   const mapping = {
     '登録者ID': nextId, '名前': formData.name, 'フリガナ': formData.furigana, '呼び名': formData.nickname,
@@ -98,12 +98,12 @@ function addNewRow(formData) {
     '特定技能要件＞JFT取得年月': formData.jftDate,
     '特定技能要件＞介護技能評価試験': formData.kaigoSkill, '特定技能要件＞介護技能取得年月': formData.kaigoSkillDate,
     '特定技能要件＞介護日本語評価試験': formData.kaigoLang, '特定技能要件＞介護日本語取得年月': formData.kaigoLangDate,
+    '特定技能要件＞その他の評価試験': formData.otherExam, '特定技能要件＞その他の評価試験の取得年月': formData.otherExamDate,
     'その他の日本語能力試験': formData.otherJapanese, '取得年月': formData.otherJapaneseDate,
     '修正前コメント': formData.comment, 
     '日本在住の親族について': formData.relative, 'ステータス': '未採用',
-    '登録日': today // 新規追加：登録日をセット
+    '登録日': today
   };
-
   for (let header in mapping) {
     const h = header.replace(/\s/g, '');
     if (col[h]) rowValues[col[h]-1] = mapping[header];
@@ -111,7 +111,6 @@ function addNewRow(formData) {
 
   const newRow = lastRow + 1;
   
-  // ARRAYFORMULA破壊を防ぐため、特定列（顔写真、満年齢）をスキップして分割書き込み
   const skipIndices = [];
   if (col['満年齢']) skipIndices.push(col['満年齢'] - 1);
   if (col['顔写真']) skipIndices.push(col['顔写真'] - 1);
@@ -126,16 +125,13 @@ function addNewRow(formData) {
     }
     startCol = skipIdx + 1;
   });
-
   if (startCol < safeMaxCol) {
     const length = safeMaxCol - startCol;
     masterSheet.getRange(newRow, startCol + 1, 1, length).setValues([rowValues.slice(startCol)]);
   }
 
-  // 表示形式の設定
   if (col['生年月日']) masterSheet.getRange(newRow, col['生年月日']).setNumberFormat('yyyy"年"m"月"d"日"');
   if (col['登録日']) masterSheet.getRange(newRow, col['登録日']).setNumberFormat('yyyy/MM/dd');
-
   if (formData.imageFile && col['顔写真']) {
     try {
       const dataUri = `data:${formData.imageFile.mimeType};base64,${formData.imageFile.contents}`;
@@ -149,7 +145,7 @@ function addNewRow(formData) {
 }
 
 function updateRow(formData) {
-  const monthFields = ['eduStart', 'eduEnd', 'jlptDate', 'jftDate', 'kaigoSkillDate', 'kaigoLangDate', 'otherJapaneseDate'];
+  const monthFields = ['eduStart', 'eduEnd', 'jlptDate', 'jftDate', 'kaigoSkillDate', 'kaigoLangDate', 'otherExamDate', 'otherJapaneseDate'];
   monthFields.forEach(f => { if (formData[f]) formData[f] = normalizeYearMonth(formData[f]); });
   if (formData.birthday) formData.birthday = new Date(formData.birthday.replace(/-/g, '/'));
 
@@ -157,7 +153,6 @@ function updateRow(formData) {
   const col = getMasterColumnMap(masterSheet);
   const row = Number(formData.row);
   if (!row) return "エラー：行が不明です。";
-
   const mapping = {
     '名前': formData.name, 'フリガナ': formData.furigana, '呼び名': formData.nickname, '生年月日': formData.birthday,
     '性別': formData.gender, '配偶者': formData.spouse, '身長': formData.height, '体重': formData.weight,
@@ -170,16 +165,15 @@ function updateRow(formData) {
     '特定技能要件＞JLPT取得年月': formData.jlptDate, '特定技能要件＞JFTBasicレベル': formData.jftLevel,
     '特定技能要件＞JFT取得年月': formData.jftDate, '特定技能要件＞介護技能評価試験': formData.kaigoSkill,
     '特定技能要件＞介護技能取得年月': formData.kaigoSkillDate, '特定技能要件＞介護日本語評価試験': formData.kaigoLang,
-    '特定技能要件＞介護日本語取得年月': formData.kaigoLangDate, 'その他の日本語能力試験': formData.otherJapanese,
+    '特定技能要件＞介護日本語取得年月': formData.kaigoLangDate, '特定技能要件＞その他の評価試験': formData.otherExam,
+    '特定技能要件＞その他の評価試験の取得年月': formData.otherExamDate, 'その他の日本語能力試験': formData.otherJapanese,
     '取得年月': formData.otherJapaneseDate, 
     '修正前コメント': formData.comment, 
     '日本在住の親族について': formData.relative
   };
-
   const safeMaxCol = Math.max(masterSheet.getLastColumn(), ...Object.values(col));
   const currentRowRange = masterSheet.getRange(row, 1, 1, safeMaxCol);
   const currentRowData = currentRowRange.getValues()[0];
-
   for (let header in mapping) {
     const h = header.replace(/\s/g, '');
     if (col[h] && mapping[header] !== undefined) {
@@ -190,7 +184,6 @@ function updateRow(formData) {
   const skipIndices = [];
   if (col['顔写真']) skipIndices.push(col['顔写真'] - 1);
   if (col['満年齢']) skipIndices.push(col['満年齢'] - 1);
-  // ARRAYFORMULA破壊防止
   
   skipIndices.sort((a, b) => a - b);
   
@@ -202,7 +195,6 @@ function updateRow(formData) {
     }
     startCol = skipIdx + 1;
   });
-
   if (startCol < safeMaxCol) {
     const length = safeMaxCol - startCol;
     masterSheet.getRange(row, startCol + 1, 1, length).setValues([currentRowData.slice(startCol)]);
@@ -242,7 +234,6 @@ function updateAddInfoRow(formData) {
     const safeMaxCol = Math.max(sheet.getLastColumn(), ...Object.values(col));
     const currentRowRange = sheet.getRange(row, 1, 1, safeMaxCol);
     const currentRowData = currentRowRange.getValues()[0];
-
     for (let key in mapping) {
       const h = mapping[key].replace(/\s/g, '');
       if (col[h] && formData[key] !== undefined) {
@@ -253,7 +244,6 @@ function updateAddInfoRow(formData) {
     const skipIndices = [];
     if (col['顔写真']) skipIndices.push(col['顔写真'] - 1);
     if (col['満年齢']) skipIndices.push(col['満年齢'] - 1);
-    // ARRAYFORMULA破壊防止
     
     skipIndices.sort((a, b) => a - b);
     
@@ -265,7 +255,6 @@ function updateAddInfoRow(formData) {
       }
       startCol = skipIdx + 1;
     });
-
     if (startCol < safeMaxCol) {
       const length = safeMaxCol - startCol;
       sheet.getRange(row, startCol + 1, 1, length).setValues([currentRowData.slice(startCol)]);
