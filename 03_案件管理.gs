@@ -2,34 +2,35 @@
 // 案件データの操作（登録・更新・削除・詳細取得）
 // =========================================
 
-/**
- * 案件登録（新規事業者の自動マスタ登録付き）
- */
 function addJob(formData) {
   try {
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getSheetByName('案件管理');
     if (!sheet) throw new Error("「案件管理」シートが見つかりません。");
 
-    const companyName = String(formData.company || "").trim();
-    if (companyName) {
+    const companiesArr = Array.isArray(formData.companies) ? formData.companies.map(c => String(c).trim()).filter(c => c) : [];
+    if (companiesArr.length > 0) {
       const compSheet = ss.getSheetByName('事業者マスタ');
       if (compSheet) {
         const compData = compSheet.getDataRange().getValues();
-        const exists = compData.some(row => String(row[1]).trim() === companyName);
-        if (!exists) {
-          let lastIdNum = 0;
-          for (let i = 1; i < compData.length; i++) {
-            let idVal = String(compData[i][0]);
-            let match = idVal.match(/\d+/);
-            if (match) {
-              let num = parseInt(match[0], 10);
-              if (num > lastIdNum) lastIdNum = num;
-            }
+        let lastIdNum = 0;
+        for (let i = 1; i < compData.length; i++) {
+          let idVal = String(compData[i][0]);
+          let match = idVal.match(/\d+/);
+          if (match) {
+            let num = parseInt(match[0], 10);
+            if (num > lastIdNum) lastIdNum = num;
           }
-          const nextCompId = "CO-" + (lastIdNum + 1).toString().padStart(4, '0');
-          compSheet.appendRow([nextCompId, companyName, "", "", "", "案件登録により自動追加"]);
         }
+        companiesArr.forEach(companyName => {
+          const exists = compData.some(row => String(row[1]).trim() === companyName);
+          if (!exists) {
+            lastIdNum++;
+            const nextCompId = "CO-" + lastIdNum.toString().padStart(4, '0');
+            compSheet.appendRow([nextCompId, companyName, "", "", "", "案件登録により自動追加"]);
+            compData.push([nextCompId, companyName]); // 重複防止用
+          }
+        });
       }
     }
 
@@ -66,15 +67,16 @@ function addJob(formData) {
     const candidatesArr = Array.isArray(formData.candidates) ? formData.candidates : [];
     let fileUrlsArr = Array.isArray(formData.relatedFiles) ? formData.relatedFiles : [];
 
-    // 08_ドライブ連携.gs の共通処理を呼び出し
-    fileUrlsArr = handleDriveUploads(nextId, companyName, fileUrlsArr, formData.uploadFiles);
+    // 代表企業名（1社目）をフォルダ名に使用する
+    const mainCompany = companiesArr.length > 0 ? companiesArr[0] : "";
+    fileUrlsArr = handleDriveUploads(nextId, mainCompany, fileUrlsArr, formData.uploadFiles);
     const fileUrlsText = fileUrlsArr.join('\n');
 
     const rowData = [
       nextId,                           
       formData.status || '未着手',                      
       today,                            
-      companyName,                      
+      companiesArr.join('\n'),                      
       formData.skill || '',             
       candidatesArr.join('\n'),         
       interviewDate,                    
@@ -88,9 +90,8 @@ function addJob(formData) {
       if (fileUrlsText) convertToSmartChips(sheet, targetRow, 9, fileUrlsText);
       sheet.getRange(targetRow, 3).setNumberFormat('yyyy"年"m"月"d"日"');
       sheet.getRange(targetRow, 7).setNumberFormat('yyyy"年"m"月"d"日"');
-    } catch(ex) { console.warn("装飾処理でエラー: " + ex.message); }
+    } catch(ex) {}
 
-    // ★修正箇所：アップロードファイルの有無で完了メッセージを切り替え
     let resultMsg = `案件登録が完了しました: ${nextId}`;
     if (formData.uploadFiles && formData.uploadFiles.length > 0) {
       resultMsg += "\n（専用フォルダを作成・特定し、ファイルを保存しました）";
@@ -100,9 +101,6 @@ function addJob(formData) {
   } catch(e) { throw new Error("登録に失敗しました: " + e.message); }
 }
 
-/**
- * 案件詳細の取得
- */
 function getJobDetails(jobId) {
   try {
     const sheet = getMasterSheet('案件管理');
@@ -144,25 +142,47 @@ function getJobDetails(jobId) {
   } catch(e) { throw new Error(e.message); }
 }
 
-/**
- * 案件情報の更新
- */
 function updateJob(formData) {
   try {
     const sheet = getMasterSheet('案件管理');
     const row = Number(formData.row);
     if (!row || row < 2) throw new Error("無効な行番号です。");
 
-    const companyName = String(formData.company || "").trim();
+    const companiesArr = Array.isArray(formData.companies) ? formData.companies.map(c => String(c).trim()).filter(c => c) : [];
+    if (companiesArr.length > 0) {
+      const compSheet = ss.getSheetByName('事業者マスタ');
+      if (compSheet) {
+        const compData = compSheet.getDataRange().getValues();
+        let lastIdNum = 0;
+        for (let i = 1; i < compData.length; i++) {
+          let idVal = String(compData[i][0]);
+          let match = idVal.match(/\d+/);
+          if (match) {
+            let num = parseInt(match[0], 10);
+            if (num > lastIdNum) lastIdNum = num;
+          }
+        }
+        companiesArr.forEach(companyName => {
+          const exists = compData.some(row => String(row[1]).trim() === companyName);
+          if (!exists) {
+            lastIdNum++;
+            const nextCompId = "CO-" + lastIdNum.toString().padStart(4, '0');
+            compSheet.appendRow([nextCompId, companyName, "", "", "", "案件更新により自動追加"]);
+            compData.push([nextCompId, companyName]);
+          }
+        });
+      }
+    }
+
     const candidatesArr = Array.isArray(formData.candidates) ? formData.candidates : [];
     let fileUrlsArr = Array.isArray(formData.relatedFiles) ? formData.relatedFiles : [];
     
-    // 08_ドライブ連携.gs の共通処理を呼び出し
-    fileUrlsArr = handleDriveUploads(formData.id, companyName, fileUrlsArr, formData.uploadFiles);
+    const mainCompany = companiesArr.length > 0 ? companiesArr[0] : "";
+    fileUrlsArr = handleDriveUploads(formData.id, mainCompany, fileUrlsArr, formData.uploadFiles);
     const fileUrlsText = fileUrlsArr.join('\n');
     
     sheet.getRange(row, 2).setValue(formData.status || '未着手');
-    sheet.getRange(row, 4).setValue(companyName);
+    sheet.getRange(row, 4).setValue(companiesArr.join('\n'));
     sheet.getRange(row, 5).setValue(formData.skill || '');
     sheet.getRange(row, 6).setValue(candidatesArr.join('\n'));
     
@@ -178,7 +198,6 @@ function updateJob(formData) {
     try { convertToSmartChips(sheet, row, 9, fileUrlsText);
     } catch(ex) {}
     
-    // ★修正箇所：アップロードファイルの有無で完了メッセージを切り替え
     let resultMsg = "案件情報を更新しました。";
     if (formData.uploadFiles && formData.uploadFiles.length > 0) {
       resultMsg += "\n（専用フォルダを特定・作成し、ファイルを保存しました）";
@@ -188,9 +207,6 @@ function updateJob(formData) {
   } catch(e) { throw new Error(e.message); }
 }
 
-/**
- * 案件の削除
- */
 function deleteJobRow(jobId) {
   try {
     const sheet = getMasterSheet('案件管理');

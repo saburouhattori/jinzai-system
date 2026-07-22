@@ -1,5 +1,4 @@
 <script>
-// 関連ファイルの入力行に「検索ボタン」を追加
 function addJobFileRow(prefix, urlVal = '') {
   const containerId = prefix + '_file_list';
   const container = document.getElementById(containerId);
@@ -14,17 +13,33 @@ function addJobFileRow(prefix, urlVal = '') {
   container.insertAdjacentHTML('beforeend', html);
 }
 
-
-// --- 案件登録（新規） ---
 function addJobCandRow() {
   const listEl = document.getElementById('job_cand_list');
   if(listEl) listEl.insertAdjacentHTML('beforeend', createCandRowHTML('job-cand-id'));
 }
 
+function addJobCompanyRow(listId, val = '') {
+  const container = document.getElementById(listId);
+  if (!container) return;
+  
+  const placeholderText = isCompanyLoading ? "事業者辞書を取得中..." : "例：株式会社〇〇";
+  const disabledAttr = isCompanyLoading ? "disabled" : "";
+
+  const html = `<div style="position: relative; display: flex; gap: 10px; margin-bottom: 8px;">
+      <input type="text" class="job-company-input" placeholder="${placeholderText}" value="${val}" autocomplete="off" oninput="showCompanySuggest(this)" onfocus="showCompanySuggest(this)" style="flex: 1;" ${disabledAttr}>
+      <button type="button" class="btn-delete-small" onclick="if(this.parentElement.parentElement.children.length > 1) this.parentElement.remove()" style="height: 30px;">削除</button>
+    </div>`;
+  container.insertAdjacentHTML('beforeend', html);
+}
+
 async function submitJob() {
-  let companyEl = document.getElementById('job_company');
-  let company = companyEl ? companyEl.value.trim() : '';
-  if (!company) { showModal('事業者名を入力してください。'); return; }
+  let compInputs = document.querySelectorAll('#job_company_list .job-company-input');
+  let companies = [];
+  compInputs.forEach(input => {
+    let val = input.value.trim();
+    if(val) companies.push(val);
+  });
+  if (companies.length === 0) { showModal('事業者名を入力してください。'); return; }
   
   let candListEl = document.getElementById('job_cand_list');
   let candInputDivs = candListEl ? candListEl.children : []; 
@@ -51,7 +66,6 @@ async function submitJob() {
     if(val) relatedFiles.push(val);
   });
 
-  // --- ファイルアップロード処理の追加 ---
   let uploadFiles = [];
   let fileInputEl = document.getElementById('job_upload_files');
   if (fileInputEl && fileInputEl.files.length > 0) {
@@ -83,7 +97,7 @@ async function submitJob() {
   let memoEl = document.getElementById('job_memo');
 
   let formData = {
-    company: company,
+    companies: companies,
     status: statusEl ? statusEl.value : '未着手',
     skill: skillEl ? skillEl.value : '',
     candidates: candidates,
@@ -96,7 +110,6 @@ async function submitJob() {
   let btnEl = document.getElementById('jobBtn');
   if(btnEl) btnEl.disabled = true; 
   
-  // 【課題8修正】アップロードファイルの有無でローディングメッセージを適切に切り替え
   if (uploadFiles.length > 0) {
     showModal('案件を登録し、フォルダを作成中...', true);
   } else {
@@ -107,17 +120,20 @@ async function submitJob() {
     .withSuccessHandler(function(msg) {
       try {
         if(btnEl) btnEl.disabled = false; 
-        
         showModal(msg);
         
-        // フォームのクリア処理
         if(statusEl) statusEl.value = '未着手';
-        if(companyEl) companyEl.value = ''; 
         if(skillEl) skillEl.value = '';
         if(interviewDateEl) interviewDateEl.value = '';
         if(memoEl) memoEl.value = '';
         if(fileInputEl) fileInputEl.value = '';
         
+        let compListEl = document.getElementById('job_company_list');
+        if(compListEl) {
+          compListEl.innerHTML = '';
+          addJobCompanyRow('job_company_list');
+        }
+
         let fileListEl = document.getElementById('job_file_list');
         if(fileListEl) {
            fileListEl.innerHTML = ''; 
@@ -128,7 +144,6 @@ async function submitJob() {
         }
       } catch(frontendErr) {
         showModal('登録は完了しましたが、画面の初期化に失敗しました。画面を更新してください。');
-        console.error(frontendErr);
       }
     })
     .withFailureHandler(function(err) {
@@ -138,7 +153,6 @@ async function submitJob() {
     .addJob(formData);
 }
 
-// --- 案件情報の修正・削除 ---
 function searchJobData() {
   let searchIdEl = document.getElementById('edit_job_searchId');
   if(!searchIdEl) return;
@@ -161,10 +175,21 @@ function searchJobData() {
           setVal('edit_job_row', data.row);
           setVal('edit_job_id', data.id);
           setVal('edit_job_status', data.status || "未着手");
-          setVal('edit_job_company', data.company || "");
           setVal('edit_job_skill', data.skill || "");
           setVal('edit_job_interviewDate', data.interviewDate || "");
           setVal('edit_job_memo', data.memo || "");
+
+          let compContainer = document.getElementById('edit_job_company_list');
+          if(compContainer) {
+            compContainer.innerHTML = '';
+            if (data.company) {
+              let comps = data.company.split(/\r?\n/);
+              comps.forEach(c => {
+                if(c.trim()) addJobCompanyRow('edit_job_company_list', c.trim());
+              });
+            }
+            if(compContainer.innerHTML === '') addJobCompanyRow('edit_job_company_list');
+          }
 
           let candContainer = document.getElementById('edit_job_cand_list');
           if(candContainer) {
@@ -193,7 +218,6 @@ function searchJobData() {
             if(fileContainer.innerHTML === '') addJobFileRow('edit_job');
           }
           
-          // ファイルアップロードの初期化
           let fileInputEl = document.getElementById('edit_job_upload_files');
           if(fileInputEl) fileInputEl.value = '';
 
@@ -227,8 +251,13 @@ async function submitJobEdit() {
   if (!rowEl || !rowEl.value) return;
   let row = rowEl.value;
 
-  let companyEl = document.getElementById('edit_job_company');
-  let company = companyEl ? companyEl.value.trim() : '';
+  let compInputs = document.querySelectorAll('#edit_job_company_list .job-company-input');
+  let companies = [];
+  compInputs.forEach(input => {
+    let val = input.value.trim();
+    if(val) companies.push(val);
+  });
+  if (companies.length === 0) { showModal('事業者名を入力してください。'); return; }
   
   let candListEl = document.getElementById('edit_job_cand_list');
   let candInputDivs = candListEl ? candListEl.children : []; 
@@ -255,7 +284,6 @@ async function submitJobEdit() {
     if(val) relatedFiles.push(val);
   });
 
-  // --- ファイルアップロード処理の追加 ---
   let uploadFiles = [];
   let fileInputEl = document.getElementById('edit_job_upload_files');
   if (fileInputEl && fileInputEl.files.length > 0) {
@@ -287,7 +315,7 @@ async function submitJobEdit() {
     row: row,
     id: getVal('edit_job_id'),
     status: getVal('edit_job_status'),
-    company: company,
+    companies: companies,
     skill: getVal('edit_job_skill'),
     candidates: candidates,
     interviewDate: getVal('edit_job_interviewDate'),
@@ -299,7 +327,6 @@ async function submitJobEdit() {
   let btnEl = document.getElementById('jobEditBtn');
   if(btnEl) btnEl.disabled = true;
 
-  // 【課題8修正】更新時もアップロードファイルの有無でメッセージを切り替え
   if (uploadFiles.length > 0) {
     showModal('更新し、ファイルを保存中...', true);
   } else {
@@ -324,7 +351,7 @@ function submitJobDelete() {
   if (!idEl || !idEl.value) return;
   let jobId = idEl.value;
 
-  if (!confirm(`案件 ${jobId} を完全に削除します。よろしいですか？\n※この操作は取り消せません。`)) {
+  if (!confirm(`案件 ${jobId} を削除します。よろしいですか？\n※この操作は取り消せません。`)) {
     return;
   }
 
@@ -347,6 +374,7 @@ window.addEventListener('DOMContentLoaded', () => {
   if (MODE === 'JOB') {
     addJobCandRow();
     addJobFileRow('job');
+    addJobCompanyRow('job_company_list');
   }
 });
 </script>

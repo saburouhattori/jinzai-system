@@ -42,14 +42,13 @@ function getJobDict() {
   return dict;
 }
 
-// 選択したIDでの簡易リスト生成機能
 function generateSimpleList(candIds) {
   try {
     const masterSheet = getMasterSheet('登録者マスタ');
     const masterData = masterSheet.getDataRange().getValues();
     const col = getMasterColumnMap(masterSheet);
     const listSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('簡易リスト');
-    // シートの初期化 (2行目以降のB~L列をクリア)
+    
     const lastRowList = listSheet.getLastRow();
     if (lastRowList >= 2) {
       listSheet.getRange(2, 2, lastRowList, 11).clearContent();
@@ -80,7 +79,6 @@ function generateSimpleList(candIds) {
           getVal('その他の日本語能力試験'),
           id
         ]);
-        // 写真表示用のVLOOKUP関数を生成 (L列のIDを参照)
         formulas.push(['=IFERROR(VLOOKUP(L' + (result.length + 1) + ', \'登録者マスタ\'!$A:$C, 3, FALSE), "")']);
       }
     });
@@ -94,7 +92,7 @@ function generateSimpleList(candIds) {
   }
 }
 
-// ====== マスタ連携・リスト同期処理 (列非依存・動的マッピング版) ======
+// ====== マスタ連携・リスト同期処理 ======
 
 function syncListSheets() {
   updateCandidateLists(true);
@@ -103,7 +101,7 @@ function syncListSheets() {
 
 function normalize_(str) {
   if (str === null || str === undefined) return '';
-  return String(str).replace(/[\s　\n\r]+/g, '').toLowerCase();
+  return String(str).replace(/[\s \n\r]+/g, '').toLowerCase();
 }
 
 function buildRowByHeaders_(headers, dataMap) {
@@ -134,12 +132,54 @@ function updateCandidateLists(silent = false) {
     return jobMap;
   });
   
-  const hiredData = [], unhiredData = [];
-
   if (masterHeaders.findIndex(h => normalize_(h) === normalize_('登録者ID')) === -1) {
     throw new Error('登録者マスタに「登録者ID」列が見つかりません。');
   }
 
+  // 案件管理のデータを基準に、採用された候補者の情報をマップ化する
+  const hiredCandidatesMap = new Map();
+
+  for (const job of jobList) {
+    const jobId = job[normalize_('案件ID')] || '';
+    const skillField = job[normalize_('技能分野')] || '';
+    const hiredText = String(job[normalize_('採用者名')] || '');
+
+    if (!hiredText || hiredText.includes("採用者なし")) continue;
+
+    // 代表企業名の取得（企業が個別に指定されていない場合のフォールバック用）
+    const compText = String(job[normalize_('事業者名')] || '');
+    const defaultCompany = compText.split(/\r?\n/)[0].trim();
+
+    const hiredLines = hiredText.split(/\r?\n/).filter(line => line.trim() !== "");
+    for (const line of hiredLines) {
+      // SD-0001-名前（企業名） の形式をパース
+      const match = line.match(/^(SD-\d+)-(.*?)(?:[（\(](.*?)[）\)])?$/);
+      let candId = "";
+      let assignedCompany = defaultCompany;
+
+      if (match) {
+        candId = match[1].trim();
+        if (match[3]) {
+          assignedCompany = match[3].trim();
+        }
+      } else if (line.trim().startsWith("SD-")) {
+        candId = line.trim().split('-').slice(0, 2).join('-').trim();
+      }
+
+      if (candId) {
+        hiredCandidatesMap.set(candId, {
+          jobId: jobId,
+          skillField: skillField,
+          company: assignedCompany
+        });
+      }
+    }
+  }
+
+  const hiredData = [];
+  const unhiredData = [];
+
+  // マスタデータをループし、採用者マップを基準に振り分ける
   for (let i = 0; i < masterData.length; i++) {
     const row = masterData[i];
     const dataMap = {};
@@ -150,9 +190,6 @@ function updateCandidateLists(silent = false) {
     }
 
     const candidateId = dataMap[normalize_('登録者ID')];
-    const status = dataMap[normalize_('ステータス')];
-    const companyName = dataMap[normalize_('採用事業者')];
-
     if (!candidateId) continue;
 
     const jlpt = dataMap[normalize_('特定技能要件＞JLPTレベル')];
@@ -175,34 +212,27 @@ function updateCandidateLists(silent = false) {
 
     dataMap[normalize_('JLPT')] = jlpt;
     dataMap[normalize_('JFT Basic')] = jft;
-    dataMap[normalize_('採用事業者名')] = companyName; 
     dataMap[normalize_('在留資格交付申請の有無')] = dataMap[normalize_('在留資格交付申請の回数')];
-    
-    if (status === '採用' || status === '内定') {
-      let jobId = '', skillField = '';
-      if (companyName) {
-        const matchedJob = jobList.find(job => {
-          const jComp = job[normalize_('事業者名')];
-          const jCands = String(job[normalize_('候補者名')] || '');
-          const jHired = String(job[normalize_('採用者名')] || '');
-          return jComp === companyName && (jCands.includes(candidateId) || jHired.includes(candidateId));
-        });
-        if (matchedJob) {
-          jobId = matchedJob[normalize_('案件ID')] || '';
-          skillField = matchedJob[normalize_('技能分野')] || '';
-        }
-      }
-      dataMap[normalize_('案件ID')] = jobId;
-      dataMap[normalize_('技能分野')] = skillField;
+
+    // 案件管理の採用実績を判定基準にする
+    if (hiredCandidatesMap.has(candidateId)) {
+      const hireInfo = hiredCandidatesMap.get(candidateId);
+      dataMap[normalize_('案件ID')] = hireInfo.jobId;
+      dataMap[normalize_('技能分野')] = hireInfo.skillField;
+      dataMap[normalize_('採用事業者名')] = hireInfo.company;
+      dataMap[normalize_('採用事業者')] = hireInfo.company; 
+
       hiredData.push(buildRowByHeaders_(hiredHeaders, dataMap));
-    } else if (status === '未採用') {
-      // ★変更箇所：ステータスが「未採用」の候補者のみを対象にする
-      unhiredData.push(buildRowByHeaders_(unhiredHeaders, dataMap));
+    } else {
+      const status = dataMap[normalize_('ステータス')];
+      // 案件に紐付いておらず、マスタステータスが未採用のものを抽出
+      if (status === '未採用') {
+        unhiredData.push(buildRowByHeaders_(unhiredHeaders, dataMap));
+      }
     }
   }
-    ///JoJo!貴様、見ているな！///
 
-  // シートへの書き込み処理
+  // シート書き込み
   if (hiredData.length > 0) {
     const lastRow = hiredSheet.getLastRow();
     if (lastRow > 1) hiredSheet.getRange(2, 1, lastRow - 1, hiredHeaders.length).clearContent();

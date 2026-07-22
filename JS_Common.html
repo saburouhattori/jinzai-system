@@ -2,58 +2,50 @@
 let candidateDict = {};
 let jobDict = {};
 let currentFileInput = null; 
-
 let companyListArray = [];
+let isCompanyLoading = false; // 辞書の取得状態を管理するフラグ
 
-// ★修正: 独自のサジェストシステム用のデータ取得関数
 function loadCompanyList() {
-  let jobCompInput = document.getElementById('job_company');
-  let editCompInput = document.getElementById('edit_job_company');
-
-  if (jobCompInput) {
-    jobCompInput.disabled = true;
-    jobCompInput.placeholder = "事業者辞書を取得中...";
-  }
-  if (editCompInput) {
-    editCompInput.disabled = true;
-    editCompInput.placeholder = "取得中...";
-  }
+  isCompanyLoading = true;
+  let inputs = document.querySelectorAll('.job-company-input');
+  inputs.forEach(input => {
+    input.disabled = true;
+    input.placeholder = "事業者辞書を取得中...";
+  });
   
   google.script.run
     .withSuccessHandler(function(companies) {
       companyListArray = companies;
-      
-      if (jobCompInput) {
-        jobCompInput.disabled = false;
-        jobCompInput.placeholder = "例：株式会社〇〇（新規も可）";
-      }
-      if (editCompInput) {
-        editCompInput.disabled = false;
-        editCompInput.placeholder = "";
-      }
+      isCompanyLoading = false;
+      let currentInputs = document.querySelectorAll('.job-company-input');
+      currentInputs.forEach(input => {
+        input.disabled = false;
+        input.placeholder = "例：株式会社〇〇";
+      });
     })
     .withFailureHandler(function(err) {
       console.error("事業者リスト取得エラー: " + err.message);
-      if (jobCompInput) {
-        jobCompInput.disabled = false;
-        jobCompInput.placeholder = "例：株式会社〇〇（新規も可）";
-      }
-      if (editCompInput) {
-        editCompInput.disabled = false;
-        editCompInput.placeholder = "";
-      }
+      isCompanyLoading = false;
+      let currentInputs = document.querySelectorAll('.job-company-input');
+      currentInputs.forEach(input => {
+        input.disabled = false;
+        input.placeholder = "例：株式会社〇〇";
+      });
     })
     .getCompanyList();
 }
 
-// 入力内容に応じて独自のサジェストボックスを表示する関数
-function showCompanySuggest(inputId, suggestId) {
-  const inputEl = document.getElementById(inputId);
-  const suggestEl = document.getElementById(suggestId);
-  if (!inputEl || !suggestEl) return;
-
+function showCompanySuggest(inputEl) {
+  if (!inputEl) return;
   const val = inputEl.value.trim().toLowerCase();
   
+  let suggestEl = inputEl.parentNode.querySelector('.suggest-box');
+  if (!suggestEl) {
+    suggestEl = document.createElement('div');
+    suggestEl.className = 'suggest-box';
+    inputEl.parentNode.appendChild(suggestEl);
+  }
+
   const filtered = companyListArray.filter(comp => comp.toLowerCase().includes(val));
   
   if (filtered.length === 0) {
@@ -64,30 +56,25 @@ function showCompanySuggest(inputId, suggestId) {
   let html = '';
   filtered.forEach(comp => {
     const safeComp = comp.replace(/'/g, "\\'").replace(/"/g, "&quot;");
-    html += `<div class="suggest-item" onclick="selectCompany('${inputId}', '${suggestId}', '${safeComp}')">${comp}</div>`;
+    html += `<div class="suggest-item" onclick="selectCompany(this, '${safeComp}')">${comp}</div>`;
   });
   
   suggestEl.innerHTML = html;
   suggestEl.style.display = 'block';
 }
 
-// サジェストをクリックして選択した時の処理
-function selectCompany(inputId, suggestId, val) {
-  const inputEl = document.getElementById(inputId);
-  const suggestEl = document.getElementById(suggestId);
-  if (inputEl) {
-    inputEl.value = val;
-  }
-  if (suggestEl) suggestEl.style.display = 'none';
+function selectCompany(itemEl, val) {
+  const suggestEl = itemEl.parentElement;
+  const inputEl = suggestEl.parentElement.querySelector('input[type="text"]');
+  if (inputEl) inputEl.value = val;
+  suggestEl.style.display = 'none';
 }
 
-// 画面のどこか関係ない場所をクリックしたらサジェストを閉じる
 document.addEventListener('click', function(e) {
   if (!e.target.closest('.field')) {
     document.querySelectorAll('.suggest-box').forEach(el => el.style.display = 'none');
   }
 });
-
 
 window.addEventListener('DOMContentLoaded', () => {
   google.script.run.withSuccessHandler(function(dict) { candidateDict = dict; }).getCandidateDict();

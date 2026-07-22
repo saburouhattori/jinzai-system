@@ -9,10 +9,11 @@
   </select>
 </div>
 
-<div class="field" style="position: relative;">
+<div class="field">
   <label>事業者名（特定技能所属機関名を入力してください）</label>
-  <input type="text" id="job_company" placeholder="例：株式会社〇〇（新規も可）" autocomplete="off" oninput="showCompanySuggest('job_company', 'job_company_suggest')" onfocus="showCompanySuggest('job_company', 'job_company_suggest')">
-  <div id="job_company_suggest" class="suggest-box"></div>
+  <div id="job_company_list">
+  </div>
+  <button class="btn-secondary" onclick="addJobCompanyRow('job_company_list')" style="margin-top:5px; font-size:11px; padding: 6px; width: auto;">+ 事業者名を追加</button>
 </div>
 
 <div class="field">
@@ -88,10 +89,11 @@
         </select>
       </div>
       
-      <div class="field flex-2" style="position: relative;">
+      <div class="field flex-2">
         <label>事業者名</label>
-        <input type="text" id="edit_job_company" placeholder="事業者名を入力" autocomplete="off" oninput="showCompanySuggest('edit_job_company', 'edit_job_company_suggest')" onfocus="showCompanySuggest('edit_job_company', 'edit_job_company_suggest')">
-        <div id="edit_job_company_suggest" class="suggest-box"></div>
+        <div id="edit_job_company_list">
+        </div>
+        <button class="btn-secondary" onclick="addJobCompanyRow('edit_job_company_list')" style="margin-top:5px; font-size:11px; padding: 6px; width: auto;">+ 事業者名を追加</button>
       </div>
     </div>
 

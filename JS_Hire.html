@@ -25,20 +25,36 @@ function fetchJobCandidates(mode) {
   showModal('候補者を取得中...', true);
   
   google.script.run
-    .withSuccessHandler(function(candidates) {
+    .withSuccessHandler(function(data) {
       closeModal(); 
       let container = document.getElementById(mode + '_cand_list');
       if(!container) return;
+      
+      let candidates = data.candidates;
+      let companies = data.companies;
+
       if (!candidates || candidates.length === 0) { 
         container.innerHTML = '<div style="color:#d93025; font-size:12px;">候補者が見つかりません。案件IDを確認してください。</div>'; 
         return; 
       }
       let html = '';
       candidates.forEach(c => {
-        html += `<label style="display:flex; align-items:center; margin-bottom:8px; font-size:14px; cursor:pointer;">
-                   <input type="checkbox" class="${mode}-cand-checkbox" value="${c.id}" style="margin:0 8px 0 0; width:16px; height:16px; flex-shrink:0;">
-                   <span style="line-height:1.2;">${c.display}</span>
-                 </label>`;
+        let companySelect = '';
+        if (companies.length > 0) {
+          companySelect = `<select class="hire-company-select" style="margin-left: 10px; width: 150px; font-size: 12px; padding: 4px;">`;
+          companies.forEach(comp => {
+            companySelect += `<option value="${comp}">${comp}</option>`;
+          });
+          companySelect += `</select>`;
+        }
+
+        html += `<div style="display:flex; align-items:center; margin-bottom:8px; font-size:14px;">
+                   <label style="display:flex; align-items:center; cursor:pointer; flex: 1;">
+                     <input type="checkbox" class="${mode}-cand-checkbox" value="${c.id}" style="margin:0 8px 0 0; width:16px; height:16px; flex-shrink:0;">
+                     <span style="line-height:1.2;">${c.display}</span>
+                   </label>
+                   ${companySelect}
+                 </div>`;
       });
       container.innerHTML = html;
 
@@ -65,15 +81,20 @@ function submitHire() {
   if (checkboxes.length === 0) { showModal('先に「候補者検索」を行ってください。'); return; }
   
   let isNone = document.getElementById('hire_none') && document.getElementById('hire_none').checked;
-  let hiredIds = []; 
+  let hiredData = []; 
 
   if (!isNone) {
-    checkboxes.forEach(cb => { if (cb.checked) hiredIds.push(cb.value); });
-    if (hiredIds.length === 0) { 
+    checkboxes.forEach(cb => { 
+      if (cb.checked) {
+        let selectEl = cb.closest('div').querySelector('.hire-company-select');
+        hiredData.push({ id: cb.value, company: selectEl ? selectEl.value : '' });
+      }
+    });
+    if (hiredData.length === 0) { 
       showModal('採用者がいる場合は候補者を選択してください。いない場合は「採用者なし」にチェックを入れてください。'); 
       return; 
     }
-    if (!confirm(`選択した ${hiredIds.length} 名を「採用」として結果を登録します。よろしいですか？`)) return;
+    if (!confirm(`選択した ${hiredData.length} 名を「採用」として結果を登録します。よろしいですか？`)) return;
   } else {
     if (!confirm(`「採用者なし」として面接結果を登録します。よろしいですか？\n（候補者全員の履歴に不採用として記録されます）`)) return;
   }
@@ -105,6 +126,6 @@ function submitHire() {
       if(btnEl) btnEl.disabled = false; 
       showModal('登録エラー: ' + err.message);
     })
-    .registerHire(jobId, hiredIds);
+    .registerHire(jobId, hiredData);
 }
 </script>
