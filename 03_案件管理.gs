@@ -144,6 +144,7 @@ function getJobDetails(jobId) {
 
 function updateJob(formData) {
   try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet(); // 不足していた変数を追加
     const sheet = getMasterSheet('案件管理');
     const row = Number(formData.row);
     if (!row || row < 2) throw new Error("無効な行番号です。");

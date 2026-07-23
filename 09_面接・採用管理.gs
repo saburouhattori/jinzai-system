@@ -52,7 +52,7 @@ function registerHire(jobId, hiredData) {
     }
 
     const companyNames = companyNamesText.split(/\r?\n/).filter(c => c.trim());
-    const defaultCompany = companyNames[0] || ""; // 不採用時の履歴には代表企業名を記載
+    const defaultCompany = companyNames[0] || "";
 
     const candDict = getCandidateDict();
     const allCandidateIds = allCandidatesRaw.split(/\r?\n/).map(line => line.split('-').slice(0, 2).join('-').trim()).filter(id => id !== "");
@@ -73,7 +73,7 @@ function registerHire(jobId, hiredData) {
           const rowIdx = j + 1;
           if (isHired) {
             if (mCol['ステータス']) mSheet.getRange(rowIdx, mCol['ステータス']).setValue('採用');
-            if (mCol['採用事業者']) mSheet.getRange(rowIdx, mCol['採用事業者']).setValue(hiredComp); // 個別企業をセット
+            if (mCol['採用事業者']) mSheet.getRange(rowIdx, mCol['採用事業者']).setValue(hiredComp);
           }
           if (mCol['面接履歴']) {
             const historyCell = mSheet.getRange(rowIdx, mCol['面接履歴']);
@@ -87,10 +87,28 @@ function registerHire(jobId, hiredData) {
 
     let hiredNamesText = "採用者なし";
     if (hiredData.length > 0) {
-      hiredNamesText = hiredData.map(item => {
-         const name = candDict[item.id] || "";
-         return name ? `${item.id}-${name}（${item.company}）` : `${item.id}（${item.company}）`;
-      }).join('\n');
+      if (companyNames.length <= 1) {
+        // 事業者が1社のみの場合は、名前だけを並べる
+        hiredNamesText = hiredData.map(item => {
+           const name = candDict[item.id] || "";
+           return name ? `${item.id}-${name}` : `${item.id}`;
+        }).join('\n');
+      } else {
+        // 事業者が複数社の場合は、企業ごとに見出しをつけてグループ化する
+        const grouped = {};
+        hiredData.forEach(item => {
+          if (!grouped[item.company]) grouped[item.company] = [];
+          const name = candDict[item.id] || "";
+          grouped[item.company].push(name ? `${item.id}-${name}` : `${item.id}`);
+        });
+        
+        let lines = [];
+        for (const [comp, cands] of Object.entries(grouped)) {
+          lines.push(`【${comp}】`);
+          lines.push(...cands);
+        }
+        hiredNamesText = lines.join('\n');
+      }
     }
 
     sheet.getRange(targetJobRow, 8).setValue(hiredNamesText);

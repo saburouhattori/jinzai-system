@@ -74,24 +74,25 @@ function syncToPaymentManagement() {
       }
       
       const hiredList = hiredText.split(/\r?\n/).filter(line => line.trim() !== "");
+      let currentCompany = defaultCompany;
+
       for (const line of hiredList) {
+        if (line.startsWith('【') && line.endsWith('】')) {
+          currentCompany = line.slice(1, -1).trim();
+          continue;
+        }
+
         let candidateID = "";
         let candidateName = "";
-        let assignedCompany = defaultCompany;
         
-        // 例: SD-0001-名前（A社）
-        const match = line.match(/^(SD-\d+)-(.*?)(?:[（\(](.*?)[）\)])?$/);
-        if (match) {
-          candidateID = match[1].trim();
-          candidateName = match[2].trim();
-          if (match[3]) assignedCompany = match[3].trim();
+        if (line.trim() === "採用者なし") {
+          candidateID = "採用者なし";
+          candidateName = "採用者なし";
         } else {
-          const rawId = line.trim();
-          if (rawId.startsWith("SD-")) {
-            candidateID = rawId;
-          } else if (rawId === "採用者なし") {
-            candidateID = "採用者なし";
-            candidateName = "採用者なし";
+          const match = line.match(/^(SD-\d+)(?:-(.*))?$/);
+          if (match) {
+            candidateID = match[1].trim();
+            candidateName = match[2] ? match[2].trim() : "";
           } else {
             continue; 
           }
@@ -101,7 +102,7 @@ function syncToPaymentManagement() {
            syncRecords.push({
              jobID: jobID,
              candidateID: candidateID,
-             companyName: assignedCompany,
+             companyName: currentCompany,
              fieldName: fieldName,
              candidateName: candidateName,
              interviewDate: interviewDate

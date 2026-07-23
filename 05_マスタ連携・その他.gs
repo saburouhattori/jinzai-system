@@ -136,7 +136,6 @@ function updateCandidateLists(silent = false) {
     throw new Error('登録者マスタに「登録者ID」列が見つかりません。');
   }
 
-  // 案件管理のデータを基準に、採用された候補者の情報をマップ化する
   const hiredCandidatesMap = new Map();
 
   for (const job of jobList) {
@@ -146,31 +145,23 @@ function updateCandidateLists(silent = false) {
 
     if (!hiredText || hiredText.includes("採用者なし")) continue;
 
-    // 代表企業名の取得（企業が個別に指定されていない場合のフォールバック用）
     const compText = String(job[normalize_('事業者名')] || '');
     const defaultCompany = compText.split(/\r?\n/)[0].trim();
+    let currentCompany = defaultCompany;
 
     const hiredLines = hiredText.split(/\r?\n/).filter(line => line.trim() !== "");
     for (const line of hiredLines) {
-      // SD-0001-名前（企業名） の形式をパース
-      const match = line.match(/^(SD-\d+)-(.*?)(?:[（\(](.*?)[）\)])?$/);
-      let candId = "";
-      let assignedCompany = defaultCompany;
-
-      if (match) {
-        candId = match[1].trim();
-        if (match[3]) {
-          assignedCompany = match[3].trim();
-        }
-      } else if (line.trim().startsWith("SD-")) {
-        candId = line.trim().split('-').slice(0, 2).join('-').trim();
+      if (line.startsWith('【') && line.endsWith('】')) {
+        currentCompany = line.slice(1, -1).trim();
+        continue;
       }
 
-      if (candId) {
-        hiredCandidatesMap.set(candId, {
+      const match = line.match(/^(SD-\d+)/);
+      if (match) {
+        hiredCandidatesMap.set(match[1], {
           jobId: jobId,
           skillField: skillField,
-          company: assignedCompany
+          company: currentCompany
         });
       }
     }
@@ -179,7 +170,6 @@ function updateCandidateLists(silent = false) {
   const hiredData = [];
   const unhiredData = [];
 
-  // マスタデータをループし、採用者マップを基準に振り分ける
   for (let i = 0; i < masterData.length; i++) {
     const row = masterData[i];
     const dataMap = {};
@@ -214,7 +204,6 @@ function updateCandidateLists(silent = false) {
     dataMap[normalize_('JFT Basic')] = jft;
     dataMap[normalize_('在留資格交付申請の有無')] = dataMap[normalize_('在留資格交付申請の回数')];
 
-    // 案件管理の採用実績を判定基準にする
     if (hiredCandidatesMap.has(candidateId)) {
       const hireInfo = hiredCandidatesMap.get(candidateId);
       dataMap[normalize_('案件ID')] = hireInfo.jobId;
@@ -225,14 +214,12 @@ function updateCandidateLists(silent = false) {
       hiredData.push(buildRowByHeaders_(hiredHeaders, dataMap));
     } else {
       const status = dataMap[normalize_('ステータス')];
-      // 案件に紐付いておらず、マスタステータスが未採用のものを抽出
       if (status === '未採用') {
         unhiredData.push(buildRowByHeaders_(unhiredHeaders, dataMap));
       }
     }
   }
 
-  // シート書き込み
   if (hiredData.length > 0) {
     const lastRow = hiredSheet.getLastRow();
     if (lastRow > 1) hiredSheet.getRange(2, 1, lastRow - 1, hiredHeaders.length).clearContent();
