@@ -3,7 +3,7 @@ let candidateDict = {};
 let jobDict = {};
 let currentFileInput = null; 
 let companyListArray = [];
-let isCompanyLoading = false; // 辞書の取得状態を管理するフラグ
+let isCompanyLoading = false; 
 
 function loadCompanyList() {
   isCompanyLoading = true;
@@ -183,7 +183,8 @@ function showModal(msg, keepOpen) {
 function closeModal() { document.getElementById('overlay').style.display = 'none'; }
 
 function createCandRowHTML(className, val = '', nameVal = '') {
-  return `<div style="display: flex; gap: 10px; align-items: center; margin-bottom: 8px;">
+  // ★ クラスに cand-row-item を付与することで自動的に番号がつきます
+  return `<div class="cand-row-item" style="display: flex; gap: 10px; align-items: center; margin-bottom: 8px;">
     <input type="text" class="${className}" placeholder="例: 1" value="${val}" oninput="checkCandId(this)" onblur="applyFormat(this)" style="width: 100px; flex-shrink: 0; padding: 6px; box-sizing: border-box; height: 30px; margin: 0;">
     <span class="cand-name-display" style="flex: 1;">${nameVal}</span>
     <button type="button" class="btn-delete-small" onclick="this.parentElement.remove()">削除</button>
