@@ -68,8 +68,10 @@ function submitAddInfo() {
   
   showModal('保存中...', true);
   google.script.run.withSuccessHandler(function(msg) { 
-    showModal(msg); 
-    // ★バックグラウンドでリスト同期を実行
+    showModal(msg + "\n\n※自動的に画面を閉じます...", true);
+    setTimeout(function() {
+      google.script.host.close();
+    }, 2000);
     google.script.run.syncListSheets();
   }).updateAddInfoRow(formData);
 }
@@ -103,7 +105,12 @@ function sendData(formData) {
 }
 
 function onSuccess(msg) {
-  document.getElementById('mainBtn').disabled = false; showModal(msg);
+  document.getElementById('mainBtn').disabled = false; 
+  showModal(msg + "\n\n※自動的に画面を閉じます...", true);
+  setTimeout(function() {
+    google.script.host.close();
+  }, 2000);
+
   if (MODE === 'NEW') {
     let inputs = document.querySelectorAll('input[type="text"], input[type="date"], input[type="number"], input[type="email"], textarea');
     inputs.forEach(input => input.value = '');
@@ -111,7 +118,6 @@ function onSuccess(msg) {
     let fileInput = document.getElementById('imageFile'); if (fileInput) fileInput.value = '';
     document.getElementById('relativeDetail').style.display = 'none';
   }
-  // ★バックグラウンドでリスト同期を実行
   google.script.run.syncListSheets();
 }
 
@@ -122,10 +128,12 @@ function submitDelete() {
   if (!confirm(adminId + " のデータを完全に削除します。よろしいですか？")) return;
   showModal('削除中...', true);
   google.script.run.withSuccessHandler(function(msg) {
-    showModal(msg); 
+    showModal(msg + "\n\n※自動的に画面を閉じます...", true);
+    setTimeout(function() {
+      google.script.host.close();
+    }, 2000);
     document.getElementById('delete_id').value = ''; 
     document.getElementById('deleteNameDisplay').innerText = '';
-    // ★バックグラウンドでリスト同期を実行
     google.script.run.syncListSheets();
   }).deleteCandidate(adminId);
 }

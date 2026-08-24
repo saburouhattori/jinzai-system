@@ -12,7 +12,10 @@ function submitCompany() {
     .withSuccessHandler(function(msg) {
       try {
         document.getElementById('compBtn').disabled = false; 
-        showModal(msg);
+        showModal(msg + "\n\n※自動的に画面を閉じます...", true);
+        setTimeout(function() {
+          google.script.host.close();
+        }, 2000);
         document.querySelectorAll('#form-company input, #form-company textarea').forEach(el => el.value = '');
         let warningEl = document.getElementById('comp_warning');
         if(warningEl) warningEl.style.display = 'none';

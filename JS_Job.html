@@ -120,7 +120,11 @@ async function submitJob() {
     .withSuccessHandler(function(msg) {
       try {
         if(btnEl) btnEl.disabled = false; 
-        showModal(msg);
+        
+        showModal(msg + "\n\n※自動的に画面を閉じます...", true);
+        setTimeout(function() {
+          google.script.host.close();
+        }, 2000);
         
         if(statusEl) statusEl.value = '未着手';
         if(skillEl) skillEl.value = '';
@@ -139,11 +143,12 @@ async function submitJob() {
            fileListEl.innerHTML = ''; 
            addJobFileRow('job');
         }
+        let candListEl = document.getElementById('job_cand_list');
         if(candListEl) {
            candListEl.innerHTML = createCandRowHTML('job-cand-id');
         }
       } catch(frontendErr) {
-        showModal('登録は完了しましたが、画面の初期化に失敗しました。画面を更新してください。');
+        showModal('登録は完了しましたが、画面の初期化に失敗しました。画面を閉じてください。');
       }
     })
     .withFailureHandler(function(err) {
@@ -336,7 +341,10 @@ async function submitJobEdit() {
   google.script.run
     .withSuccessHandler(function(msg) {
       if(btnEl) btnEl.disabled = false;
-      showModal(msg);
+      showModal(msg + "\n\n※自動的に画面を閉じます...", true);
+      setTimeout(function() {
+        google.script.host.close();
+      }, 2000);
       if(fileInputEl) fileInputEl.value = '';
     })
     .withFailureHandler(function(err) {
@@ -358,11 +366,10 @@ function submitJobDelete() {
   showModal('削除中...', true);
   google.script.run
     .withSuccessHandler(function(msg) {
-      showModal(msg);
-      let fieldsEl = document.getElementById('job_edit_fields');
-      let searchEl = document.getElementById('edit_job_searchId');
-      if(fieldsEl) fieldsEl.style.display = 'none';
-      if(searchEl) searchEl.value = '';
+      showModal(msg + "\n\n※自動的に画面を閉じます...", true);
+      setTimeout(function() {
+        google.script.host.close();
+      }, 2000);
     })
     .withFailureHandler(function(err) {
       showModal('削除エラー: ' + err.message);
