@@ -52,7 +52,9 @@ function registerHire(jobId, hiredData) {
     }
 
     const companyNames = companyNamesText.split(/\r?\n/).filter(c => c.trim());
-    const defaultCompany = companyNames[0] || "";
+    
+    // 不採用時の履歴用に、すべての企業名を「・」で結合する
+    const defaultCompany = companyNames.join('・') || "";
 
     const candDict = getCandidateDict();
     const allCandidateIds = allCandidatesRaw.split(/\r?\n/).map(line => line.split('-').slice(0, 2).join('-').trim()).filter(id => id !== "");
@@ -64,6 +66,7 @@ function registerHire(jobId, hiredData) {
     
     allCandidateIds.forEach(candId => {
       const isHired = hiredIdMap.has(candId);
+      // 採用時は選択した企業、不採用時は全企業を連結した文字列を使用
       const hiredComp = isHired ? hiredIdMap.get(candId) : defaultCompany;
       const resultText = isHired ? `（採用）` : "（不採用）";
       const newHistoryLine = `${formattedDate}：${hiredComp}${resultText}`;
