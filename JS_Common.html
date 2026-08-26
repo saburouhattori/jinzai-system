@@ -4,6 +4,8 @@ let jobDict = {};
 let currentFileInput = null; 
 let companyListArray = [];
 let isCompanyLoading = false; 
+let isCandidateDictLoading = false;
+let isJobDictLoading = false;
 
 function loadCompanyList() {
   isCompanyLoading = true;
@@ -77,7 +79,20 @@ document.addEventListener('click', function(e) {
 });
 
 window.addEventListener('DOMContentLoaded', () => {
-  google.script.run.withSuccessHandler(function(dict) { candidateDict = dict; }).getCandidateDict();
+  // 候補者辞書の取得
+  isCandidateDictLoading = true;
+  google.script.run.withSuccessHandler(function(dict) { 
+    candidateDict = dict; 
+    isCandidateDictLoading = false;
+    // ロード完了後に入力欄を再チェック
+    document.querySelectorAll('input[oninput*="checkCandId"]').forEach(inputEl => {
+      if (inputEl.value.trim() !== '') {
+        let displayIdMatch = inputEl.getAttribute('oninput').match(/'([^']+)'/);
+        let displayId = displayIdMatch ? displayIdMatch[1] : null;
+        checkCandId(inputEl, displayId);
+      }
+    });
+  }).getCandidateDict();
 
   if (MODE === 'NEW' || MODE === 'EDIT') {
     google.script.run.withSuccessHandler(function(schools) {
@@ -98,7 +113,15 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   if (MODE === 'HIRE') {
-    google.script.run.withSuccessHandler(function(dict) { jobDict = dict; }).getJobDict();
+    // 案件辞書の取得
+    isJobDictLoading = true;
+    google.script.run.withSuccessHandler(function(dict) { 
+      jobDict = dict; 
+      isJobDictLoading = false;
+      // ロード完了後に入力欄を再チェック
+      let inputEl = document.getElementById('hire_job_id');
+      if (inputEl && inputEl.value.trim() !== '') checkJobId(inputEl, 'hireJobDisplay');
+    }).getJobDict();
   }
 });
 
@@ -140,12 +163,20 @@ function selectDriveFile(url, name) {
 
 function formatId(rawId) { let numStr = rawId.replace(/[^0-9]/g, ''); return numStr.length > 0 ? "SD-" + numStr.padStart(4, '0') : rawId; }
 function applyFormat(inputElem) { if (inputElem.value.trim() !== '') inputElem.value = formatId(inputElem.value); }
+
 function checkCandId(inputElem, displayId) {
   let rawVal = inputElem.value.trim();
   let displayElem = displayId ? document.getElementById(displayId) : inputElem.nextElementSibling;
   if (!displayElem) return;
   if (rawVal === '') { displayElem.innerText = ''; return; }
-  let formatted = formatId(rawVal);
+  
+  if (isCandidateDictLoading) {
+    displayElem.innerText = '辞書データを読み込み中...';
+    displayElem.style.color = '#888';
+    return;
+  }
+  
+  let formatted = formatId(rawVal).replace(/\s/g, '').toUpperCase();
   if (candidateDict[formatted]) {
     displayElem.innerText = candidateDict[formatted]; displayElem.style.color = (MODE === 'DELETE') ? '#d93025' : '#1a73e8';
   } else {
@@ -155,12 +186,20 @@ function checkCandId(inputElem, displayId) {
 
 function formatJobId(rawId) { let numStr = rawId.replace(/[^0-9]/g, ''); return numStr.length > 0 ? "JOB-" + numStr.padStart(4, '0') : rawId; }
 function applyJobFormat(inputElem) { if (inputElem.value.trim() !== '') inputElem.value = formatJobId(inputElem.value); }
+
 function checkJobId(inputElem, displayId) {
   let rawVal = inputElem.value.trim();
   let displayElem = document.getElementById(displayId);
   if (!displayElem) return;
   if (rawVal === '') { displayElem.innerText = ''; return; }
-  let formatted = formatJobId(rawVal);
+  
+  if (isJobDictLoading) {
+    displayElem.innerText = '辞書データを読み込み中...'; 
+    displayElem.style.color = '#888';
+    return;
+  }
+
+  let formatted = formatJobId(rawVal).replace(/\s/g, '').toUpperCase();
   if (jobDict[formatted]) {
     displayElem.innerText = jobDict[formatted]; displayElem.style.color = '#34a853';
   } else {
@@ -183,7 +222,6 @@ function showModal(msg, keepOpen) {
 function closeModal() { document.getElementById('overlay').style.display = 'none'; }
 
 function createCandRowHTML(className, val = '', nameVal = '') {
-  // ★ クラスに cand-row-item を付与することで自動的に番号がつきます
   return `<div class="cand-row-item" style="display: flex; gap: 10px; align-items: center; margin-bottom: 8px;">
     <input type="text" class="${className}" placeholder="例: 1" value="${val}" oninput="checkCandId(this)" onblur="applyFormat(this)" style="width: 100px; flex-shrink: 0; padding: 6px; box-sizing: border-box; height: 30px; margin: 0;">
     <span class="cand-name-display" style="flex: 1;">${nameVal}</span>

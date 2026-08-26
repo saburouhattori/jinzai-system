@@ -27,7 +27,12 @@ function getCandidateDict() {
   if (lastRow < 2) return {};
   const data = sheet.getRange(2, 1, lastRow - 1, 2).getValues();
   const dict = {};
-  data.forEach(row => { if (row[0]) dict[String(row[0]).trim()] = String(row[1]); });
+  data.forEach(row => { 
+    if (row[0]) {
+      const id = String(row[0]).replace(/\s/g, '').toUpperCase();
+      dict[id] = String(row[1]); 
+    }
+  });
   return dict;
 }
 
@@ -38,7 +43,12 @@ function getJobDict() {
   if (lastRow < 2) return {};
   const data = sheet.getRange(2, 1, lastRow - 1, 4).getValues();
   const dict = {};
-  data.forEach(row => { if (row[0]) dict[String(row[0]).trim()] = `${row[3]} (${row[1]})`; });
+  data.forEach(row => { 
+    if (row[0]) {
+      const id = String(row[0]).replace(/\s/g, '').toUpperCase();
+      dict[id] = `${row[3]} (${row[1]})`; 
+    }
+  });
   return dict;
 }
 

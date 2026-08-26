@@ -108,9 +108,10 @@ function getJobDetails(jobId) {
     const lastRow = sheet.getLastRow();
     if (lastRow < 2) return null;
     const data = sheet.getRange(1, 1, lastRow, 10).getValues();
-    const searchId = String(jobId).trim().toUpperCase();
+    // 検索IDの空白を除去して大文字化
+    const searchId = String(jobId).replace(/\s/g, '').toUpperCase();
     for (let i = 1; i < data.length; i++) {
-      if (String(data[i][0]).trim().toUpperCase() === searchId) {
+      if (String(data[i][0]).replace(/\s/g, '').toUpperCase() === searchId) {
         let rawUrls = "";
         try {
           const richText = sheet.getRange(i + 1, 9).getRichTextValue();
@@ -144,7 +145,7 @@ function getJobDetails(jobId) {
 
 function updateJob(formData) {
   try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet(); // 不足していた変数を追加
+    const ss = SpreadsheetApp.getActiveSpreadsheet(); 
     const sheet = getMasterSheet('案件管理');
     const row = Number(formData.row);
     if (!row || row < 2) throw new Error("無効な行番号です。");
