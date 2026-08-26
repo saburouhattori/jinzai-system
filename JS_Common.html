@@ -84,7 +84,6 @@ window.addEventListener('DOMContentLoaded', () => {
   google.script.run.withSuccessHandler(function(dict) { 
     candidateDict = dict; 
     isCandidateDictLoading = false;
-    // ロード完了後に入力欄を再チェック
     document.querySelectorAll('input[oninput*="checkCandId"]').forEach(inputEl => {
       if (inputEl.value.trim() !== '') {
         let displayIdMatch = inputEl.getAttribute('oninput').match(/'([^']+)'/);
@@ -113,12 +112,10 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   if (MODE === 'HIRE') {
-    // 案件辞書の取得
     isJobDictLoading = true;
     google.script.run.withSuccessHandler(function(dict) { 
       jobDict = dict; 
       isJobDictLoading = false;
-      // ロード完了後に入力欄を再チェック
       let inputEl = document.getElementById('hire_job_id');
       if (inputEl && inputEl.value.trim() !== '') checkJobId(inputEl, 'hireJobDisplay');
     }).getJobDict();
@@ -212,13 +209,32 @@ function toggleRelative() {
   if(sel && det) { if (sel.value === '有') { det.style.display = 'block'; } else { det.style.display = 'none'; det.value = ''; } }
 }
 
-function showModal(msg, keepOpen) {
+function showModal(msg, keepOpen, isSuccess) {
   document.getElementById('modal-text').innerText = msg;
   document.getElementById('overlay').style.display = 'flex';
-  document.querySelector('#modal-message button').style.display = keepOpen ? 'none' : 'block';
+  
+  const btnContainer = document.getElementById('modal-button-container');
+  const btnClose = document.getElementById('modal-btn-close');
+  const btnExit = document.getElementById('modal-btn-exit');
   const spinner = document.getElementById('modal-spinner');
-  if (spinner) spinner.style.display = keepOpen ? 'block' : 'none';
+
+  if (keepOpen) {
+    if (btnContainer) btnContainer.style.display = 'none';
+    if (spinner) spinner.style.display = 'block';
+  } else {
+    if (btnContainer) btnContainer.style.display = 'flex';
+    if (spinner) spinner.style.display = 'none';
+    
+    if (isSuccess) {
+      if (btnClose) btnClose.innerText = '続けて作業';
+      if (btnExit) btnExit.style.display = 'block';
+    } else {
+      if (btnClose) btnClose.innerText = '閉じる';
+      if (btnExit) btnExit.style.display = 'none';
+    }
+  }
 }
+
 function closeModal() { document.getElementById('overlay').style.display = 'none'; }
 
 function createCandRowHTML(className, val = '', nameVal = '') {

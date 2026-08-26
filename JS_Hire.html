@@ -107,10 +107,7 @@ function submitHire() {
     .withSuccessHandler(function(msg) {
       try {
         if(btnEl) btnEl.disabled = false; 
-        showModal(msg + "\n\n※自動的に画面を閉じます...", true);
-        setTimeout(function() {
-          google.script.host.close();
-        }, 2000);
+        showModal(msg, false, true);
 
         idEl.value = ''; 
         let dispEl = document.getElementById('hireJobDisplay');

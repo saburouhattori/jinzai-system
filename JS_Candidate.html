@@ -68,10 +68,7 @@ function submitAddInfo() {
   
   showModal('保存中...', true);
   google.script.run.withSuccessHandler(function(msg) { 
-    showModal(msg + "\n\n※自動的に画面を閉じます...", true);
-    setTimeout(function() {
-      google.script.host.close();
-    }, 2000);
+    showModal(msg, false, true);
     google.script.run.syncListSheets();
   }).updateAddInfoRow(formData);
 }
@@ -106,10 +103,7 @@ function sendData(formData) {
 
 function onSuccess(msg) {
   document.getElementById('mainBtn').disabled = false; 
-  showModal(msg + "\n\n※自動的に画面を閉じます...", true);
-  setTimeout(function() {
-    google.script.host.close();
-  }, 2000);
+  showModal(msg, false, true);
 
   if (MODE === 'NEW') {
     let inputs = document.querySelectorAll('input[type="text"], input[type="date"], input[type="number"], input[type="email"], textarea');
@@ -128,10 +122,7 @@ function submitDelete() {
   if (!confirm(adminId + " のデータを完全に削除します。よろしいですか？")) return;
   showModal('削除中...', true);
   google.script.run.withSuccessHandler(function(msg) {
-    showModal(msg + "\n\n※自動的に画面を閉じます...", true);
-    setTimeout(function() {
-      google.script.host.close();
-    }, 2000);
+    showModal(msg, false, true);
     document.getElementById('delete_id').value = ''; 
     document.getElementById('deleteNameDisplay').innerText = '';
     google.script.run.syncListSheets();

@@ -121,10 +121,7 @@ async function submitJob() {
       try {
         if(btnEl) btnEl.disabled = false; 
         
-        showModal(msg + "\n\n※自動的に画面を閉じます...", true);
-        setTimeout(function() {
-          google.script.host.close();
-        }, 2000);
+        showModal(msg, false, true);
         
         if(statusEl) statusEl.value = '未着手';
         if(skillEl) skillEl.value = '';
@@ -341,10 +338,7 @@ async function submitJobEdit() {
   google.script.run
     .withSuccessHandler(function(msg) {
       if(btnEl) btnEl.disabled = false;
-      showModal(msg + "\n\n※自動的に画面を閉じます...", true);
-      setTimeout(function() {
-        google.script.host.close();
-      }, 2000);
+      showModal(msg, false, true);
       if(fileInputEl) fileInputEl.value = '';
     })
     .withFailureHandler(function(err) {
@@ -366,10 +360,11 @@ function submitJobDelete() {
   showModal('削除中...', true);
   google.script.run
     .withSuccessHandler(function(msg) {
-      showModal(msg + "\n\n※自動的に画面を閉じます...", true);
-      setTimeout(function() {
-        google.script.host.close();
-      }, 2000);
+      showModal(msg, false, true);
+      let fieldsEl = document.getElementById('job_edit_fields');
+      let searchEl = document.getElementById('edit_job_searchId');
+      if(fieldsEl) fieldsEl.style.display = 'none';
+      if(searchEl) searchEl.value = '';
     })
     .withFailureHandler(function(err) {
       showModal('削除エラー: ' + err.message);
