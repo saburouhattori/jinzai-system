@@ -6,6 +6,7 @@ let companyListArray = [];
 let isCompanyLoading = false; 
 let isCandidateDictLoading = false;
 let isJobDictLoading = false;
+let currentAddedJobId = ""; // ★直前に登録した案件IDを保持
 
 function loadCompanyList() {
   isCompanyLoading = true;
@@ -79,7 +80,6 @@ document.addEventListener('click', function(e) {
 });
 
 window.addEventListener('DOMContentLoaded', () => {
-  // 候補者辞書の取得
   isCandidateDictLoading = true;
   google.script.run.withSuccessHandler(function(dict) { 
     candidateDict = dict; 
@@ -209,13 +209,14 @@ function toggleRelative() {
   if(sel && det) { if (sel.value === '有') { det.style.display = 'block'; } else { det.style.display = 'none'; det.value = ''; } }
 }
 
-function showModal(msg, keepOpen, isSuccess) {
+function showModal(msg, keepOpen, isSuccess, actionData = null) {
   document.getElementById('modal-text').innerText = msg;
   document.getElementById('overlay').style.display = 'flex';
   
   const btnContainer = document.getElementById('modal-button-container');
   const btnClose = document.getElementById('modal-btn-close');
   const btnExit = document.getElementById('modal-btn-exit');
+  const btnHire = document.getElementById('modal-btn-hire');
   const spinner = document.getElementById('modal-spinner');
 
   if (keepOpen) {
@@ -228,14 +229,63 @@ function showModal(msg, keepOpen, isSuccess) {
     if (isSuccess) {
       if (btnClose) btnClose.innerText = '続けて作業';
       if (btnExit) btnExit.style.display = 'block';
+      
+      // ★ 案件追加・更新時のみ「面接結果を登録」ボタンを表示
+      if (btnHire) {
+        if (actionData && actionData.type === 'JOB_ADDED') {
+          btnHire.style.display = 'block';
+          currentAddedJobId = actionData.jobId;
+        } else {
+          btnHire.style.display = 'none';
+        }
+      }
     } else {
       if (btnClose) btnClose.innerText = '閉じる';
       if (btnExit) btnExit.style.display = 'none';
+      if (btnHire) btnHire.style.display = 'none';
     }
   }
 }
 
 function closeModal() { document.getElementById('overlay').style.display = 'none'; }
+
+// ★ 案件画面から面接結果画面へ遷移する関数
+function goToHireFromJob() {
+   closeModal();
+   
+   // 案件関係のフォームを隠す
+   let jobForm = document.getElementById('form-job');
+   if (jobForm) jobForm.style.display = 'none';
+   let editJobForm = document.getElementById('form-job-edit');
+   if (editJobForm) editJobForm.style.display = 'none';
+   
+   // 面接結果登録のフォームを表示
+   document.getElementById('form-hire').style.display = 'block';
+   
+   // IDをセット
+   const hireJobIdEl = document.getElementById('hire_job_id');
+   if (hireJobIdEl && currentAddedJobId) {
+      hireJobIdEl.value = currentAddedJobId;
+   }
+
+   // 辞書データに先ほどの新規案件を反映させるため、再度読み込む
+   isJobDictLoading = true;
+   let displayElem = document.getElementById('hireJobDisplay');
+   if (displayElem) {
+      displayElem.innerText = '辞書データを読み込み中...';
+      displayElem.style.color = '#888';
+   }
+   
+   google.script.run.withSuccessHandler(function(dict) { 
+     jobDict = dict; 
+     isJobDictLoading = false;
+     if (hireJobIdEl) {
+       checkJobId(hireJobIdEl, 'hireJobDisplay');
+       // IDチェック後、候補者を自動的に取得・表示
+       fetchJobCandidates('hire');
+     }
+   }).getJobDict();
+}
 
 function createCandRowHTML(className, val = '', nameVal = '') {
   return `<div class="cand-row-item" style="display: flex; gap: 10px; align-items: center; margin-bottom: 8px;">

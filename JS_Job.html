@@ -121,7 +121,10 @@ async function submitJob() {
       try {
         if(btnEl) btnEl.disabled = false; 
         
-        showModal(msg, false, true);
+        // ★メッセージからJOB-〇〇を抽出してモーダルに渡す
+        let jobIdMatch = msg.match(/JOB-\d+/);
+        let newJobId = jobIdMatch ? jobIdMatch[0] : null;
+        showModal(msg, false, true, newJobId ? {type: 'JOB_ADDED', jobId: newJobId} : null);
         
         if(statusEl) statusEl.value = '未着手';
         if(skillEl) skillEl.value = '';
@@ -338,7 +341,11 @@ async function submitJobEdit() {
   google.script.run
     .withSuccessHandler(function(msg) {
       if(btnEl) btnEl.disabled = false;
-      showModal(msg, false, true);
+      
+      // ★更新したIDをモーダルに渡す
+      let updatedJobId = document.getElementById('edit_job_id').value;
+      showModal(msg, false, true, {type: 'JOB_ADDED', jobId: updatedJobId});
+      
       if(fileInputEl) fileInputEl.value = '';
     })
     .withFailureHandler(function(err) {

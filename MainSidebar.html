@@ -36,9 +36,10 @@
   <div id="modal-message">
     <div id="modal-spinner" class="spinner"></div>
     <div id="modal-text" style="font-weight:bold; color:#1a73e8; margin-bottom:15px;"></div>
-    <div id="modal-button-container" style="display: flex; gap: 10px; justify-content: center;">
-      <button class="btn-secondary" id="modal-btn-close" onclick="closeModal()" style="flex: 1; margin: 0;">閉じる</button>
-      <button class="btn-primary" id="modal-btn-exit" onclick="google.script.host.close()" style="display: none; flex: 1; margin: 0;">画面を終了</button>
+    <div id="modal-button-container" style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+      <button class="btn-secondary" id="modal-btn-close" onclick="closeModal()" style="flex: 1; margin: 0; min-width: 100px;">閉じる</button>
+      <button class="btn-primary" id="modal-btn-hire" onclick="goToHireFromJob()" style="display: none; flex: 1; margin: 0; min-width: 120px; background: #34a853;">面接結果を登録</button>
+      <button class="btn-primary" id="modal-btn-exit" onclick="google.script.host.close()" style="display: none; flex: 1; margin: 0; min-width: 100px;">画面を終了</button>
     </div>
   </div>
 </div>
