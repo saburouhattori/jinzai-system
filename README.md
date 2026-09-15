@@ -96,6 +96,5 @@ Google Apps Script (GAS) と Google スプレッドシートを活用した人�
 * **案件関連ファイル保存用親フォルダID**: `1UuwRUPmldGgBR6dVUjldMI0vwZOjab0t`
 
 ## 関連ドキュメント
-* [更新履歴 (CHANGELOG.md)](CHANGELOG.md)
-* [今後の実装予定・課題 (TODO.md)](TODO.md)
+* [開発・保守ドキュメント（TODO・更新履歴） (DOCS.md)](DOCS.md)
 * [開発・保守ガイドライン (MAINTENANCE.md)](MAINTENANCE.md)
