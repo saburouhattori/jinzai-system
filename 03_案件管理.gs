@@ -9,30 +9,7 @@ function addJob(formData) {
     if (!sheet) throw new Error("「案件管理」シートが見つかりません。");
 
     const companiesArr = Array.isArray(formData.companies) ? formData.companies.map(c => String(c).trim()).filter(c => c) : [];
-    if (companiesArr.length > 0) {
-      const compSheet = ss.getSheetByName('事業者マスタ');
-      if (compSheet) {
-        const compData = compSheet.getDataRange().getValues();
-        let lastIdNum = 0;
-        for (let i = 1; i < compData.length; i++) {
-          let idVal = String(compData[i][0]);
-          let match = idVal.match(/\d+/);
-          if (match) {
-            let num = parseInt(match[0], 10);
-            if (num > lastIdNum) lastIdNum = num;
-          }
-        }
-        companiesArr.forEach(companyName => {
-          const exists = compData.some(row => String(row[1]).trim() === companyName);
-          if (!exists) {
-            lastIdNum++;
-            const nextCompId = "CO-" + lastIdNum.toString().padStart(4, '0');
-            compSheet.appendRow([nextCompId, companyName, "", "", "", "案件登録により自動追加"]);
-            compData.push([nextCompId, companyName]); // 重複防止用
-          }
-        });
-      }
-    }
+    // ★ 事業者の自動追加ロジックを削除し、フロント側で検証済みの名前をそのまま使用します。
 
     const dataRange = sheet.getDataRange();
     const aVals = dataRange.getValues().map(r => r[0]); 
@@ -151,30 +128,7 @@ function updateJob(formData) {
     if (!row || row < 2) throw new Error("無効な行番号です。");
 
     const companiesArr = Array.isArray(formData.companies) ? formData.companies.map(c => String(c).trim()).filter(c => c) : [];
-    if (companiesArr.length > 0) {
-      const compSheet = ss.getSheetByName('事業者マスタ');
-      if (compSheet) {
-        const compData = compSheet.getDataRange().getValues();
-        let lastIdNum = 0;
-        for (let i = 1; i < compData.length; i++) {
-          let idVal = String(compData[i][0]);
-          let match = idVal.match(/\d+/);
-          if (match) {
-            let num = parseInt(match[0], 10);
-            if (num > lastIdNum) lastIdNum = num;
-          }
-        }
-        companiesArr.forEach(companyName => {
-          const exists = compData.some(row => String(row[1]).trim() === companyName);
-          if (!exists) {
-            lastIdNum++;
-            const nextCompId = "CO-" + lastIdNum.toString().padStart(4, '0');
-            compSheet.appendRow([nextCompId, companyName, "", "", "", "案件更新により自動追加"]);
-            compData.push([nextCompId, companyName]);
-          }
-        });
-      }
-    }
+    // ★ 事業者の自動追加ロジックを削除
 
     const candidatesArr = Array.isArray(formData.candidates) ? formData.candidates : [];
     let fileUrlsArr = Array.isArray(formData.relatedFiles) ? formData.relatedFiles : [];

@@ -35,11 +35,26 @@ function addJobCompanyRow(listId, val = '') {
 async function submitJob() {
   let compInputs = document.querySelectorAll('#job_company_list .job-company-input');
   let companies = [];
+  let unlistedCompanies = []; // 未登録の事業者を控える配列
+
   compInputs.forEach(input => {
     let val = input.value.trim();
-    if(val) companies.push(val);
+    if (val) {
+      companies.push(val);
+      // マスタ(companyListArray)に存在するかチェック
+      if (!companyListArray.includes(val)) {
+        unlistedCompanies.push(val);
+      }
+    }
   });
+
   if (companies.length === 0) { showModal('事業者名を入力してください。'); return; }
+
+  // 未登録の事業者があった場合はブロックする
+  if (unlistedCompanies.length > 0) {
+    showModal(`未登録の事業者が含まれています：\n「${unlistedCompanies.join('」「')}」\n\n先に管理者（服部三郎）へ連絡し、事業者マスタへの登録を依頼してください。`);
+    return;
+  }
   
   let candListEl = document.getElementById('job_cand_list');
   let candInputDivs = candListEl ? candListEl.children : []; 
@@ -121,7 +136,6 @@ async function submitJob() {
       try {
         if(btnEl) btnEl.disabled = false; 
         
-        // ★メッセージからJOB-〇〇を抽出してモーダルに渡す
         let jobIdMatch = msg.match(/JOB-\d+/);
         let newJobId = jobIdMatch ? jobIdMatch[0] : null;
         showModal(msg, false, true, newJobId ? {type: 'JOB_ADDED', jobId: newJobId} : null);
@@ -258,11 +272,25 @@ async function submitJobEdit() {
 
   let compInputs = document.querySelectorAll('#edit_job_company_list .job-company-input');
   let companies = [];
+  let unlistedCompanies = [];
+
   compInputs.forEach(input => {
     let val = input.value.trim();
-    if(val) companies.push(val);
+    if (val) {
+      companies.push(val);
+      if (!companyListArray.includes(val)) {
+        unlistedCompanies.push(val);
+      }
+    }
   });
+
   if (companies.length === 0) { showModal('事業者名を入力してください。'); return; }
+
+  // 未登録の事業者があった場合はブロックする
+  if (unlistedCompanies.length > 0) {
+    showModal(`未登録の事業者が含まれています：\n「${unlistedCompanies.join('」「')}」\n\n先に管理者（服部三郎）へ連絡し、事業者マスタへの登録を依頼してください。`);
+    return;
+  }
   
   let candListEl = document.getElementById('edit_job_cand_list');
   let candInputDivs = candListEl ? candListEl.children : []; 
@@ -342,7 +370,6 @@ async function submitJobEdit() {
     .withSuccessHandler(function(msg) {
       if(btnEl) btnEl.disabled = false;
       
-      // ★更新したIDをモーダルに渡す
       let updatedJobId = document.getElementById('edit_job_id').value;
       showModal(msg, false, true, {type: 'JOB_ADDED', jobId: updatedJobId});
       
