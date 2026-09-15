@@ -6,7 +6,7 @@ let companyListArray = [];
 let isCompanyLoading = false; 
 let isCandidateDictLoading = false;
 let isJobDictLoading = false;
-let currentAddedJobId = ""; // ★直前に登録した案件IDを保持
+let currentAddedJobId = ""; 
 
 function loadCompanyList() {
   isCompanyLoading = true;
@@ -175,7 +175,14 @@ function checkCandId(inputElem, displayId) {
   
   let formatted = formatId(rawVal).replace(/\s/g, '').toUpperCase();
   if (candidateDict[formatted]) {
-    displayElem.innerText = candidateDict[formatted]; displayElem.style.color = (MODE === 'DELETE') ? '#d93025' : '#1a73e8';
+    displayElem.innerText = candidateDict[formatted].name;
+    // 既に採用済みの場合は警告表示
+    if (candidateDict[formatted].status === '採用') {
+      displayElem.innerText += ' (採用済)';
+      displayElem.style.color = '#d93025';
+    } else {
+      displayElem.style.color = (MODE === 'DELETE') ? '#d93025' : '#1a73e8';
+    }
   } else {
     displayElem.innerText = '未登録のIDです'; displayElem.style.color = '#d93025';
   }
@@ -230,7 +237,6 @@ function showModal(msg, keepOpen, isSuccess, actionData = null) {
       if (btnClose) btnClose.innerText = '続けて作業';
       if (btnExit) btnExit.style.display = 'block';
       
-      // ★ 案件追加・更新時のみ「面接結果を登録」ボタンを表示
       if (btnHire) {
         if (actionData && actionData.type === 'JOB_ADDED') {
           btnHire.style.display = 'block';
@@ -249,26 +255,21 @@ function showModal(msg, keepOpen, isSuccess, actionData = null) {
 
 function closeModal() { document.getElementById('overlay').style.display = 'none'; }
 
-// ★ 案件画面から面接結果画面へ遷移する関数
 function goToHireFromJob() {
    closeModal();
    
-   // 案件関係のフォームを隠す
    let jobForm = document.getElementById('form-job');
    if (jobForm) jobForm.style.display = 'none';
    let editJobForm = document.getElementById('form-job-edit');
    if (editJobForm) editJobForm.style.display = 'none';
    
-   // 面接結果登録のフォームを表示
    document.getElementById('form-hire').style.display = 'block';
    
-   // IDをセット
    const hireJobIdEl = document.getElementById('hire_job_id');
    if (hireJobIdEl && currentAddedJobId) {
       hireJobIdEl.value = currentAddedJobId;
    }
 
-   // 辞書データに先ほどの新規案件を反映させるため、再度読み込む
    isJobDictLoading = true;
    let displayElem = document.getElementById('hireJobDisplay');
    if (displayElem) {
@@ -281,7 +282,6 @@ function goToHireFromJob() {
      isJobDictLoading = false;
      if (hireJobIdEl) {
        checkJobId(hireJobIdEl, 'hireJobDisplay');
-       // IDチェック後、候補者を自動的に取得・表示
        fetchJobCandidates('hire');
      }
    }).getJobDict();

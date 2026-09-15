@@ -35,13 +35,12 @@ function addJobCompanyRow(listId, val = '') {
 async function submitJob() {
   let compInputs = document.querySelectorAll('#job_company_list .job-company-input');
   let companies = [];
-  let unlistedCompanies = []; // 未登録の事業者を控える配列
+  let unlistedCompanies = [];
 
   compInputs.forEach(input => {
     let val = input.value.trim();
     if (val) {
       companies.push(val);
-      // マスタ(companyListArray)に存在するかチェック
       if (!companyListArray.includes(val)) {
         unlistedCompanies.push(val);
       }
@@ -50,7 +49,6 @@ async function submitJob() {
 
   if (companies.length === 0) { showModal('事業者名を入力してください。'); return; }
 
-  // 未登録の事業者があった場合はブロックする
   if (unlistedCompanies.length > 0) {
     showModal(`未登録の事業者が含まれています：\n「${unlistedCompanies.join('」「')}」\n\n先に管理者（服部三郎）へ連絡し、事業者マスタへの登録を依頼してください。`);
     return;
@@ -59,19 +57,35 @@ async function submitJob() {
   let candListEl = document.getElementById('job_cand_list');
   let candInputDivs = candListEl ? candListEl.children : []; 
   let candidates = [];
+  let unlistedCands = [];
+  let hiredCands = [];
+
   Array.from(candInputDivs).forEach(div => { 
     let inputEl = div.querySelector('input.job-cand-id');
-    let nameEl = div.querySelector('span.cand-name-display');
     if (inputEl && inputEl.value.trim()) {
       let idStr = formatId(inputEl.value.trim());
-      let nameStr = nameEl ? nameEl.innerText.trim() : "";
-      if (nameStr && nameStr !== "該当なし" && nameStr !== "読込中...") {
-        candidates.push(`${idStr}-${nameStr}`);
+      let lookupId = idStr.replace(/\s/g, '').toUpperCase();
+      
+      let candData = candidateDict[lookupId];
+      if (!candData) {
+        unlistedCands.push(idStr);
       } else {
-        candidates.push(idStr);
+        if (candData.status === '採用') {
+          hiredCands.push(`${idStr} (${candData.name})`);
+        }
+        candidates.push(`${idStr}-${candData.name}`);
       }
     } 
   });
+
+  if (unlistedCands.length > 0) {
+    showModal(`未登録の候補者IDが含まれています：\n「${unlistedCands.join('」「')}」\n\n正しいIDを入力してください。`);
+    return;
+  }
+  if (hiredCands.length > 0) {
+    showModal(`以下の候補者は既に他の案件で「採用」となっているため、登録できません：\n\n${hiredCands.join('\n')}`);
+    return;
+  }
   if (candidates.length === 0) { showModal('候補者を少なくとも1名入力してください。'); return; }
   
   let fileInputs = document.querySelectorAll('.job-file-input');
@@ -286,7 +300,6 @@ async function submitJobEdit() {
 
   if (companies.length === 0) { showModal('事業者名を入力してください。'); return; }
 
-  // 未登録の事業者があった場合はブロックする
   if (unlistedCompanies.length > 0) {
     showModal(`未登録の事業者が含まれています：\n「${unlistedCompanies.join('」「')}」\n\n先に管理者（服部三郎）へ連絡し、事業者マスタへの登録を依頼してください。`);
     return;
@@ -295,19 +308,35 @@ async function submitJobEdit() {
   let candListEl = document.getElementById('edit_job_cand_list');
   let candInputDivs = candListEl ? candListEl.children : []; 
   let candidates = [];
+  let unlistedCands = [];
+  let hiredCands = [];
+
   Array.from(candInputDivs).forEach(div => { 
     let inputEl = div.querySelector('input.edit-job-cand-id');
-    let nameEl = div.querySelector('span.cand-name-display');
     if (inputEl && inputEl.value.trim()) {
       let idStr = formatId(inputEl.value.trim());
-      let nameStr = nameEl ? nameEl.innerText.trim() : "";
-      if (nameStr && nameStr !== "該当なし" && nameStr !== "読込中...") {
-        candidates.push(`${idStr}-${nameStr}`);
+      let lookupId = idStr.replace(/\s/g, '').toUpperCase();
+      
+      let candData = candidateDict[lookupId];
+      if (!candData) {
+        unlistedCands.push(idStr);
       } else {
-        candidates.push(idStr);
+        if (candData.status === '採用') {
+          hiredCands.push(`${idStr} (${candData.name})`);
+        }
+        candidates.push(`${idStr}-${candData.name}`);
       }
     } 
   });
+
+  if (unlistedCands.length > 0) {
+    showModal(`未登録の候補者IDが含まれています：\n「${unlistedCands.join('」「')}」\n\n正しいIDを入力してください。`);
+    return;
+  }
+  if (hiredCands.length > 0) {
+    showModal(`以下の候補者は既に他の案件で「採用」となっているため、登録できません：\n\n${hiredCands.join('\n')}`);
+    return;
+  }
   if (candidates.length === 0) { showModal('候補者を少なくとも1名入力してください。'); return; }
 
   let fileInputs = document.querySelectorAll('.edit_job-file-input');

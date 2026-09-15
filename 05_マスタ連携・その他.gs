@@ -25,14 +25,28 @@ function getCandidateDict() {
   if (!sheet) return {};
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return {};
-  const data = sheet.getRange(2, 1, lastRow - 1, 2).getValues();
-  const dict = {};
-  data.forEach(row => { 
-    if (row[0]) {
-      const id = String(row[0]).replace(/\s/g, '').toUpperCase();
-      dict[id] = String(row[1]); 
-    }
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const col = {};
+  headers.forEach((h, i) => {
+    col[String(h).replace(/\n/g, '').replace(/\s/g, '').trim()] = i;
   });
+  
+  const idIdx = col['登録者ID'];
+  const nameIdx = col['名前'];
+  const statusIdx = col['ステータス'];
+
+  const dict = {};
+  for(let i = 1; i < data.length; i++) {
+    const row = data[i];
+    if (row[idIdx]) {
+      const id = String(row[idIdx]).replace(/\s/g, '').toUpperCase();
+      dict[id] = {
+        name: nameIdx !== undefined ? String(row[nameIdx]) : "",
+        status: statusIdx !== undefined ? String(row[statusIdx]).trim() : ""
+      };
+    }
+  }
   return dict;
 }
 
