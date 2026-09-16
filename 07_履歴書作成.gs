@@ -97,15 +97,27 @@ function rirekisyo() {
   // 学歴
   rSheet.getRange('B17').setValue(getVal('学歴＞入学年月'));
   const schoolName = getVal('学歴＞学校名');
-  rSheet.getRange('F17').setValue(schoolName ? schoolName + '　入学' : '');
+  const schoolDept = getVal('学歴＞学部・学科・専攻');
+  
+  // ★ 学部・学科・専攻が存在する場合は連結する
+  let schoolFullText = "";
+  if (schoolName) {
+    schoolFullText = schoolName;
+    if (schoolDept) {
+      schoolFullText += ' ' + schoolDept;
+    }
+    schoolFullText += ' 入学';
+  }
+  rSheet.getRange('F17').setValue(schoolFullText);
+  
   rSheet.getRange('B18').setValue(getVal('学歴＞卒業/中退年月'));
   rSheet.getRange('F18').setValue(getVal('学歴＞状況'));
   rSheet.getRange('F20').setValue(getVal('学歴＞補足'));
   
   // 職歴
-  rSheet.getRange('C23').setValue(getVal('職歴①＞期間') + '　' + getVal('職歴①＞内容'));
-  rSheet.getRange('C24').setValue(getVal('職歴②＞期間') + '　' + getVal('職歴②＞内容'));
-  rSheet.getRange('B25').setValue(getVal('職歴③＞期間') + '　' + getVal('職歴③＞内容'));
+  rSheet.getRange('C23').setValue(getVal('職歴①＞期間') + ' ' + getVal('職歴①＞内容'));
+  rSheet.getRange('C24').setValue(getVal('職歴②＞期間') + ' ' + getVal('職歴②＞内容'));
+  rSheet.getRange('B25').setValue(getVal('職歴③＞期間') + ' ' + getVal('職歴③＞内容'));
 
   // 資格・試験
   const jlptLvl = getVal('特定技能要件＞JLPTレベル');
