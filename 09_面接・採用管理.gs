@@ -14,7 +14,12 @@ function getJobCandidates(jobId) {
     const candDict = getCandidateDict(); 
     const candidates = ids.map(id => {
       const cleanId = id.split('-').slice(0, 2).join('-').trim();
-      return { id: cleanId, display: candDict[cleanId] ? `${cleanId} (${candDict[cleanId]})` : id, name: candDict[cleanId] || "" };
+      // ▼ オブジェクトの .name を正しく参照するように修正
+      return { 
+        id: cleanId, 
+        display: candDict[cleanId] ? `${cleanId} (${candDict[cleanId].name})` : id, 
+        name: candDict[cleanId] ? candDict[cleanId].name : "" 
+      };
     }).filter(c => c.id);
 
     return { candidates: candidates, companies: companies };
@@ -93,7 +98,8 @@ function registerHire(jobId, hiredData) {
       if (companyNames.length <= 1) {
         // 事業者が1社のみの場合は、名前だけを並べる
         hiredNamesText = hiredData.map(item => {
-           const name = candDict[item.id] || "";
+           // ▼ オブジェクトの .name を正しく参照するように修正
+           const name = candDict[item.id] ? candDict[item.id].name : "";
            return name ? `${item.id}-${name}` : `${item.id}`;
         }).join('\n');
       } else {
@@ -101,7 +107,8 @@ function registerHire(jobId, hiredData) {
         const grouped = {};
         hiredData.forEach(item => {
           if (!grouped[item.company]) grouped[item.company] = [];
-          const name = candDict[item.id] || "";
+          // ▼ オブジェクトの .name を正しく参照するように修正
+          const name = candDict[item.id] ? candDict[item.id].name : "";
           grouped[item.company].push(name ? `${item.id}-${name}` : `${item.id}`);
         });
         
