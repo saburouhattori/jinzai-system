@@ -56,12 +56,20 @@ function submitAddInfo() {
   fields.forEach(f => { 
     let el = document.getElementById('add_' + f); 
     if (el) {
+      let val = el.value;
+      
+      // ▼▼ 空白補正処理 ▼▼
+      if (typeof val === 'string') {
+        // 全角スペースを半角スペースに統一、連続する空白を1つにし、前後の空白を除去
+        val = val.replace(/ /g, ' ').replace(/\s+/g, ' ').trim();
+      }
+
       if (f === 'birthCity') {
-        formData[f] = el.value.toUpperCase();
+        formData[f] = val.toUpperCase();
       } else if (f === 'passportNum') {
-        formData[f] = el.value.replace(/[^a-zA-Z0-9]/g, '');
+        formData[f] = val.replace(/[^a-zA-Z0-9]/g, '');
       } else {
-        formData[f] = el.value; 
+        formData[f] = val; 
       }
     }
   });
@@ -77,9 +85,32 @@ function submitData() {
   let formData = {};
   
   const fields = ['name','furigana','nickname','birthday','gender','spouse','height','weight','address','birthplace','email','school','eduSchool','eduDept','eduStatus','eduStart','eduEnd','eduNote','expPeriod1','expContent1','expPeriod2','expContent2','expPeriod3','expContent3','jlptLevel','jlptDate','jftLevel','jftDate','kaigoSkill','kaigoSkillDate','kaigoLang','kaigoLangDate','otherExam','otherExamDate','otherJapanese','otherJapaneseDate','comment'];
-  fields.forEach(f => { let el = document.getElementById(f); if(el) formData[f] = el.value; });
+  fields.forEach(f => { 
+    let el = document.getElementById(f); 
+    if(el) {
+      let val = el.value;
+      
+      // ▼▼ 空白補正処理 ▼▼
+      if (typeof val === 'string') {
+        // 全角スペースを半角スペースに統一、連続する空白を1つにし、前後の空白を除去
+        val = val.replace(/ /g, ' ').replace(/\s+/g, ' ').trim();
+        
+        // ※もしフリガナの内部空白を「完全に削除」したい場合は、以下のコメントアウトを外して運用可能です
+        // if (f === 'furigana') val = val.replace(/\s/g, ''); 
+      }
+      
+      formData[f] = val; 
+    } 
+  });
+  
   let relSel = document.getElementById('relativeSelect'); let relDet = document.getElementById('relativeDetail');
-  if (relSel && relDet) formData.relative = (relSel.value === '有') ? relDet.value : "日本に家族や親戚はいません。";
+  if (relSel && relDet) {
+    let relVal = relDet.value;
+    if (typeof relVal === 'string') {
+      relVal = relVal.replace(/ /g, ' ').replace(/\s+/g, ' ').trim();
+    }
+    formData.relative = (relSel.value === '有') ? relVal : "日本に家族や親戚はいません。";
+  }
   
   if (MODE === 'EDIT') {
     formData.row = document.getElementById('targetRow').value;
