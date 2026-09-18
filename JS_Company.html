@@ -1,9 +1,37 @@
 <script>
 // --- 事業者登録 ---
 function submitCompany() {
-  let name = document.getElementById('comp_name').value.trim();
-  if (!name) { showModal('事業者名称は必須です。'); return; }
-  let formData = { name: name, yomi: document.getElementById('comp_yomi').value, address: document.getElementById('comp_address').value, url: document.getElementById('comp_url').value, note: document.getElementById('comp_note').value };
+  let nameEl = document.getElementById('comp_name');
+  let name = nameEl ? nameEl.value : '';
+
+  // ▼ 事業者名称の必須チェックとスペース禁止チェック
+  if (!name.trim()) { 
+    showModal('事業者名称は必須です。'); 
+    return; 
+  }
+  if (/[\s ]/.test(name)) {
+    showModal('事業者名称にスペース（空白）を含めることはできません。');
+    return;
+  }
+
+  // ▼ ヨミガナ・所在地用の空白補正関数（半角統一、連続除去、トリム）
+  let cleanVal = (id) => {
+    let el = document.getElementById(id);
+    if (!el) return '';
+    let val = el.value;
+    if (typeof val === 'string') {
+      return val.replace(/ /g, ' ').replace(/\s+/g, ' ').trim();
+    }
+    return val;
+  };
+
+  let formData = { 
+    name: name, // スペースなし確認済み
+    yomi: cleanVal('comp_yomi'), 
+    address: cleanVal('comp_address'), 
+    url: document.getElementById('comp_url') ? document.getElementById('comp_url').value : '', 
+    note: document.getElementById('comp_note') ? document.getElementById('comp_note').value : ''
+  };
   
   document.getElementById('compBtn').disabled = true; 
   showModal('登録中...', true);
