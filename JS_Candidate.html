@@ -18,7 +18,25 @@ function searchData() {
                       'expPeriod3','expContent3','jlptLevel','jlptDate','jftLevel','jftDate',
                       'kaigoSkill','kaigoSkillDate','kaigoLang','kaigoLangDate','otherExam',
                       'otherExamDate','otherJapanese','otherJapaneseDate','comment'];
-      fields.forEach(f => { let el = document.getElementById(f); if(el) { let val = data[f] || ""; if(val.startsWith && val.startsWith("'")) val = val.substring(1); el.value = val; } });
+      
+      fields.forEach(f => { 
+        let el = document.getElementById(f); 
+        if(el) { 
+          let val = data[f] || ""; 
+          if(typeof val === 'string' && val.startsWith("'")) val = val.substring(1); 
+          
+          // ▼▼ type="month" 項目のための逆変換処理 ▼▼
+          if (el.type === 'month' && typeof val === 'string') {
+            let match = val.match(/(\d{4})[-\/年](\d{1,2})/);
+            if (match) {
+              val = match[1] + '-' + match[2].padStart(2, '0');
+            }
+          }
+          
+          el.value = val; 
+        } 
+      });
+      
       let relSel = document.getElementById('relativeSelect'); let relDet = document.getElementById('relativeDetail');
       if (data.relative && data.relative !== "日本に家族や親戚はいません。" && data.relative !== "無" && data.relative !== "なし") {
         relSel.value = "有"; relDet.value = data.relative; relDet.style.display = "block";
@@ -57,13 +75,9 @@ function submitAddInfo() {
     let el = document.getElementById('add_' + f); 
     if (el) {
       let val = el.value;
-      
-      // ▼▼ 空白補正処理（改行維持 ＆ 全角スペース確実対応） ▼▼
       if (typeof val === 'string') {
-        // 行ごとに分割 → 全角スペース(\u3000)を半角に変換 → 連続する半角スペースを1つに統合 → 前後の余白を削除 → 再度改行で結合
         val = val.split('\n').map(line => line.replace(/\u3000/g, ' ').replace(/ +/g, ' ').trim()).join('\n');
       }
-
       if (f === 'birthCity') {
         formData[f] = val.toUpperCase();
       } else if (f === 'passportNum') {
@@ -89,12 +103,9 @@ function submitData() {
     let el = document.getElementById(f); 
     if(el) {
       let val = el.value;
-      
-      // ▼▼ 空白補正処理（改行維持 ＆ 全角スペース確実対応） ▼▼
       if (typeof val === 'string') {
         val = val.split('\n').map(line => line.replace(/\u3000/g, ' ').replace(/ +/g, ' ').trim()).join('\n');
       }
-      
       formData[f] = val; 
     } 
   });
@@ -133,7 +144,7 @@ function onSuccess(msg) {
   showModal(msg, false, true);
 
   if (MODE === 'NEW') {
-    let inputs = document.querySelectorAll('input[type="text"], input[type="date"], input[type="number"], input[type="email"], textarea');
+    let inputs = document.querySelectorAll('input[type="text"], input[type="date"], input[type="number"], input[type="email"], input[type="month"], textarea');
     inputs.forEach(input => input.value = '');
     let selects = document.querySelectorAll('select'); selects.forEach(select => select.selectedIndex = 0);
     let fileInput = document.getElementById('imageFile'); if (fileInput) fileInput.value = '';

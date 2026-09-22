@@ -29,8 +29,8 @@
   <div class="field"><label>状況</label><select id="eduStatus"><option value="">未選択</option><option value="卒業">卒業</option><option value="中途退学">中途退学</option><option value="在学中">在学中</option><option value="休学中">休学中</option></select></div>
 </div>
 <div class="form-row">
-  <div class="field"><label>入学年月</label><input type="text" id="eduStart" placeholder=" YYYY年MM月 "></div>
-  <div class="field"><label>卒業/中退年月</label><input type="text" id="eduEnd" placeholder=" YYYY年MM月 "></div>
+  <div class="field"><label>入学年月</label><input type="month" id="eduStart"></div>
+  <div class="field"><label>卒業/中退年月</label><input type="month" id="eduEnd"></div>
   <div class="field flex-2"><label>補足</label><input type="text" id="eduNote"></div>
 </div>
 
@@ -52,21 +52,21 @@
 <div class="form-row">
   <div class="field">
     <label>JLPT</label>
-    <div class="sub-field"><select id="jlptLevel" style="flex:1;"><option value="">未選択</option><option value="N1">N1</option><option value="N2">N2</option><option value="N3">N3</option><option value="N4">N4</option></select><input type="text" id="jlptDate" placeholder="年月" style="flex:1;"></div>
+    <div class="sub-field"><select id="jlptLevel" style="flex:1;"><option value="">未選択</option><option value="N1">N1</option><option value="N2">N2</option><option value="N3">N3</option><option value="N4">N4</option></select><input type="month" id="jlptDate" style="flex:1;"></div>
   </div>
   <div class="field">
     <label>JFT Basic</label>
-    <div class="sub-field"><select id="jftLevel" style="flex:1;"><option value="">未選択</option><option value="A2">A2</option></select><input type="text" id="jftDate" placeholder="年月" style="flex:1;"></div>
+    <div class="sub-field"><select id="jftLevel" style="flex:1;"><option value="">未選択</option><option value="A2">A2</option></select><input type="month" id="jftDate" style="flex:1;"></div>
   </div>
 </div>
 <div class="form-row">
   <div class="field">
     <label>介護技能評価試験</label>
-    <div class="sub-field"><select id="kaigoSkill" style="flex:1;"><option value="">未選択</option><option value="合格">合格</option><option value="受験予定">受験予定</option></select><input type="text" id="kaigoSkillDate" placeholder="年月" style="flex:1;"></div>
+    <div class="sub-field"><select id="kaigoSkill" style="flex:1;"><option value="">未選択</option><option value="合格">合格</option><option value="受験予定">受験予定</option></select><input type="month" id="kaigoSkillDate" style="flex:1;"></div>
   </div>
   <div class="field">
     <label>介護日本語評価試験</label>
-    <div class="sub-field"><select id="kaigoLang" style="flex:1;"><option value="">未選択</option><option value="合格">合格</option><option value="受験予定">受験予定</option></select><input type="text" id="kaigoLangDate" placeholder="年月" style="flex:1;"></div>
+    <div class="sub-field"><select id="kaigoLang" style="flex:1;"><option value="">未選択</option><option value="合格">合格</option><option value="受験予定">受験予定</option></select><input type="month" id="kaigoLangDate" style="flex:1;"></div>
   </div>
 </div>
 <div class="form-row">
@@ -78,7 +78,7 @@
         <option value="外食業特定技能１号技能測定試験">外食業特定技能１号技能測定試験</option>
         <option value="飲食料品製造業特定技能１号技能測定試験">飲食料品製造業特定技能１号技能測定試験</option>
       </select>
-      <input type="text" id="otherExamDate" placeholder="年月" style="flex:1;">
+      <input type="month" id="otherExamDate" style="flex:1;">
     </div>
   </div>
   <div class="field flex-2"></div>
@@ -92,7 +92,7 @@
       <select id="otherJapanese" style="flex:1;">
         <option value="">未選択</option><option value="NAT-TEST 5級">NAT-TEST 5級</option><option value="NAT-TEST 4級">NAT-TEST 4級</option><option value="NAT-TEST 3級">NAT-TEST 3級</option><option value="NAT-TEST 2級">NAT-TEST 2級</option><option value="NAT-TEST 1級">NAT-TEST 1級</option><option value="J.TEST G級">J.TEST G級</option><option value="J.TEST F級">J.TEST F級</option><option value="J.TEST E級">J.TEST E級</option><option value="J.TEST D級">J.TEST D級</option><option value="J.TEST C級">J.TEST C級</option><option value="J.TEST 準B級">J.TEST 準B級</option><option value="J.TEST B級">J.TEST B級</option><option value="J.TEST 準A級">J.TEST 準A級</option><option value="J.TEST A級">J.TEST A級</option><option value="J.TEST 特A級">J.TEST 特A級</option><option value="J-cert A1">J-cert A1</option><option value="J-cert A2.1">J-cert A2.1</option><option value="J-cert A2.2">J-cert A2.2</option><option value="J-cert B1">J-cert B1</option><option value="J-cert B2">J-cert B2</option><option value="J-cert C1">J-cert C1</option><option value="J-cert C2">J-cert C2</option>
       </select>
-      <input type="text" id="otherJapaneseDate" placeholder="年月" style="flex:1;">
+      <input type="month" id="otherJapaneseDate" style="flex:1;">
     </div>
   </div>
   <div class="field flex-2">
