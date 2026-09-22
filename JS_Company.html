@@ -9,18 +9,18 @@ function submitCompany() {
     showModal('事業者名称は必須です。'); 
     return; 
   }
-  if (/[\s ]/.test(name)) {
+  if (/[\s\u3000]/.test(name)) {
     showModal('事業者名称にスペース（空白）を含めることはできません。');
     return;
   }
 
-  // ▼ ヨミガナ・所在地用の空白補正関数（半角統一、連続除去、トリム）
+  // ▼ ヨミガナ・所在地用の空白補正関数（改行維持 ＆ 全角スペース確実対応）
   let cleanVal = (id) => {
     let el = document.getElementById(id);
     if (!el) return '';
     let val = el.value;
     if (typeof val === 'string') {
-      return val.replace(/ /g, ' ').replace(/\s+/g, ' ').trim();
+      return val.split('\n').map(line => line.replace(/\u3000/g, ' ').replace(/ +/g, ' ').trim()).join('\n');
     }
     return val;
   };
