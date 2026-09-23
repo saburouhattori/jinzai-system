@@ -14,8 +14,8 @@ function searchData() {
       
       const fields = ['name','furigana','nickname','birthday','gender','spouse','height','weight',
                       'address','birthplace','email','school','eduSchool','eduDept','eduStatus',
-                      'eduStart','eduEnd','eduNote','expPeriod1','expContent1','expPeriod2','expContent2',
-                      'expPeriod3','expContent3','jlptLevel','jlptDate','jftLevel','jftDate',
+                      'eduStart','eduEnd','eduNote',
+                      'expContent1','expContent2','expContent3','jlptLevel','jlptDate','jftLevel','jftDate',
                       'kaigoSkill','kaigoSkillDate','kaigoLang','kaigoLangDate','otherExam',
                       'otherExamDate','otherJapanese','otherJapaneseDate','comment'];
       
@@ -25,16 +25,31 @@ function searchData() {
           let val = data[f] || ""; 
           if(typeof val === 'string' && val.startsWith("'")) val = val.substring(1); 
           
-          // ▼▼ type="month" 項目のための逆変換処理 ▼▼
           if (el.type === 'month' && typeof val === 'string') {
             let match = val.match(/(\d{4})[-\/年](\d{1,2})/);
             if (match) {
               val = match[1] + '-' + match[2].padStart(2, '0');
             }
           }
-          
           el.value = val; 
         } 
+      });
+      
+      // ▼▼ 職歴期間の読み込み（文字列から年月へ分割セット） ▼▼
+      [1, 2, 3].forEach(i => {
+        let pVal = data['expPeriod' + i] || "";
+        let sEl = document.getElementById('expPeriod' + i + '_start');
+        let eEl = document.getElementById('expPeriod' + i + '_end');
+        if (sEl && eEl) {
+           let matches = [...pVal.matchAll(/(\d{4})[-\/年](\d{1,2})/g)];
+           if (matches.length === 1 && pVal.trim().startsWith('〜')) {
+              sEl.value = "";
+              eEl.value = matches[0][1] + '-' + matches[0][2].padStart(2, '0');
+           } else {
+              sEl.value = matches.length >= 1 ? matches[0][1] + '-' + matches[0][2].padStart(2, '0') : "";
+              eEl.value = matches.length >= 2 ? matches[1][1] + '-' + matches[1][2].padStart(2, '0') : "";
+           }
+        }
       });
       
       let relSel = document.getElementById('relativeSelect'); let relDet = document.getElementById('relativeDetail');
@@ -98,7 +113,7 @@ function submitAddInfo() {
 function submitData() {
   let formData = {};
   
-  const fields = ['name','furigana','nickname','birthday','gender','spouse','height','weight','address','birthplace','email','school','eduSchool','eduDept','eduStatus','eduStart','eduEnd','eduNote','expPeriod1','expContent1','expPeriod2','expContent2','expPeriod3','expContent3','jlptLevel','jlptDate','jftLevel','jftDate','kaigoSkill','kaigoSkillDate','kaigoLang','kaigoLangDate','otherExam','otherExamDate','otherJapanese','otherJapaneseDate','comment'];
+  const fields = ['name','furigana','nickname','birthday','gender','spouse','height','weight','address','birthplace','email','school','eduSchool','eduDept','eduStatus','eduStart','eduEnd','eduNote','expContent1','expContent2','expContent3','jlptLevel','jlptDate','jftLevel','jftDate','kaigoSkill','kaigoSkillDate','kaigoLang','kaigoLangDate','otherExam','otherExamDate','otherJapanese','otherJapaneseDate','comment'];
   fields.forEach(f => { 
     let el = document.getElementById(f); 
     if(el) {
@@ -108,6 +123,21 @@ function submitData() {
       }
       formData[f] = val; 
     } 
+  });
+  
+  // ▼▼ 職歴期間の結合保存 ▼▼
+  [1, 2, 3].forEach(i => {
+    let sEl = document.getElementById('expPeriod' + i + '_start');
+    let eEl = document.getElementById('expPeriod' + i + '_end');
+    let sVal = sEl && sEl.value ? sEl.value.split('-')[0] + "年" + parseInt(sEl.value.split('-')[1], 10) + "月" : "";
+    let eVal = eEl && eEl.value ? eEl.value.split('-')[0] + "年" + parseInt(eEl.value.split('-')[1], 10) + "月" : "";
+    
+    let combined = "";
+    if (sVal && eVal) combined = sVal + " 〜 " + eVal;
+    else if (sVal) combined = sVal + " 〜";
+    else if (eVal) combined = "〜 " + eVal;
+    
+    formData['expPeriod' + i] = combined;
   });
   
   let relSel = document.getElementById('relativeSelect'); let relDet = document.getElementById('relativeDetail');
