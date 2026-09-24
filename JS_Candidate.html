@@ -1,7 +1,32 @@
 <script>
+/**
+ * 全角数字を半角数字に変換する関数
+ * @param {string} str - 変換対象の文字列
+ * @returns {string} - 半角数字に変換された文字列
+ */
+function toHalfWidthNumber(str) {
+  if (!str || typeof str !== 'string') return str;
+  return str.replace(/[０-９]/g, function(s) {
+    return String.fromCharCode(s.charCodeAt(0) - 0xfee0);
+  });
+}
+
+// 画面読み込み完了時に自動変換イベントを設定
+document.addEventListener('DOMContentLoaded', function() {
+  const numInputs = document.querySelectorAll('input[type="number"], input[type="text"], textarea');
+  numInputs.forEach(input => {
+    input.addEventListener('blur', function() {
+      if (typeof this.value === 'string') {
+        this.value = toHalfWidthNumber(this.value);
+      }
+    });
+  });
+});
+
 function searchData() {
   let rawId = document.getElementById('searchId').value.trim();
   if (!rawId) { showModal('管理番号を入力してください。'); return; }
+  rawId = toHalfWidthNumber(rawId);
   let adminId = formatId(rawId);
   document.getElementById('searchId').value = adminId;
   document.getElementById('searchBtn').disabled = true;
@@ -13,11 +38,11 @@ function searchData() {
       document.getElementById('targetRow').value = data.row;
       
       const fields = ['name','furigana','nickname','birthday','gender','spouse','height','weight',
-                      'address','birthplace','email','school','eduSchool','eduDept','eduStatus',
-                      'eduStart','eduEnd','eduNote',
-                      'expContent1','expContent2','expContent3','jlptLevel','jlptDate','jftLevel','jftDate',
-                      'kaigoSkill','kaigoSkillDate','kaigoLang','kaigoLangDate','otherExam',
-                      'otherExamDate','otherJapanese','otherJapaneseDate','comment'];
+        'address','birthplace','email','school','eduSchool','eduDept','eduStatus',
+        'eduStart','eduEnd','eduNote',
+        'expContent1','expContent2','expContent3','jlptLevel','jlptDate','jftLevel','jftDate',
+        'kaigoSkill','kaigoSkillDate','kaigoLang','kaigoLangDate','otherExam',
+        'otherExamDate','otherJapanese','otherJapaneseDate','comment'];
       
       fields.forEach(f => { 
         let el = document.getElementById(f); 
@@ -41,14 +66,14 @@ function searchData() {
         let sEl = document.getElementById('expPeriod' + i + '_start');
         let eEl = document.getElementById('expPeriod' + i + '_end');
         if (sEl && eEl) {
-           let matches = [...pVal.matchAll(/(\d{4})[-\/年](\d{1,2})/g)];
-           if (matches.length === 1 && pVal.trim().startsWith('〜')) {
-              sEl.value = "";
-              eEl.value = matches[0][1] + '-' + matches[0][2].padStart(2, '0');
-           } else {
-              sEl.value = matches.length >= 1 ? matches[0][1] + '-' + matches[0][2].padStart(2, '0') : "";
-              eEl.value = matches.length >= 2 ? matches[1][1] + '-' + matches[1][2].padStart(2, '0') : "";
-           }
+          let matches = [...pVal.matchAll(/(\d{4})[-\/年](\d{1,2})/g)];
+          if (matches.length === 1 && pVal.trim().startsWith('〜')) {
+            sEl.value = "";
+            eEl.value = matches[0][1] + '-' + matches[0][2].padStart(2, '0');
+          } else {
+            sEl.value = matches.length >= 1 ? matches[0][1] + '-' + matches[0][2].padStart(2, '0') : "";
+            eEl.value = matches.length >= 2 ? matches[1][1] + '-' + matches[1][2].padStart(2, '0') : "";
+          }
         }
       });
       
@@ -65,6 +90,7 @@ function searchData() {
 function searchDataAddInfo() {
   let rawId = document.getElementById('searchIdAddInfo').value.trim();
   if (!rawId) { showModal('管理番号を入力してください。'); return; }
+  rawId = toHalfWidthNumber(rawId);
   let adminId = formatId(rawId);
   document.getElementById('searchIdAddInfo').value = adminId;
   showModal('検索中...', true);
@@ -91,6 +117,7 @@ function submitAddInfo() {
     if (el) {
       let val = el.value;
       if (typeof val === 'string') {
+        val = toHalfWidthNumber(val);
         val = val.split('\n').map(line => line.replace(/\u3000/g, ' ').replace(/ +/g, ' ').trim()).join('\n');
       }
       if (f === 'birthCity') {
@@ -119,6 +146,7 @@ function submitData() {
     if(el) {
       let val = el.value;
       if (typeof val === 'string') {
+        val = toHalfWidthNumber(val);
         val = val.split('\n').map(line => line.replace(/\u3000/g, ' ').replace(/ +/g, ' ').trim()).join('\n');
       }
       formData[f] = val; 
@@ -144,6 +172,7 @@ function submitData() {
   if (relSel && relDet) {
     let relVal = relDet.value;
     if (typeof relVal === 'string') {
+      relVal = toHalfWidthNumber(relVal);
       relVal = relVal.split('\n').map(line => line.replace(/\u3000/g, ' ').replace(/ +/g, ' ').trim()).join('\n');
     }
     formData.relative = (relSel.value === '有') ? relVal : "日本に家族や親戚はいません。";
@@ -172,7 +201,7 @@ function sendData(formData) {
 function onSuccess(msg) {
   document.getElementById('mainBtn').disabled = false; 
   showModal(msg, false, true);
-
+  
   if (MODE === 'NEW') {
     let inputs = document.querySelectorAll('input[type="text"], input[type="date"], input[type="number"], input[type="email"], input[type="month"], textarea');
     inputs.forEach(input => input.value = '');
@@ -186,6 +215,7 @@ function onSuccess(msg) {
 function submitDelete() {
   let rawId = document.getElementById('delete_id').value.trim();
   if (!rawId) { showModal('削除するIDを入力してください。'); return; }
+  rawId = toHalfWidthNumber(rawId);
   let adminId = formatId(rawId);
   if (!confirm(adminId + " のデータを完全に削除します。よろしいですか？")) return;
   showModal('削除中...', true);
