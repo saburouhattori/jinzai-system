@@ -14,6 +14,10 @@ function syncToPaymentManagement() {
     const targetSheet = targetSS.getSheetByName("支払い管理");
     if (!targetSheet) throw new Error("外部シートに「支払い管理」が見つかりません。");
 
+    // ▼ 両方のスプレッドシートのタイムゾーンを取得（時差ズレ防止の要）
+    const sourceTZ = ss.getSpreadsheetTimeZone();
+    const targetTZ = targetSS.getSpreadsheetTimeZone();
+
     const sourceData = sourceSheet.getDataRange().getValues();
     const sourceMap = getMasterColumnMap(sourceSheet);
     const targetData = targetSheet.getDataRange().getValues();
@@ -25,11 +29,12 @@ function syncToPaymentManagement() {
     const tIdIdx = targetMap['登録者ID'] - 1;
 
     let appendCount = 0;
-    let skipCount = 0;
+    let updateCount = 0;
     const targetKeys = {};
     const existingCandidateMap = new Map();
     let footerRowIndex = targetData.length + 1;
 
+    // 既存データのマッピング
     if (targetData.length > 1) {
       for (let i = 1; i < targetData.length; i++) {
         const jId = String(targetData[i][tJobIdx] || "").trim();
@@ -56,6 +61,7 @@ function syncToPaymentManagement() {
 
     const syncRecords = [];
     
+    // 案件管理からのデータ抽出
     for (let i = 1; i < sourceData.length; i++) {
       const row = sourceData[i];
       const jobID = sourceMap['案件ID'] ? String(row[sourceMap['案件ID'] - 1] || "").trim() : "";
@@ -68,9 +74,15 @@ function syncToPaymentManagement() {
       const defaultCompany = companyNameCell.split(/\r?\n/)[0];
       const fieldName = sourceMap['技能分野'] ? row[sourceMap['技能分野'] - 1] : "";
       
-      let interviewDate = sourceMap['面接日'] ? row[sourceMap['面接日'] - 1] : "";
-      if (typeof interviewDate === "string") {
-        interviewDate = interviewDate.trim();
+      let rawInterviewDate = sourceMap['面接日'] ? row[sourceMap['面接日'] - 1] : "";
+      let interviewDate = "";
+      if (rawInterviewDate instanceof Date) {
+        // 元シートのタイムゾーンで文字列化
+        interviewDate = Utilities.formatDate(rawInterviewDate, sourceTZ, "yyyy/MM/dd");
+      } else if (typeof rawInterviewDate === "string") {
+        interviewDate = rawInterviewDate.trim().replace(/-/g, '/');
+      } else if (rawInterviewDate) {
+        interviewDate = String(rawInterviewDate).replace(/-/g, '/');
       }
       
       const hiredList = hiredText.split(/\r?\n/).filter(line => line.trim() !== "");
@@ -115,14 +127,51 @@ function syncToPaymentManagement() {
     const warnings = new Set();
     const newRowsToAppend = [];
 
+    // 書き込み・更新処理
     for (const record of syncRecords) {
       const key = record.jobID + "_" + record.candidateID;
       
+      // ▼▼ 既存データの場合は、差分がある基本情報のみを更新 ▼▼
       if (targetKeys[key] !== undefined) {
-        skipCount++;
+        const tIdx = targetKeys[key];
+        let hasChanges = false;
+        
+        const checkAndUpdate = (colName, newVal) => {
+          if (targetMap[colName]) {
+            const cIdx = targetMap[colName] - 1;
+            const oldVal = targetData[tIdx][cIdx];
+            
+            let oldStr = oldVal;
+            if (oldVal instanceof Date) {
+              // ▼ ターゲットシートのタイムゾーンで文字列化して「画面の見た目」を比較
+              oldStr = Utilities.formatDate(oldVal, targetTZ, "yyyy/MM/dd");
+            } else {
+              oldStr = String(oldVal || "").trim().replace(/-/g, '/');
+            }
+            
+            const newStr = String(newVal).trim().replace(/-/g, '/');
+            
+            if (oldStr !== newStr) {
+              targetSheet.getRange(tIdx + 1, cIdx + 1).setValue(newStr);
+              // 日付列なら書式も整える
+              if (colName === '面接日') {
+                targetSheet.getRange(tIdx + 1, cIdx + 1).setNumberFormat('yyyy/MM/dd');
+              }
+              hasChanges = true;
+            }
+          }
+        };
+
+        checkAndUpdate('事業者名', record.companyName);
+        checkAndUpdate('技能分野', record.fieldName);
+        checkAndUpdate('名前', record.candidateName);
+        checkAndUpdate('面接日', record.interviewDate);
+        
+        if (hasChanges) updateCount++;
         continue; 
       }
 
+      // ▼▼ 新規データの場合は配列にストックして後で一括追加 ▼▼
       const vals = {};
       vals['案件ID'] = record.jobID;
       vals['登録者ID'] = record.candidateID;
@@ -149,9 +198,14 @@ function syncToPaymentManagement() {
     if (newRowsToAppend.length > 0) {
       targetSheet.insertRowsBefore(footerRowIndex, newRowsToAppend.length);
       targetSheet.getRange(footerRowIndex, 1, newRowsToAppend.length, numCols).setValues(newRowsToAppend);
+      
+      // 追加した行の面接日列のフォーマットを整える
+      if (targetMap['面接日']) {
+        targetSheet.getRange(footerRowIndex, targetMap['面接日'], newRowsToAppend.length, 1).setNumberFormat('yyyy/MM/dd');
+      }
     }
 
-    let resultMessage = `支払い管理への同期が完了しました。\n新規追加: ${appendCount}件\nスキップ（既存）: ${skipCount}件`;
+    let resultMessage = `支払い管理への同期が完了しました。\n新規追加: ${appendCount}件\n情報更新: ${updateCount}件\n（変更なしスキップ: ${syncRecords.length - appendCount - updateCount}件）`;
     if (warnings.size > 0) {
       resultMessage += `\n\n【重複警告】\n以下の登録者は、別案件IDで既に登録されています。\n`;
       resultMessage += Array.from(warnings).join("\n");
