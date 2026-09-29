@@ -55,17 +55,31 @@ function getJobDict() {
   if (!sheet) return {};
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return {};
-  const data = sheet.getRange(2, 1, lastRow - 1, 4).getValues();
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const colMap = {};
+  headers.forEach((h, i) => colMap[String(h).replace(/\s/g, '')] = i);
+  
+  const idIdx = colMap['案件ID'];
+  const compIdx = colMap['事業者名'];
+  const statusIdx = colMap['ステータス'];
+  const hireIdx = colMap['採用者名'];
+
   const dict = {};
-  data.forEach(row => { 
-    if (row[0]) {
-      const id = String(row[0]).replace(/\s/g, '').toUpperCase();
-      dict[id] = `${row[3]} (${row[1]})`; 
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    if (row[idIdx]) {
+      const id = String(row[idIdx]).replace(/\s/g, '').toUpperCase();
+      const hireNames = hireIdx !== undefined ? String(row[hireIdx] || "").trim() : "";
+      const isRegistered = hireNames !== "";
+      dict[id] = {
+        text: `${row[compIdx] || ""} (${row[statusIdx] || ""})`,
+        isRegistered: isRegistered
+      };
     }
-  });
+  }
   return dict;
 }
-
 function generateSimpleList(candIds) {
   try {
     const masterSheet = getMasterSheet('登録者マスタ');

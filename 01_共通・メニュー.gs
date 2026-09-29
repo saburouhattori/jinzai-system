@@ -71,7 +71,8 @@ function onOpen() {
   ui.createMenu( '案件・採用管理' )
     .addItem( '案件登録' , 'showSidebarJobNew')
     .addItem( '案件更新/削除' , 'showSidebarJobEdit')
-    .addItem( '面接結果登録' , 'showSidebarHire') // ← 変更箇所
+    .addItem( '面接結果登録' , 'showSidebarHire')
+    .addItem( '面接結果の修正・更新' , 'showSidebarHireEdit')
     .addToUi();
 }
 
@@ -99,7 +100,8 @@ function showSidebarCompany() { showMainSidebar('COMPANY',  '事業者マスタ�
 function showSidebarJobNew()  { showMainSidebar('JOB',  '案件登録' ); }
 function showSidebarJobEdit() { showMainSidebar('JOB_EDIT', '案件更新/削除' ); }
 function showSidebarDelete()  { showMainSidebar('DELETE', '登録者削除'); }
-function showSidebarHire()    { showMainSidebar('HIRE', '面接結果登録'); } // ← 変更箇所
+function showSidebarHire()    { showMainSidebar('HIRE', '面接結果登録'); }
+function showSidebarHireEdit(){ showMainSidebar('HIRE_EDIT', '面接結果の修正・更新'); }
 function showSidebarList()    { showMainSidebar('LIST', '簡易リスト出力'); }
 
 /**

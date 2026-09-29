@@ -1,5 +1,7 @@
 <script>
-// --- 採用登録 ---
+// =========================================
+// 1. 面接結果登録 (改修前: HIRE)
+// =========================================
 
 function toggleHireNone(checkbox) {
   let listDiv = document.getElementById('hire_cand_list');
@@ -15,19 +17,34 @@ function toggleHireNone(checkbox) {
 }
 
 function fetchJobCandidates(mode) {
-  let idEl = document.getElementById(mode + '_job_id');
+  let idEl = document.getElementById('hire_job_id');
   if(!idEl) return;
   let rawId = idEl.value.trim();
   if (!rawId) { showModal('案件IDを入力してください。'); return; }
   let jobId = formatJobId(rawId); 
   idEl.value = jobId;
+
+  // ▼ フロントエンドの厳密なブロック
+  if (isJobDictLoading) {
+     showModal('辞書データを読み込み中です。少々お待ちください。');
+     return;
+  }
+  let jobData = jobDict[jobId.toUpperCase()];
+  if (!jobData) {
+     showModal('未登録の案件IDです。');
+     return;
+  }
+  if (jobData.isRegistered) {
+     showModal('この案件は既に面接結果が登録されています。\n結果を変更・取消する場合は「面接結果の修正・更新」メニューを使用してください。');
+     return;
+  }
   
   showModal('候補者を取得中...', true);
   
   google.script.run
     .withSuccessHandler(function(data) {
       closeModal(); 
-      let container = document.getElementById(mode + '_cand_list');
+      let container = document.getElementById('hire_cand_list');
       if(!container) return;
       
       let candidates = data.candidates;
@@ -50,7 +67,7 @@ function fetchJobCandidates(mode) {
 
         html += `<div style="display:flex; align-items:center; margin-bottom:8px; font-size:14px;">
                    <label style="display:flex; align-items:center; cursor:pointer; flex: 1;">
-                     <input type="checkbox" class="${mode}-cand-checkbox" value="${c.id}" style="margin:0 8px 0 0; width:16px; height:16px; flex-shrink:0;">
+                     <input type="checkbox" class="hire-cand-checkbox" value="${c.id}" style="margin:0 8px 0 0; width:16px; height:16px; flex-shrink:0;">
                      <span style="line-height:1.2;">${c.display}</span>
                    </label>
                    ${companySelect}
@@ -65,7 +82,7 @@ function fetchJobCandidates(mode) {
       }
     })
     .withFailureHandler(function(err) {
-      showModal('候補者取得エラー: ' + err.message);
+      showModal('エラー: ' + err.message);
     })
     .getJobCandidates(jobId);
 }
@@ -128,5 +145,140 @@ function submitHire() {
       showModal('登録エラー: ' + err.message);
     })
     .registerHire(jobId, hiredData);
+}
+
+// =========================================
+// 2. 面接結果の修正・更新 (改修後: HIRE_EDIT)
+// =========================================
+
+function fetchJobCandidatesEdit(mode) {
+  let idEl = document.getElementById('hireEdit_job_id');
+  if(!idEl) return;
+  let rawId = idEl.value.trim();
+  if (!rawId) { showModal('案件IDを入力してください。'); return; }
+  let jobId = formatJobId(rawId); 
+  idEl.value = jobId;
+
+  // ▼ フロントエンドの厳密なブロック
+  if (isJobDictLoading) {
+     showModal('辞書データを読み込み中です。少々お待ちください。');
+     return;
+  }
+  let jobData = jobDict[jobId.toUpperCase()];
+  if (!jobData) {
+     showModal('未登録の案件IDです。');
+     return;
+  }
+  if (!jobData.isRegistered) {
+     showModal('この案件はまだ面接結果が登録されていません。\n結果を登録する場合は「面接結果登録」メニューを使用してください。');
+     return;
+  }
+  
+  showModal('候補者を取得中...', true);
+  
+  google.script.run
+    .withSuccessHandler(function(data) {
+      closeModal(); 
+      let container = document.getElementById('hireEdit_cand_list');
+      if(!container) return;
+      
+      let candidates = data.candidates;
+      let companies = data.companies;
+
+      if (!candidates || candidates.length === 0) { 
+        container.innerHTML = '<div style="color:#d93025; font-size:12px;">候補者が見つかりません。案件IDを確認してください。</div>'; 
+        return; 
+      }
+      
+      let html = '';
+      candidates.forEach(c => {
+        let companySelect = '';
+        if (companies.length > 0) {
+          companySelect = `<select class="hireEdit-company-select" style="margin-right: 8px; width: 140px; font-size: 12px; padding: 4px;">`;
+          companies.forEach(comp => {
+            let selComp = (comp === c.pastCompany) ? 'selected' : '';
+            companySelect += `<option value="${comp}" ${selComp}>${comp}</option>`;
+          });
+          companySelect += `</select>`;
+        }
+
+        let defaultResult = c.pastResult || '不採用';
+        let selRes = (val) => val === defaultResult ? 'selected' : '';
+
+        let resultSelect = `
+          <select class="hireEdit-result-select" style="margin-left: auto; width: 170px; font-size: 12px; padding: 4px; border: 1px solid #1a73e8; color: #1a73e8; font-weight: bold;">
+            <option value="採用" ${selRes('採用')}>採用</option>
+            <option value="不採用" ${selRes('不採用')}>不採用</option>
+            <option value="内定辞退（候補者都合）" ${selRes('内定辞退（候補者都合）')}>内定辞退（候補者都合）</option>
+            <option value="内定取消（事業者都合）" ${selRes('内定取消（事業者都合）')}>内定取消（事業者都合）</option>
+            <option value="面接結果の取消" ${selRes('面接結果の取消')}>面接結果の取消</option>
+          </select>
+        `;
+
+        html += `<div class="hireEdit-cand-row" data-id="${c.id}" style="display:flex; align-items:center; margin-bottom:8px; font-size:14px; background:#fff; padding:8px; border:1px solid #ddd; border-radius:4px;">
+                   <span style="font-weight:bold; color:#333; width:150px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-right: 10px;">${c.display}</span>
+                   ${companySelect}
+                   ${resultSelect}
+                 </div>`;
+      });
+      container.innerHTML = html;
+    })
+    .withFailureHandler(function(err) {
+      showModal('エラー: ' + err.message);
+    })
+    .getJobCandidatesEdit(jobId);
+}
+
+function submitHireEdit() {
+  let idEl = document.getElementById('hireEdit_job_id');
+  if(!idEl) return;
+  let rawId = idEl.value.trim();
+  if (!rawId) { showModal('案件IDを入力してください。'); return; }
+  let jobId = formatJobId(rawId);
+  
+  let rows = document.querySelectorAll('.hireEdit-cand-row');
+  if (rows.length === 0) { showModal('先に「候補者検索」を行ってください。'); return; }
+  
+  let resultData = [];
+
+  rows.forEach(row => {
+    let id = row.getAttribute('data-id');
+    let compSel = row.querySelector('.hireEdit-company-select');
+    let resSel = row.querySelector('.hireEdit-result-select');
+    
+    let result = resSel.value;
+    let company = compSel ? compSel.value : '';
+    
+    resultData.push({ id: id, company: company, result: result });
+  });
+
+  if (!confirm(`表示されている面接結果をシステムに登録・更新します。よろしいですか？\n※各候補者のマスタ情報と面接履歴が自動更新されます。`)) return;
+  
+  let btnEl = document.getElementById('hireEditBtn');
+  if(btnEl) btnEl.disabled = true; 
+  
+  showModal('登録・更新を実行中...', true);
+  google.script.run
+    .withSuccessHandler(function(msg) {
+      try {
+        if(btnEl) btnEl.disabled = false; 
+        showModal(msg, false, true);
+
+        idEl.value = ''; 
+        let dispEl = document.getElementById('hireEditJobDisplay');
+        let listEl = document.getElementById('hireEdit_cand_list');
+        if(dispEl) dispEl.innerText = '';
+        if(listEl) listEl.innerHTML = '<div style="font-size: 12px; color: #888;">-- 上の検索ボタンを押してください --</div>';
+        
+        google.script.run.syncListSheets();
+      } catch(e) {
+        showModal('登録は完了しましたが、画面の更新に失敗しました: ' + e.message);
+      }
+    })
+    .withFailureHandler(function(err) {
+      if(btnEl) btnEl.disabled = false; 
+      showModal('登録・更新エラー: ' + err.message);
+    })
+    .updateHire(jobId, resultData);
 }
 </script>

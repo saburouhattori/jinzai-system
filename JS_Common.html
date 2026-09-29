@@ -111,13 +111,15 @@ window.addEventListener('DOMContentLoaded', () => {
     }).getAgentList();
   }
 
-  if (MODE === 'HIRE') {
+  if (MODE === 'HIRE' || MODE === 'HIRE_EDIT') {
     isJobDictLoading = true;
     google.script.run.withSuccessHandler(function(dict) { 
       jobDict = dict; 
       isJobDictLoading = false;
-      let inputEl = document.getElementById('hire_job_id');
-      if (inputEl && inputEl.value.trim() !== '') checkJobId(inputEl, 'hireJobDisplay');
+      let inputEl = document.getElementById(MODE === 'HIRE' ? 'hire_job_id' : 'hireEdit_job_id');
+      if (inputEl && inputEl.value.trim() !== '') {
+          checkJobId(inputEl, MODE === 'HIRE' ? 'hireJobDisplay' : 'hireEditJobDisplay');
+      }
     }).getJobDict();
   }
 });
@@ -176,7 +178,6 @@ function checkCandId(inputElem, displayId) {
   let formatted = formatId(rawVal).replace(/\s/g, '').toUpperCase();
   if (candidateDict[formatted]) {
     displayElem.innerText = candidateDict[formatted].name;
-    // 既に採用済みの場合は警告表示
     if (candidateDict[formatted].status === '採用') {
       displayElem.innerText += ' (採用済)';
       displayElem.style.color = '#d93025';
@@ -204,8 +205,18 @@ function checkJobId(inputElem, displayId) {
   }
 
   let formatted = formatJobId(rawVal).replace(/\s/g, '').toUpperCase();
-  if (jobDict[formatted]) {
-    displayElem.innerText = jobDict[formatted]; displayElem.style.color = '#34a853';
+  let jobData = jobDict[formatted];
+  if (jobData) {
+    if (MODE === 'HIRE' && jobData.isRegistered) {
+      displayElem.innerText = jobData.text + ' (結果登録済)'; 
+      displayElem.style.color = '#d93025';
+    } else if (MODE === 'HIRE_EDIT' && !jobData.isRegistered) {
+      displayElem.innerText = jobData.text + ' (未登録の案件)'; 
+      displayElem.style.color = '#d93025';
+    } else {
+      displayElem.innerText = jobData.text; 
+      displayElem.style.color = '#34a853';
+    }
   } else {
     displayElem.innerText = '未登録の案件IDです'; displayElem.style.color = '#d93025';
   }
@@ -264,6 +275,8 @@ function goToHireFromJob() {
    if (editJobForm) editJobForm.style.display = 'none';
    
    document.getElementById('form-hire').style.display = 'block';
+   let editHireForm = document.getElementById('form-hire-edit');
+   if (editHireForm) editHireForm.style.display = 'none';
    
    const hireJobIdEl = document.getElementById('hire_job_id');
    if (hireJobIdEl && currentAddedJobId) {
