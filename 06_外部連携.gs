@@ -10,6 +10,9 @@ function syncToPaymentManagement() {
     const sourceSheet = ss.getSheetByName('案件管理');
     if (!sourceSheet) throw new Error("「案件管理」シートが見つかりません。");
 
+    const masterSheet = ss.getSheetByName('登録者マスタ');
+    if (!masterSheet) throw new Error("「登録者マスタ」シートが見つかりません。");
+
     const targetSS = SpreadsheetApp.openById(EXTERNAL_SS_ID_FUNTOCO);
     const targetSheet = targetSS.getSheetByName("支払い管理");
     if (!targetSheet) throw new Error("外部シートに「支払い管理」が見つかりません。");
@@ -20,10 +23,43 @@ function syncToPaymentManagement() {
 
     const sourceData = sourceSheet.getDataRange().getValues();
     const sourceMap = getMasterColumnMap(sourceSheet);
+
+    const masterData = masterSheet.getDataRange().getValues();
+    const masterMap = getMasterColumnMap(masterSheet);
+
     const targetData = targetSheet.getDataRange().getValues();
     const targetMap = getMasterColumnMap(targetSheet);
 
     if (sourceData.length < 2) return "同期対象の案件がありません。";
+
+    // ▼ 日付フォーマット用ヘルパー関数（NaNやundefined等のゴミデータを排除）
+    const formatDateStr = (val, tz) => {
+      if (!val) return "";
+      if (val instanceof Date) return Utilities.formatDate(val, tz, "yyyy/MM/dd");
+      const s = String(val).trim().replace(/-/g, '/');
+      if (s === "NaN" || s === "undefined" || s === "Invalid Date") return "";
+      return s;
+    };
+
+    // ▼▼ マスタから 内定日・入国日・入職日の抽出（登録者マスタがSSoT） ▼▼
+    const candidateInfo = {};
+    if (masterMap['登録者ID']) {
+      const idIdx = masterMap['登録者ID'] - 1;
+      const offerIdx = masterMap['内定日'] ? masterMap['内定日'] - 1 : -1;
+      const entryIdx = masterMap['入国日'] ? masterMap['入国日'] - 1 : -1;
+      const workIdx = masterMap['入職日'] ? masterMap['入職日'] - 1 : -1;
+
+      for (let i = 1; i < masterData.length; i++) {
+        const cid = String(masterData[i][idIdx]).trim();
+        if (!cid) continue;
+
+        let oDate = offerIdx !== -1 ? formatDateStr(masterData[i][offerIdx], sourceTZ) : "";
+        let eDate = entryIdx !== -1 ? formatDateStr(masterData[i][entryIdx], sourceTZ) : "";
+        let wDate = workIdx !== -1 ? formatDateStr(masterData[i][workIdx], sourceTZ) : "";
+
+        candidateInfo[cid] = { offerDate: oDate, entryDate: eDate, workDate: wDate };
+      }
+    }
 
     const tJobIdx = targetMap['案件ID'] - 1;
     const tIdIdx = targetMap['登録者ID'] - 1;
@@ -39,7 +75,7 @@ function syncToPaymentManagement() {
       for (let i = 1; i < targetData.length; i++) {
         const jId = String(targetData[i][tJobIdx] || "").trim();
         const cId = String(targetData[i][tIdIdx] || "").trim();
-        
+
         if (!jId && !cId) {
           footerRowIndex = i + 1;
           break;
@@ -74,26 +110,7 @@ function syncToPaymentManagement() {
       const defaultCompany = companyNameCell.split(/\r?\n/)[0];
       const fieldName = sourceMap['技能分野'] ? row[sourceMap['技能分野'] - 1] : "";
       
-      let rawInterviewDate = sourceMap['面接日'] ? row[sourceMap['面接日'] - 1] : "";
-      let interviewDate = "";
-      if (rawInterviewDate instanceof Date) {
-        interviewDate = Utilities.formatDate(rawInterviewDate, sourceTZ, "yyyy/MM/dd");
-      } else if (typeof rawInterviewDate === "string") {
-        interviewDate = rawInterviewDate.trim().replace(/-/g, '/');
-      } else if (rawInterviewDate) {
-        interviewDate = String(rawInterviewDate).replace(/-/g, '/');
-      }
-
-      // ★追加: 内定日の抽出
-      let rawOfferDate = sourceMap['内定日'] ? row[sourceMap['内定日'] - 1] : "";
-      let offerDate = "";
-      if (rawOfferDate instanceof Date) {
-        offerDate = Utilities.formatDate(rawOfferDate, sourceTZ, "yyyy/MM/dd");
-      } else if (typeof rawOfferDate === "string") {
-        offerDate = rawOfferDate.trim().replace(/-/g, '/');
-      } else if (rawOfferDate) {
-        offerDate = String(rawOfferDate).replace(/-/g, '/');
-      }
+      const interviewDate = sourceMap['面接日'] ? formatDateStr(row[sourceMap['面接日'] - 1], sourceTZ) : "";
       
       const hiredList = hiredText.split(/\r?\n/).filter(line => line.trim() !== "");
       let currentCompany = defaultCompany;
@@ -121,6 +138,15 @@ function syncToPaymentManagement() {
         }
 
         if(candidateID) {
+           let oDate = "";
+           let eDate = "";
+           let wDate = "";
+           if (candidateID !== "採用者なし" && candidateInfo[candidateID]) {
+             oDate = candidateInfo[candidateID].offerDate;
+             eDate = candidateInfo[candidateID].entryDate;
+             wDate = candidateInfo[candidateID].workDate;
+           }
+
            syncRecords.push({
              jobID: jobID,
              candidateID: candidateID,
@@ -128,7 +154,9 @@ function syncToPaymentManagement() {
              fieldName: fieldName,
              candidateName: candidateName,
              interviewDate: interviewDate,
-             offerDate: offerDate // ★追加
+             offerDate: oDate,
+             entryDate: eDate,
+             workDate: wDate
            });
         }
       }
@@ -156,18 +184,12 @@ function syncToPaymentManagement() {
             const cIdx = targetMap[colName] - 1;
             const oldVal = targetData[tIdx][cIdx];
             
-            let oldStr = oldVal;
-            if (oldVal instanceof Date) {
-              oldStr = Utilities.formatDate(oldVal, targetTZ, "yyyy/MM/dd");
-            } else {
-              oldStr = String(oldVal || "").trim().replace(/-/g, '/');
-            }
-            
-            const newStr = String(newVal).trim().replace(/-/g, '/');
+            const oldStr = formatDateStr(oldVal, targetTZ);
+            const newStr = formatDateStr(newVal, targetTZ);
             
             if (oldStr !== newStr) {
               targetSheet.getRange(tIdx + 1, cIdx + 1).setValue(newStr);
-              if (colName === '面接日' || colName === '内定日') { // ★追加: 内定日の書式も整える
+              if (['面接日', '内定日', '入国日', '入職日'].includes(colName)) {
                 targetSheet.getRange(tIdx + 1, cIdx + 1).setNumberFormat('yyyy/MM/dd');
               }
               hasChanges = true;
@@ -179,7 +201,9 @@ function syncToPaymentManagement() {
         checkAndUpdate('技能分野', record.fieldName);
         checkAndUpdate('名前', record.candidateName);
         checkAndUpdate('面接日', record.interviewDate);
-        checkAndUpdate('内定日', record.offerDate); // ★追加: 内定日を更新対象に追加
+        checkAndUpdate('内定日', record.offerDate);
+        checkAndUpdate('入国日', record.entryDate);
+        checkAndUpdate('入職日', record.workDate);
         
         if (hasChanges) updateCount++;
         continue; 
@@ -194,7 +218,9 @@ function syncToPaymentManagement() {
       vals['技能分野'] = record.fieldName;
       vals['名前'] = record.candidateName;
       vals['面接日'] = record.interviewDate;
-      vals['内定日'] = record.offerDate; // ★追加: 新規追加時も内定日をセット
+      vals['内定日'] = record.offerDate; 
+      vals['入国日'] = record.entryDate;
+      vals['入職日'] = record.workDate;
 
       if (record.candidateID !== "採用者なし" && existingCandidateMap.has(record.candidateID)) {
          const oldJobs = existingCandidateMap.get(record.candidateID).join(", ");
@@ -226,13 +252,15 @@ function syncToPaymentManagement() {
       targetSheet.insertRowsBefore(footerRowIndex, newRowsToAppend.length);
       targetSheet.getRange(footerRowIndex, 1, newRowsToAppend.length, numCols).setValues(newRowsToAppend);
       
-      // 追加した行の面接日・内定日列のフォーマットを整える
-      if (targetMap['面接日']) {
-        targetSheet.getRange(footerRowIndex, targetMap['面接日'], newRowsToAppend.length, 1).setNumberFormat('yyyy/MM/dd');
-      }
-      if (targetMap['内定日']) { // ★追加
-        targetSheet.getRange(footerRowIndex, targetMap['内定日'], newRowsToAppend.length, 1).setNumberFormat('yyyy/MM/dd');
-      }
+      const setFormatIfExist = (colName) => {
+        if (targetMap[colName]) {
+          targetSheet.getRange(footerRowIndex, targetMap[colName], newRowsToAppend.length, 1).setNumberFormat('yyyy/MM/dd');
+        }
+      };
+      setFormatIfExist('面接日');
+      setFormatIfExist('内定日');
+      setFormatIfExist('入国日');
+      setFormatIfExist('入職日');
     }
 
     // 行の削除

@@ -102,7 +102,6 @@ function registerHire(jobId, hiredData, offerDateStr) {
               }
             }
           } else {
-            // 今回の案件で不採用または面接終了となった場合、内定日はセットしない（クリアする）
             if (mCol['内定日']) mSheet.getRange(rowIdx, mCol['内定日']).setValue('');
           }
 
@@ -163,29 +162,62 @@ function getJobCandidatesEdit(jobId) {
   try {
     const details = getJobDetails(jobId);
     if (!details) throw new Error("該当する案件が見つかりません。");
-    if (!details.interviewDate) throw new Error("面接日が設定されていません。\n先に「案件更新/削除」から面接日を登録してください。");
     
-    // ▼ バックエンドの強固なブロック（まだ結果がない場合は弾く）
     if (!details.hireNames || details.hireNames.trim() === "") {
         throw new Error("この案件はまだ面接結果が登録されていません。\n「面接結果登録」メニューを使用してください。");
     }
 
     const companies = details.company ? details.company.split(/\r?\n/).filter(c => c.trim()) : [];
+    const defaultCompany = companies.length > 0 ? companies[0] : "";
     const ids = details.candidates ? details.candidates.split(/\r?\n/).filter(id => id.trim()) : [];
 
     const mSheet = getMasterSheet('登録者マスタ');
     const mData = mSheet.getDataRange().getValues();
     const mCol = getMasterColumnMap(mSheet);
 
-    const formattedDate = String(details.interviewDate).replace(/-/g, '/');
+    let dateStr1 = "", dateStr2 = "";
+    if (details.interviewDate) {
+      const d = new Date(details.interviewDate.replace(/-/g, '/'));
+      if (!isNaN(d)) {
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const m = String(d.getMonth() + 1);
+        const dd = String(d.getDate()).padStart(2, '0');
+        const d_day = String(d.getDate());
+        dateStr1 = `${yyyy}/${mm}/${dd}`;
+        dateStr2 = `${yyyy}/${m}/${d_day}`;
+      } else {
+        dateStr1 = String(details.interviewDate).replace(/-/g, '/');
+      }
+    }
+
+    // ★最強の安全ロジック：案件管理シートの「採用者名」列から現在の採用者を直接抽出する
+    const hiredSet = new Set();
+    const hiredCompanyMap = new Map();
+    let currentCompForHired = defaultCompany;
+    
+    const hLines = details.hireNames.split(/\r?\n/).filter(l => l.trim() !== "");
+    for (const hl of hLines) {
+      if (hl.startsWith('【') && hl.endsWith('】')) {
+        currentCompForHired = hl.slice(1, -1).trim();
+      } else {
+        const match = hl.match(/^(SD-\d+)/);
+        if (match) {
+          hiredSet.add(match[1]);
+          hiredCompanyMap.set(match[1], currentCompForHired);
+        }
+      }
+    }
 
     const candDict = getCandidateDict(); 
     const candidates = ids.map(id => {
       const cleanId = id.split('-').slice(0, 2).join('-').trim();
       
-      let pastResult = "不採用"; 
-      let pastCompany = "";
+      // デフォルト値：案件管理シートで採用されていれば問答無用で「採用」にする
+      let pastResult = hiredSet.has(cleanId) ? "採用" : "不採用"; 
+      let pastCompany = hiredCompanyMap.get(cleanId) || defaultCompany;
 
+      // 面接履歴から辞退や取消などの詳細なステータスを探す
       for (let j = 1; j < mData.length; j++) {
         if (String(mData[j][0]).trim() === cleanId) {
           if (mCol['面接履歴']) {
@@ -193,16 +225,23 @@ function getJobCandidatesEdit(jobId) {
             const lines = history.split(/\r?\n/);
             for (let k = lines.length - 1; k >= 0; k--) {
               const line = lines[k];
-              if (line.startsWith(formattedDate + "：")) {
+              
+              let isMatch = false;
+              if (dateStr1 && line.startsWith(dateStr1 + "：")) isMatch = true;
+              else if (dateStr2 && line.startsWith(dateStr2 + "：")) isMatch = true;
+              
+              if (isMatch) {
                 const match = line.match(/：(.*?)(?:（(.*?)）)?$/);
                 if (match) {
-                  pastCompany = match[1].trim();
-                  const resultText = match[2] ? match[2].trim() : "";
+                  const parsedComp = match[1].trim();
+                  if (parsedComp) pastCompany = parsedComp;
                   
-                  if (resultText === "採用") pastResult = "採用";
-                  else if (resultText === "不採用") pastResult = "不採用";
-                  else if (resultText === "内定辞退") pastResult = "内定辞退（候補者都合）";
-                  else if (resultText === "事業者都合取消") pastResult = "内定取消（事業者都合）";
+                  const resultText = match[2] ? match[2].trim() : "";
+                  // 履歴に明記されていれば上書き（「採用」は既にデフォルトでセット済みなので辞退などを優先拾い上げ）
+                  if (resultText.includes("採用") && !resultText.includes("不")) pastResult = "採用";
+                  else if (resultText.includes("不採用")) pastResult = "不採用";
+                  else if (resultText.includes("内定辞退")) pastResult = "内定辞退（候補者都合）";
+                  else if (resultText.includes("取消")) pastResult = "内定取消（事業者都合）";
                 }
                 break;
               }
@@ -247,7 +286,7 @@ function updateHire(jobId, resultData, offerDateStr) {
       }
     }
     if (!companyNamesText) throw new Error("案件が見つかりません。");
-    if (!rawInterviewDate) throw new Error("面接日が設定されていません。");
+    // if (!rawInterviewDate) throw new Error("面接日が設定されていません。");
 
     let formattedDate = "日付不明";
     if (rawInterviewDate instanceof Date) {
@@ -332,11 +371,15 @@ function updateHire(jobId, resultData, offerDateStr) {
             const currentHistory = String(historyCell.getValue() || "").trim();
             let lines = currentHistory.split(/\r?\n/).filter(l => l.trim() !== "");
             
-            let existingIdx = lines.findIndex(l => l.startsWith(formattedDate + "："));
+            // 履歴の更新も揺らぎに対応
+            let existingIdx = lines.findIndex(l => {
+               if (formattedDate === "日付不明") return false;
+               return l.startsWith(formattedDate + "：") || l.startsWith(formattedDate.replace('/0', '/').replace(/\/0(\d)$/, '/$1') + "：");
+            });
             
             if (deleteHistory) {
                 if (existingIdx !== -1) lines.splice(existingIdx, 1);
-            } else if (writeHistory) {
+            } else if (writeHistory && formattedDate !== "日付不明") {
                 let histComp = (result === '不採用') ? defaultCompany : comp;
                 let newLine = `${formattedDate}：${histComp}${suffix}`;
                 if (existingIdx !== -1) {

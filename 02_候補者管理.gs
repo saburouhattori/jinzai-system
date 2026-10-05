@@ -45,6 +45,7 @@ function safeSearchByAdminId(id) {
         res.comment = getVal('修正前コメント'); 
         res.relative = getVal('日本在住の親族について');
         // 追加情報
+        res.entryDate = getVal('入国日'); res.workDate = getVal('入職日');
         res.agent = getVal('所属送り出し機関'); res.birthCity = getVal('出生地（都市名）');
         res.addressDetail = getVal('住所詳細'); res.passportNum = getVal('パスポート番号'); res.passportExp = getVal('パスポート有効期限');
         res.job = getVal('職業'); res.traineeExp = getVal('技能実習の経験の有無'); res.traineeCert = getVal('技能実習修了書の有無');
@@ -220,6 +221,7 @@ function updateAddInfoRow(formData) {
     const col = getMasterColumnMap(sheet);
     const row = Number(formData.row);
     const mapping = {
+      entryDate: '入国日', workDate: '入職日',
       agent: '所属送り出し機関', birthCity: '出生地（都市名）',
       addressDetail: '住所詳細', passportNum: 'パスポート番号', passportExp: 'パスポート有効期限',
       job: '職業', traineeExp: '技能実習の経験の有無', traineeCert: '技能実習修了書の有無',
@@ -259,6 +261,9 @@ function updateAddInfoRow(formData) {
       const length = safeMaxCol - startCol;
       sheet.getRange(row, startCol + 1, 1, length).setValues([currentRowData.slice(startCol)]);
     }
+
+    if (col['入国日'] && formData.entryDate) sheet.getRange(row, col['入国日']).setNumberFormat('yyyy"年"m"月"d"日"');
+    if (col['入職日'] && formData.workDate) sheet.getRange(row, col['入職日']).setNumberFormat('yyyy"年"m"月"d"日"');
 
     return `追加情報の登録が完了しました。`;
   } catch (e) { return "エラー: " + e.message; }
