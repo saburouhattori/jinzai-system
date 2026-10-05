@@ -123,9 +123,13 @@ function syncToPaymentManagement() {
       }
     }
 
-    const numCols = targetMap['備考'] ? targetMap['備考'] : (targetSheet.getLastColumn() || Object.keys(targetMap).length);
+    // 列数の取得を柔軟に変更（M列などの追加に自動追従）
+    const numCols = targetSheet.getLastColumn() || Object.keys(targetMap).length;
     const warnings = new Set();
     const newRowsToAppend = [];
+    
+    // 削除対象の特定用セット（今回連携すべき最新の組み合わせ）
+    const syncKeys = new Set(syncRecords.map(r => r.jobID + "_" + r.candidateID));
 
     // 書き込み・更新処理
     for (const record of syncRecords) {
@@ -173,6 +177,7 @@ function syncToPaymentManagement() {
 
       // ▼▼ 新規データの場合は配列にストックして後で一括追加 ▼▼
       const vals = {};
+      vals['チェッカー'] = false; // ヘッダー経由でも設定
       vals['案件ID'] = record.jobID;
       vals['登録者ID'] = record.candidateID;
       vals['事業者名'] = record.companyName;
@@ -186,6 +191,9 @@ function syncToPaymentManagement() {
       }
 
       const newRowValues = new Array(numCols).fill("");
+      // A列（チェックボックス）が消えないよう、安全措置としてデフォルト値(false)をセット
+      newRowValues[0] = false; 
+
       for (let headerName in vals) {
         if (targetMap[headerName] !== undefined && vals[headerName] !== undefined) {
           newRowValues[targetMap[headerName] - 1] = vals[headerName];
@@ -195,6 +203,16 @@ function syncToPaymentManagement() {
       appendCount++;
     }
 
+    // ▼▼ 削除対象の特定（支払い管理にあるが、現在の案件管理（採用リスト）にないもの）▼▼
+    const rowsToDelete = [];
+    for (const key in targetKeys) {
+      if (!syncKeys.has(key)) {
+        // targetDataのインデックスは0始まり、行番号は1始まり
+        rowsToDelete.push(targetKeys[key] + 1); 
+      }
+    }
+
+    // 新規行の一括追加
     if (newRowsToAppend.length > 0) {
       targetSheet.insertRowsBefore(footerRowIndex, newRowsToAppend.length);
       targetSheet.getRange(footerRowIndex, 1, newRowsToAppend.length, numCols).setValues(newRowsToAppend);
@@ -205,7 +223,13 @@ function syncToPaymentManagement() {
       }
     }
 
-    let resultMessage = `支払い管理への同期が完了しました。\n新規追加: ${appendCount}件\n情報更新: ${updateCount}件\n（変更なしスキップ: ${syncRecords.length - appendCount - updateCount}件）`;
+    // 行の削除（下の行から上に向かって削除することでインデックスのズレを防止）
+    rowsToDelete.sort((a, b) => b - a);
+    for (const rowNum of rowsToDelete) {
+      targetSheet.deleteRow(rowNum);
+    }
+
+    let resultMessage = `支払い管理への同期が完了しました。\n新規追加: ${appendCount}件\n情報更新: ${updateCount}件\n削除: ${rowsToDelete.length}件\n（変更なしスキップ: ${syncRecords.length - appendCount - updateCount}件）`;
     if (warnings.size > 0) {
       resultMessage += `\n\n【重複警告】\n以下の登録者は、別案件IDで既に登録されています。\n`;
       resultMessage += Array.from(warnings).join("\n");
