@@ -5,14 +5,21 @@
 
 function toggleHireNone(checkbox) {
   let listDiv = document.getElementById('hire_cand_list');
+  let offerDateContainer = document.getElementById('hire_offerDate_container');
+  let offerDateInput = document.getElementById('hire_offerDate');
+
   if (checkbox.checked) {
     listDiv.style.opacity = '0.5';
     listDiv.style.pointerEvents = 'none';
+    if(offerDateContainer) offerDateContainer.style.opacity = '0.5';
+    if(offerDateInput) offerDateInput.disabled = true;
     let checkboxes = document.querySelectorAll('.hire-cand-checkbox');
     checkboxes.forEach(cb => cb.checked = false);
   } else {
     listDiv.style.opacity = '1';
     listDiv.style.pointerEvents = 'auto';
+    if(offerDateContainer) offerDateContainer.style.opacity = '1';
+    if(offerDateInput) offerDateInput.disabled = false;
   }
 }
 
@@ -24,7 +31,6 @@ function fetchJobCandidates(mode) {
   let jobId = formatJobId(rawId); 
   idEl.value = jobId;
 
-  // ▼ フロントエンドの厳密なブロック
   if (isJobDictLoading) {
      showModal('辞書データを読み込み中です。少々お待ちください。');
      return;
@@ -52,6 +58,8 @@ function fetchJobCandidates(mode) {
 
       if (!candidates || candidates.length === 0) { 
         container.innerHTML = '<div style="color:#d93025; font-size:12px;">候補者が見つかりません。案件IDを確認してください。</div>'; 
+        let odContainer = document.getElementById('hire_offerDate_container');
+        if(odContainer) odContainer.style.display = 'none';
         return; 
       }
       let html = '';
@@ -74,6 +82,13 @@ function fetchJobCandidates(mode) {
                  </div>`;
       });
       container.innerHTML = html;
+
+      let odContainer = document.getElementById('hire_offerDate_container');
+      if(odContainer) {
+        odContainer.style.display = 'block';
+        let odInput = document.getElementById('hire_offerDate');
+        if(odInput) odInput.value = data.offerDate || '';
+      }
 
       let noneCb = document.getElementById('hire_none');
       if (noneCb) {
@@ -115,6 +130,8 @@ function submitHire() {
   } else {
     if (!confirm(`「採用者なし」として面接結果を登録します。よろしいですか？\n（候補者全員の履歴に不採用として記録されます）`)) return;
   }
+
+  let offerDate = document.getElementById('hire_offerDate') ? document.getElementById('hire_offerDate').value : '';
   
   let btnEl = document.getElementById('hireBtn');
   if(btnEl) btnEl.disabled = true; 
@@ -132,6 +149,9 @@ function submitHire() {
         if(dispEl) dispEl.innerText = '';
         if(listEl) listEl.innerHTML = '<div style="font-size: 12px; color: #888;">-- 上の検索ボタンを押してください --</div>';
         
+        let odContainer = document.getElementById('hire_offerDate_container');
+        if(odContainer) odContainer.style.display = 'none';
+
         let noneCb = document.getElementById('hire_none');
         if(noneCb) { noneCb.checked = false; toggleHireNone(noneCb); }
 
@@ -144,7 +164,7 @@ function submitHire() {
       if(btnEl) btnEl.disabled = false; 
       showModal('登録エラー: ' + err.message);
     })
-    .registerHire(jobId, hiredData);
+    .registerHire(jobId, hiredData, offerDate);
 }
 
 // =========================================
@@ -159,7 +179,6 @@ function fetchJobCandidatesEdit(mode) {
   let jobId = formatJobId(rawId); 
   idEl.value = jobId;
 
-  // ▼ フロントエンドの厳密なブロック
   if (isJobDictLoading) {
      showModal('辞書データを読み込み中です。少々お待ちください。');
      return;
@@ -187,6 +206,8 @@ function fetchJobCandidatesEdit(mode) {
 
       if (!candidates || candidates.length === 0) { 
         container.innerHTML = '<div style="color:#d93025; font-size:12px;">候補者が見つかりません。案件IDを確認してください。</div>'; 
+        let odContainer = document.getElementById('hireEdit_offerDate_container');
+        if(odContainer) odContainer.style.display = 'none';
         return; 
       }
       
@@ -222,6 +243,13 @@ function fetchJobCandidatesEdit(mode) {
                  </div>`;
       });
       container.innerHTML = html;
+
+      let odContainer = document.getElementById('hireEdit_offerDate_container');
+      if(odContainer) {
+        odContainer.style.display = 'block';
+        let odInput = document.getElementById('hireEdit_offerDate');
+        if(odInput) odInput.value = data.offerDate || '';
+      }
     })
     .withFailureHandler(function(err) {
       showModal('エラー: ' + err.message);
@@ -253,6 +281,8 @@ function submitHireEdit() {
   });
 
   if (!confirm(`表示されている面接結果をシステムに登録・更新します。よろしいですか？\n※各候補者のマスタ情報と面接履歴が自動更新されます。`)) return;
+
+  let offerDate = document.getElementById('hireEdit_offerDate') ? document.getElementById('hireEdit_offerDate').value : '';
   
   let btnEl = document.getElementById('hireEditBtn');
   if(btnEl) btnEl.disabled = true; 
@@ -270,6 +300,9 @@ function submitHireEdit() {
         if(dispEl) dispEl.innerText = '';
         if(listEl) listEl.innerHTML = '<div style="font-size: 12px; color: #888;">-- 上の検索ボタンを押してください --</div>';
         
+        let odContainer = document.getElementById('hireEdit_offerDate_container');
+        if(odContainer) odContainer.style.display = 'none';
+
         google.script.run.syncListSheets();
       } catch(e) {
         showModal('登録は完了しましたが、画面の更新に失敗しました: ' + e.message);
@@ -279,6 +312,6 @@ function submitHireEdit() {
       if(btnEl) btnEl.disabled = false; 
       showModal('登録・更新エラー: ' + err.message);
     })
-    .updateHire(jobId, resultData);
+    .updateHire(jobId, resultData, offerDate);
 }
 </script>

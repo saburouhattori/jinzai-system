@@ -77,12 +77,22 @@ function syncToPaymentManagement() {
       let rawInterviewDate = sourceMap['面接日'] ? row[sourceMap['面接日'] - 1] : "";
       let interviewDate = "";
       if (rawInterviewDate instanceof Date) {
-        // 元シートのタイムゾーンで文字列化
         interviewDate = Utilities.formatDate(rawInterviewDate, sourceTZ, "yyyy/MM/dd");
       } else if (typeof rawInterviewDate === "string") {
         interviewDate = rawInterviewDate.trim().replace(/-/g, '/');
       } else if (rawInterviewDate) {
         interviewDate = String(rawInterviewDate).replace(/-/g, '/');
+      }
+
+      // ★追加: 内定日の抽出
+      let rawOfferDate = sourceMap['内定日'] ? row[sourceMap['内定日'] - 1] : "";
+      let offerDate = "";
+      if (rawOfferDate instanceof Date) {
+        offerDate = Utilities.formatDate(rawOfferDate, sourceTZ, "yyyy/MM/dd");
+      } else if (typeof rawOfferDate === "string") {
+        offerDate = rawOfferDate.trim().replace(/-/g, '/');
+      } else if (rawOfferDate) {
+        offerDate = String(rawOfferDate).replace(/-/g, '/');
       }
       
       const hiredList = hiredText.split(/\r?\n/).filter(line => line.trim() !== "");
@@ -117,18 +127,19 @@ function syncToPaymentManagement() {
              companyName: currentCompany,
              fieldName: fieldName,
              candidateName: candidateName,
-             interviewDate: interviewDate
+             interviewDate: interviewDate,
+             offerDate: offerDate // ★追加
            });
         }
       }
     }
 
-    // 列数の取得を柔軟に変更（M列などの追加に自動追従）
+    // 列数の取得を柔軟に変更
     const numCols = targetSheet.getLastColumn() || Object.keys(targetMap).length;
     const warnings = new Set();
     const newRowsToAppend = [];
     
-    // 削除対象の特定用セット（今回連携すべき最新の組み合わせ）
+    // 削除対象の特定用セット
     const syncKeys = new Set(syncRecords.map(r => r.jobID + "_" + r.candidateID));
 
     // 書き込み・更新処理
@@ -147,7 +158,6 @@ function syncToPaymentManagement() {
             
             let oldStr = oldVal;
             if (oldVal instanceof Date) {
-              // ▼ ターゲットシートのタイムゾーンで文字列化して「画面の見た目」を比較
               oldStr = Utilities.formatDate(oldVal, targetTZ, "yyyy/MM/dd");
             } else {
               oldStr = String(oldVal || "").trim().replace(/-/g, '/');
@@ -157,8 +167,7 @@ function syncToPaymentManagement() {
             
             if (oldStr !== newStr) {
               targetSheet.getRange(tIdx + 1, cIdx + 1).setValue(newStr);
-              // 日付列なら書式も整える
-              if (colName === '面接日') {
+              if (colName === '面接日' || colName === '内定日') { // ★追加: 内定日の書式も整える
                 targetSheet.getRange(tIdx + 1, cIdx + 1).setNumberFormat('yyyy/MM/dd');
               }
               hasChanges = true;
@@ -170,6 +179,7 @@ function syncToPaymentManagement() {
         checkAndUpdate('技能分野', record.fieldName);
         checkAndUpdate('名前', record.candidateName);
         checkAndUpdate('面接日', record.interviewDate);
+        checkAndUpdate('内定日', record.offerDate); // ★追加: 内定日を更新対象に追加
         
         if (hasChanges) updateCount++;
         continue; 
@@ -177,13 +187,14 @@ function syncToPaymentManagement() {
 
       // ▼▼ 新規データの場合は配列にストックして後で一括追加 ▼▼
       const vals = {};
-      vals['チェッカー'] = false; // ヘッダー経由でも設定
+      vals['チェッカー'] = false; 
       vals['案件ID'] = record.jobID;
       vals['登録者ID'] = record.candidateID;
       vals['事業者名'] = record.companyName;
       vals['技能分野'] = record.fieldName;
       vals['名前'] = record.candidateName;
       vals['面接日'] = record.interviewDate;
+      vals['内定日'] = record.offerDate; // ★追加: 新規追加時も内定日をセット
 
       if (record.candidateID !== "採用者なし" && existingCandidateMap.has(record.candidateID)) {
          const oldJobs = existingCandidateMap.get(record.candidateID).join(", ");
@@ -191,7 +202,6 @@ function syncToPaymentManagement() {
       }
 
       const newRowValues = new Array(numCols).fill("");
-      // A列（チェックボックス）が消えないよう、安全措置としてデフォルト値(false)をセット
       newRowValues[0] = false; 
 
       for (let headerName in vals) {
@@ -203,11 +213,10 @@ function syncToPaymentManagement() {
       appendCount++;
     }
 
-    // ▼▼ 削除対象の特定（支払い管理にあるが、現在の案件管理（採用リスト）にないもの）▼▼
+    // ▼▼ 削除対象の特定 ▼▼
     const rowsToDelete = [];
     for (const key in targetKeys) {
       if (!syncKeys.has(key)) {
-        // targetDataのインデックスは0始まり、行番号は1始まり
         rowsToDelete.push(targetKeys[key] + 1); 
       }
     }
@@ -217,13 +226,16 @@ function syncToPaymentManagement() {
       targetSheet.insertRowsBefore(footerRowIndex, newRowsToAppend.length);
       targetSheet.getRange(footerRowIndex, 1, newRowsToAppend.length, numCols).setValues(newRowsToAppend);
       
-      // 追加した行の面接日列のフォーマットを整える
+      // 追加した行の面接日・内定日列のフォーマットを整える
       if (targetMap['面接日']) {
         targetSheet.getRange(footerRowIndex, targetMap['面接日'], newRowsToAppend.length, 1).setNumberFormat('yyyy/MM/dd');
       }
+      if (targetMap['内定日']) { // ★追加
+        targetSheet.getRange(footerRowIndex, targetMap['内定日'], newRowsToAppend.length, 1).setNumberFormat('yyyy/MM/dd');
+      }
     }
 
-    // 行の削除（下の行から上に向かって削除することでインデックスのズレを防止）
+    // 行の削除
     rowsToDelete.sort((a, b) => b - a);
     for (const rowNum of rowsToDelete) {
       targetSheet.deleteRow(rowNum);

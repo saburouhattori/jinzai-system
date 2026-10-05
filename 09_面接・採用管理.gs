@@ -30,26 +30,28 @@ function getJobCandidates(jobId) {
       };
     }).filter(c => c.id);
 
-    return { candidates: candidates, companies: companies };
+    return { candidates: candidates, companies: companies, offerDate: details.offerDate };
   } catch(e) { throw new Error(e.message); }
 }
 
-function registerHire(jobId, hiredData) {
+function registerHire(jobId, hiredData, offerDateStr) {
   try {
     const sheet = getMasterSheet('案件管理');
     const mSheet = getMasterSheet('登録者マスタ');
     if (!sheet || !mSheet) throw new Error("シートへのアクセスに失敗しました。");
 
     const mCol = getMasterColumnMap(mSheet);
+    const colMap = getMasterColumnMap(sheet);
     const data = sheet.getDataRange().getValues();
     const mData = mSheet.getDataRange().getValues();
+    if (!colMap['案件ID']) throw new Error("案件管理シートに案件IDが見つかりません。");
     
     let companyNamesText = "", rawInterviewDate = "", allCandidatesRaw = "", targetJobRow = -1;
     for (let i = 1; i < data.length; i++) {
-      if (String(data[i][0]).trim() === String(jobId).trim()) {
-        companyNamesText = String(data[i][3]).trim();
-        allCandidatesRaw = String(data[i][5]);
-        rawInterviewDate = data[i][6];
+      if (String(data[i][colMap['案件ID'] - 1]).trim() === String(jobId).trim()) {
+        companyNamesText = String(data[i][colMap['事業者名'] - 1]).trim();
+        allCandidatesRaw = String(data[i][colMap['候補者名'] - 1]);
+        rawInterviewDate = data[i][colMap['面接日'] - 1];
         targetJobRow = i + 1;
         break;
       }
@@ -62,6 +64,11 @@ function registerHire(jobId, hiredData) {
       formattedDate = Utilities.formatDate(rawInterviewDate, "JST", "yyyy/MM/dd");
     } else if (rawInterviewDate) {
       formattedDate = String(rawInterviewDate).replace(/[年月]/g, '/').replace(/日/g, '');
+    }
+
+    let offerDateObj = "";
+    if (offerDateStr) {
+      offerDateObj = new Date(offerDateStr.replace(/-/g, '/'));
     }
 
     const companyNames = companyNamesText.split(/\r?\n/).filter(c => c.trim());
@@ -87,7 +94,18 @@ function registerHire(jobId, hiredData) {
           if (isHired) {
             if (mCol['ステータス']) mSheet.getRange(rowIdx, mCol['ステータス']).setValue('採用');
             if (mCol['採用事業者']) mSheet.getRange(rowIdx, mCol['採用事業者']).setValue(hiredComp);
+            if (mCol['内定日']) {
+              if (offerDateObj) {
+                mSheet.getRange(rowIdx, mCol['内定日']).setValue(offerDateObj).setNumberFormat('yyyy"年"m"月"d"日"');
+              } else {
+                mSheet.getRange(rowIdx, mCol['内定日']).setValue('');
+              }
+            }
+          } else {
+            // 今回の案件で不採用または面接終了となった場合、内定日はセットしない（クリアする）
+            if (mCol['内定日']) mSheet.getRange(rowIdx, mCol['内定日']).setValue('');
           }
+
           if (mCol['面接履歴']) {
             const historyCell = mSheet.getRange(rowIdx, mCol['面接履歴']);
             const currentHistory = String(historyCell.getValue() || "").trim();
@@ -122,11 +140,18 @@ function registerHire(jobId, hiredData) {
       }
     }
 
-    sheet.getRange(targetJobRow, 8).setValue(hiredNamesText);
-    sheet.getRange(targetJobRow, 2).setValue(hiredData.length > 0 ? '入国準備' : '終了');
+    if (colMap['採用者名']) sheet.getRange(targetJobRow, colMap['採用者名']).setValue(hiredNamesText);
+    if (colMap['ステータス']) sheet.getRange(targetJobRow, colMap['ステータス']).setValue(hiredData.length > 0 ? '入国準備' : '終了');
+    if (colMap['内定日']) {
+      if (offerDateObj && hiredData.length > 0) {
+        sheet.getRange(targetJobRow, colMap['内定日']).setValue(offerDateObj).setNumberFormat('yyyy"年"m"月"d"日"');
+      } else {
+        sheet.getRange(targetJobRow, colMap['内定日']).setValue('');
+      }
+    }
 
-    if (hiredData.length > 0) return `${hiredData.length} 名の面接結果（ステータス：入国準備）、および対象候補者全員の「面接履歴」への追記が完了しました。`;
-    return `「採用者なし」として案件を終了し、対象候補者全員の「面接履歴」への追記が完了しました。`;
+    if (hiredData.length > 0) return `${hiredData.length} 名の面接結果（ステータス：入国準備）、およびマスタの内定日・面接履歴の更新が完了しました。`;
+    return `「採用者なし」として案件を終了し、対象候補者全員のマスタ更新が完了しました。`;
   } catch(e) { throw new Error(e.message); }
 }
 
@@ -196,25 +221,27 @@ function getJobCandidatesEdit(jobId) {
       };
     }).filter(c => c.id);
 
-    return { candidates: candidates, companies: companies };
+    return { candidates: candidates, companies: companies, offerDate: details.offerDate };
   } catch(e) { throw new Error(e.message); }
 }
 
-function updateHire(jobId, resultData) {
+function updateHire(jobId, resultData, offerDateStr) {
   try {
     const sheet = getMasterSheet('案件管理');
     const mSheet = getMasterSheet('登録者マスタ');
     if (!sheet || !mSheet) throw new Error("シートへのアクセスに失敗しました。");
 
     const mCol = getMasterColumnMap(mSheet);
+    const colMap = getMasterColumnMap(sheet);
     const data = sheet.getDataRange().getValues();
     const mData = mSheet.getDataRange().getValues();
+    if (!colMap['案件ID']) throw new Error("案件管理シートに案件IDが見つかりません。");
     
     let companyNamesText = "", rawInterviewDate = "", targetJobRow = -1;
     for (let i = 1; i < data.length; i++) {
-      if (String(data[i][0]).trim() === String(jobId).trim()) {
-        companyNamesText = String(data[i][3]).trim();
-        rawInterviewDate = data[i][6];
+      if (String(data[i][colMap['案件ID'] - 1]).trim() === String(jobId).trim()) {
+        companyNamesText = String(data[i][colMap['事業者名'] - 1]).trim();
+        rawInterviewDate = data[i][colMap['面接日'] - 1];
         targetJobRow = i + 1;
         break;
       }
@@ -227,6 +254,11 @@ function updateHire(jobId, resultData) {
       formattedDate = Utilities.formatDate(rawInterviewDate, "JST", "yyyy/MM/dd");
     } else if (rawInterviewDate) {
       formattedDate = String(rawInterviewDate).replace(/[年月]/g, '/').replace(/日/g, '');
+    }
+
+    let offerDateObj = "";
+    if (offerDateStr) {
+      offerDateObj = new Date(offerDateStr.replace(/-/g, '/'));
     }
 
     const companyNames = companyNamesText.split(/\r?\n/).filter(c => c.trim());
@@ -283,6 +315,18 @@ function updateHire(jobId, resultData) {
               }
           }
 
+          if (mCol['内定日']) {
+              if (result === '採用') {
+                  if (offerDateObj) {
+                      mSheet.getRange(rowIdx, mCol['内定日']).setValue(offerDateObj).setNumberFormat('yyyy"年"m"月"d"日"');
+                  } else {
+                      mSheet.getRange(rowIdx, mCol['内定日']).setValue('');
+                  }
+              } else {
+                  mSheet.getRange(rowIdx, mCol['内定日']).setValue('');
+              }
+          }
+
           if (mCol['面接履歴']) {
             const historyCell = mSheet.getRange(rowIdx, mCol['面接履歴']);
             const currentHistory = String(historyCell.getValue() || "").trim();
@@ -331,9 +375,16 @@ function updateHire(jobId, resultData) {
         }
     }
     
-    sheet.getRange(targetJobRow, 8).setValue(hiredNamesText);
-    sheet.getRange(targetJobRow, 2).setValue(hiredList.length > 0 ? '入国準備' : '終了');
+    if (colMap['採用者名']) sheet.getRange(targetJobRow, colMap['採用者名']).setValue(hiredNamesText);
+    if (colMap['ステータス']) sheet.getRange(targetJobRow, colMap['ステータス']).setValue(hiredList.length > 0 ? '入国準備' : '終了');
+    if (colMap['内定日']) {
+      if (offerDateObj && hiredList.length > 0) {
+        sheet.getRange(targetJobRow, colMap['内定日']).setValue(offerDateObj).setNumberFormat('yyyy"年"m"月"d"日"');
+      } else {
+        sheet.getRange(targetJobRow, colMap['内定日']).setValue('');
+      }
+    }
 
-    return `面接結果の更新が完了しました。\n（マスタのステータスと履歴が自動更新されました）`;
+    return `面接結果の更新が完了しました。\n（マスタのステータスと履歴・内定日が自動更新されました）`;
   } catch(e) { throw new Error(e.message); }
 }

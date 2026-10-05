@@ -99,7 +99,7 @@ function searchDataAddInfo() {
     closeModal();
     if (data) {
       document.getElementById('targetRow').value = data.row;
-      const fields = ['agent', 'offerDate', 'birthCity', 'addressDetail', 'passportNum', 'passportExp', 'job', 'traineeExp', 'traineeCert', 'crime', 'applyCount', 'rejectCount', 'overseasExp', 'travelCount', 'lastInDate', 'lastOutDate', 'relName2', 'relRelation2', 'relBirth2', 'relCountry2', 'relLive2', 'relWork2', 'relCard2', 'memo'];
+      const fields = ['agent', 'birthCity', 'addressDetail', 'passportNum', 'passportExp', 'job', 'traineeExp', 'traineeCert', 'crime', 'applyCount', 'rejectCount', 'overseasExp', 'travelCount', 'lastInDate', 'lastOutDate', 'relName2', 'relRelation2', 'relBirth2', 'relCountry2', 'relLive2', 'relWork2', 'relCard2', 'memo'];
       fields.forEach(f => { let el = document.getElementById('add_' + f); if(el) { let val = data[f] || ""; if(typeof val === 'string' && val.startsWith("'")) val = val.substring(1); el.value = val; } });
       showModal(data.name + ' さんのデータを読み込みました。\n採用後の追加情報を入力してください。');
     } else { showModal('該当するデータが見つかりません。'); }
@@ -110,7 +110,7 @@ function submitAddInfo() {
   let row = document.getElementById('targetRow').value;
   if (!row) { showModal('先に管理番号で検索して、データを読み込んでください。'); return; }
   let formData = { row: row };
-  const fields = ['agent', 'offerDate', 'birthCity', 'addressDetail', 'passportNum', 'passportExp', 'job', 'traineeExp', 'traineeCert', 'crime', 'applyCount', 'rejectCount', 'overseasExp', 'travelCount', 'lastInDate', 'lastOutDate', 'relName2', 'relRelation2', 'relBirth2', 'relCountry2', 'relLive2', 'relWork2', 'relCard2', 'memo'];
+  const fields = ['agent', 'birthCity', 'addressDetail', 'passportNum', 'passportExp', 'job', 'traineeExp', 'traineeCert', 'crime', 'applyCount', 'rejectCount', 'overseasExp', 'travelCount', 'lastInDate', 'lastOutDate', 'relName2', 'relRelation2', 'relBirth2', 'relCountry2', 'relLive2', 'relWork2', 'relCard2', 'memo'];
   
   fields.forEach(f => { 
     let el = document.getElementById('add_' + f); 

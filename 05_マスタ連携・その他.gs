@@ -179,6 +179,7 @@ function updateCandidateLists(silent = false) {
   for (const job of jobList) {
     const jobId = job[normalize_('案件ID')] || '';
     const skillField = job[normalize_('技能分野')] || '';
+    const offerDate = job[normalize_('内定日')] || ''; // ★追加: 案件管理から内定日を取得
     const hiredText = String(job[normalize_('採用者名')] || '');
 
     if (!hiredText || hiredText.includes("採用者なし")) continue;
@@ -199,7 +200,8 @@ function updateCandidateLists(silent = false) {
         hiredCandidatesMap.set(match[1], {
           jobId: jobId,
           skillField: skillField,
-          company: currentCompany
+          company: currentCompany,
+          offerDate: offerDate // ★追加
         });
       }
     }
@@ -248,6 +250,13 @@ function updateCandidateLists(silent = false) {
       dataMap[normalize_('技能分野')] = hireInfo.skillField;
       dataMap[normalize_('採用事業者名')] = hireInfo.company;
       dataMap[normalize_('採用事業者')] = hireInfo.company; 
+      
+      // ★追加: もしマスタに内定日がなく、案件側に内定日があればそれを適用する
+      if (!dataMap[normalize_('内定日')] && hireInfo.offerDate) {
+         let oDate = hireInfo.offerDate;
+         if (oDate instanceof Date) oDate = Utilities.formatDate(oDate, "JST", "yyyy/MM/dd");
+         dataMap[normalize_('内定日')] = oDate;
+      }
 
       hiredData.push(buildRowByHeaders_(hiredHeaders, dataMap));
     } else {

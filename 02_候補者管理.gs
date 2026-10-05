@@ -45,7 +45,7 @@ function safeSearchByAdminId(id) {
         res.comment = getVal('修正前コメント'); 
         res.relative = getVal('日本在住の親族について');
         // 追加情報
-        res.agent = getVal('所属送り出し機関'); res.offerDate = getVal('内定日'); res.birthCity = getVal('出生地（都市名）');
+        res.agent = getVal('所属送り出し機関'); res.birthCity = getVal('出生地（都市名）');
         res.addressDetail = getVal('住所詳細'); res.passportNum = getVal('パスポート番号'); res.passportExp = getVal('パスポート有効期限');
         res.job = getVal('職業'); res.traineeExp = getVal('技能実習の経験の有無'); res.traineeCert = getVal('技能実習修了書の有無');
         res.crime = getVal('犯罪歴の有無'); res.applyCount = getVal('在留資格交付申請の回数'); res.rejectCount = getVal('不許可となった在留資格交付申請の回数');
@@ -220,7 +220,7 @@ function updateAddInfoRow(formData) {
     const col = getMasterColumnMap(sheet);
     const row = Number(formData.row);
     const mapping = {
-      agent: '所属送り出し機関', offerDate: '内定日', birthCity: '出生地（都市名）',
+      agent: '所属送り出し機関', birthCity: '出生地（都市名）',
       addressDetail: '住所詳細', passportNum: 'パスポート番号', passportExp: 'パスポート有効期限',
       job: '職業', traineeExp: '技能実習の経験の有無', traineeCert: '技能実習修了書の有無',
       crime: '犯罪歴の有無', applyCount: '在留資格交付申請の回数', rejectCount: '不許可となった在留資格交付申請の回数',

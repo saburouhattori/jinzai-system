@@ -50,7 +50,7 @@ async function submitJob() {
   if (companies.length === 0) { showModal('事業者名を入力してください。'); return; }
 
   if (unlistedCompanies.length > 0) {
-    showModal(`未登録の事業者が含まれています：\n「${unlistedCompanies.join('」「')}」\n\n先に管理者（服部三郎）へ連絡し、事業者マスタへの登録を依頼してください。`);
+    showModal(`未登録の事業者が含まれています：\n「${unlistedCompanies.join('」「')}」\n\n先に管理者へ連絡し、事業者マスタへの登録を依頼してください。`);
     return;
   }
   
@@ -301,7 +301,7 @@ async function submitJobEdit() {
   if (companies.length === 0) { showModal('事業者名を入力してください。'); return; }
 
   if (unlistedCompanies.length > 0) {
-    showModal(`未登録の事業者が含まれています：\n「${unlistedCompanies.join('」「')}」\n\n先に管理者（服部三郎）へ連絡し、事業者マスタへの登録を依頼してください。`);
+    showModal(`未登録の事業者が含まれています：\n「${unlistedCompanies.join('」「')}」\n\n先に管理者へ連絡し、事業者マスタへの登録を依頼してください。`);
     return;
   }
   
