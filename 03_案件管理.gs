@@ -47,7 +47,6 @@ function addJob(formData) {
     const candidatesArr = Array.isArray(formData.candidates) ? formData.candidates : [];
     let fileUrlsArr = Array.isArray(formData.relatedFiles) ? formData.relatedFiles : [];
 
-    // 代表企業名（1社目）をフォルダ名に使用する
     const mainCompany = companiesArr.length > 0 ? companiesArr[0] : "";
     fileUrlsArr = handleDriveUploads(nextId, mainCompany, fileUrlsArr, formData.uploadFiles);
     const fileUrlsText = fileUrlsArr.join('\n');
@@ -63,8 +62,8 @@ function addJob(formData) {
       '技能分野': formData.skill || '',
       '候補者名': candidatesArr.join('\n'),
       '面接日': interviewDate,
-      '内定日': '', // 案件登録画面からは設定しない
-      '採用者名': '',
+      '内定日': '', 
+      '面接結果詳細': '', 
       '関連フォルダ・ファイル': fileUrlsText,
       '備考・メモ': formData.memo || ''
     };
@@ -144,7 +143,7 @@ function getJobDetails(jobId) {
           candidates: String(getVal('候補者名') || ""),
           interviewDate: toIsoDate(getVal('面接日')), 
           offerDate: toIsoDate(getVal('内定日')), 
-          hireNames: getVal('採用者名'),
+          resultDetails: String(getVal('面接結果詳細') || ""), 
           relatedFile: rawUrls, 
           memo: getVal('備考・メモ')
         };
@@ -185,7 +184,7 @@ function updateJob(formData) {
       '技能分野': formData.skill || '',
       '候補者名': candidatesArr.join('\n'),
       '面接日': interviewDate,
-      // '内定日'は面接結果画面で操作するためここでは更新対象から除外（既存の値を維持）
+      // '内定日' および '面接結果詳細' はここでは更新対象から除外（既存の値を維持）
       '関連フォルダ・ファイル': fileUrlsText,
       '備考・メモ': formData.memo || ''
     };
@@ -219,10 +218,76 @@ function deleteJobRow(jobId) {
 
     for (let i = data.length - 1; i >= 1; i--) {
       if (String(data[i][colMap['案件ID'] - 1]).trim() === String(jobId).trim()) {
+        
+        // ▼ 案件行を削除する前に、マスタの面接履歴・ステータスをロールバックする
+        const rawInterviewDate = colMap['面接日'] ? data[i][colMap['面接日'] - 1] : "";
+        const companiesText = colMap['事業者名'] ? String(data[i][colMap['事業者名'] - 1]) : "";
+        const resultDetails = colMap['面接結果詳細'] ? String(data[i][colMap['面接結果詳細'] - 1]) : "";
+        const candidatesText = colMap['候補者名'] ? String(data[i][colMap['候補者名'] - 1]) : "";
+        
+        rollbackMasterOnJobDelete(rawInterviewDate, companiesText, resultDetails, candidatesText);
+
         sheet.deleteRow(i + 1);
-        return "案件を削除しました。";
+        return "案件を削除し、関連するマスタの面接履歴とステータスをロールバック（取消）しました。";
       }
     }
     throw new Error("対象の案件が見つかりませんでした。");
   } catch(e) { throw new Error(e.message); }
+}
+
+// ---------------------------------------------------------
+// マスタ連動：候補者の名前変更時に案件管理の表記を自動置換する
+// ---------------------------------------------------------
+function updateJobCandidateName(adminId, newName) {
+  try {
+    const sheet = getMasterSheet('案件管理');
+    if (!sheet) return;
+    const colMap = getMasterColumnMap(sheet);
+    const data = sheet.getDataRange().getValues();
+    
+    const candsCol = colMap['候補者名'] ? colMap['候補者名'] - 1 : -1;
+    const detailsCol = colMap['面接結果詳細'] ? colMap['面接結果詳細'] - 1 : -1;
+
+    if (candsCol === -1 && detailsCol === -1) return;
+
+    // SD-XXXX-(旧名前) または SD-XXXX を SD-XXXX-(新名前) に置換する正規表現（カッコ等の直前まで）
+    const replaceRegex = new RegExp(`(${adminId})(?:-[^\\n\\r（]*)?`, 'g');
+
+    for (let i = 1; i < data.length; i++) {
+      let newCands = "", newDetails = "";
+
+      if (candsCol !== -1 && data[i][candsCol]) {
+        const oldVal = String(data[i][candsCol]);
+        newCands = oldVal.replace(replaceRegex, `$1-${newName}`);
+        if (oldVal !== newCands) {
+          sheet.getRange(i + 1, candsCol + 1).setValue(newCands);
+        }
+      }
+
+      if (detailsCol !== -1 && data[i][detailsCol]) {
+        const oldVal = String(data[i][detailsCol]);
+        newDetails = oldVal.replace(replaceRegex, `$1-${newName}`);
+        if (oldVal !== newDetails) {
+          const range = sheet.getRange(i + 1, detailsCol + 1);
+          const lines = newDetails.split('\n');
+          const richText = SpreadsheetApp.newRichTextValue().setText(newDetails);
+          const styleBlack = SpreadsheetApp.newTextStyle().setForegroundColor('#000000').setBold(false).build();
+          const styleBlue = SpreadsheetApp.newTextStyle().setForegroundColor('#1a73e8').setBold(true).build();
+          
+          if (newDetails.length > 0) richText.setTextStyle(0, newDetails.length, styleBlack);
+
+          let currentPos = 0;
+          lines.forEach(line => {
+            if (line.includes('（採用）')) {
+              richText.setTextStyle(currentPos, currentPos + line.length, styleBlue);
+            }
+            currentPos += line.length + 1;
+          });
+          range.setRichTextValue(richText.build());
+        }
+      }
+    }
+  } catch(e) {
+    console.error("候補者名の案件管理への連動更新に失敗しました: " + e.message);
+  }
 }

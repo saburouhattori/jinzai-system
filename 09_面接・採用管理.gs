@@ -13,7 +13,7 @@ function getJobCandidates(jobId) {
     if (!details.interviewDate) throw new Error("面接日が設定されていません。\n先に「案件更新/削除」から面接日を登録してください。");
     
     // ▼ バックエンドの強固なブロック（既に結果がある場合は弾く）
-    if (details.hireNames && details.hireNames.trim() !== "") {
+    if (details.resultDetails && details.resultDetails.trim() !== "") {
         throw new Error("この案件は既に面接結果が登録されています。\n「面接結果の修正・更新」メニューを使用してください。");
     }
     
@@ -82,11 +82,15 @@ function registerHire(jobId, hiredData, offerDateStr) {
        hiredIdMap.set(String(item.id).trim(), item.company);
     });
     
+    let resultDataArray = [];
+
     allCandidateIds.forEach(candId => {
       const isHired = hiredIdMap.has(candId);
       const hiredComp = isHired ? hiredIdMap.get(candId) : defaultCompany;
       const resultText = isHired ? `（採用）` : "（不採用）";
       const newHistoryLine = `${formattedDate}：${hiredComp}${resultText}`;
+
+      resultDataArray.push({ id: candId, company: hiredComp, result: isHired ? '採用' : '不採用' });
 
       for (let j = 1; j < mData.length; j++) {
         if (String(mData[j][0]).trim() === candId) {
@@ -115,31 +119,58 @@ function registerHire(jobId, hiredData, offerDateStr) {
       }
     });
 
-    let hiredNamesText = "採用者なし";
-    if (hiredData.length > 0) {
-      if (companyNames.length <= 1) {
-        hiredNamesText = hiredData.map(item => {
-           const name = candDict[item.id] ? candDict[item.id].name : "";
-           return name ? `${item.id}-${name}` : `${item.id}`;
+    // ▼ 採用者を上に、それ以外を下に並び替える
+    resultDataArray.sort((a, b) => {
+      if (a.result === '採用' && b.result !== '採用') return -1;
+      if (a.result !== '採用' && b.result === '採用') return 1;
+      return 0;
+    });
+
+    // ▼ 面接結果詳細テキストの構築と書式設定
+    let resultDetailsText = "";
+    if (companyNames.length <= 1) {
+        resultDetailsText = resultDataArray.map(item => {
+            const name = candDict[item.id] ? candDict[item.id].name : "";
+            const prefix = name ? `${item.id}-${name}` : `${item.id}`;
+            return `${prefix}（${item.result}）`;
         }).join('\n');
-      } else {
+    } else {
         const grouped = {};
-        hiredData.forEach(item => {
-          if (!grouped[item.company]) grouped[item.company] = [];
-          const name = candDict[item.id] ? candDict[item.id].name : "";
-          grouped[item.company].push(name ? `${item.id}-${name}` : `${item.id}`);
+        resultDataArray.forEach(item => {
+            if (!grouped[item.company]) grouped[item.company] = [];
+            const name = candDict[item.id] ? candDict[item.id].name : "";
+            const prefix = name ? `${item.id}-${name}` : `${item.id}`;
+            grouped[item.company].push(`${prefix}（${item.result}）`);
         });
-        
         let lines = [];
         for (const [comp, cands] of Object.entries(grouped)) {
-          lines.push(`【${comp}】`);
-          lines.push(...cands);
+            lines.push(`【${comp}】`);
+            lines.push(...cands);
         }
-        hiredNamesText = lines.join('\n');
-      }
+        resultDetailsText = lines.join('\n');
     }
 
-    if (colMap['採用者名']) sheet.getRange(targetJobRow, colMap['採用者名']).setValue(hiredNamesText);
+    if (colMap['面接結果詳細']) {
+      const range = sheet.getRange(targetJobRow, colMap['面接結果詳細']);
+      const richText = SpreadsheetApp.newRichTextValue().setText(resultDetailsText);
+      const styleBlack = SpreadsheetApp.newTextStyle().setForegroundColor('#000000').setBold(false).build();
+      const styleBlue = SpreadsheetApp.newTextStyle().setForegroundColor('#1a73e8').setBold(true).build();
+      
+      if (resultDetailsText.length > 0) {
+        richText.setTextStyle(0, resultDetailsText.length, styleBlack);
+      }
+
+      const lines = resultDetailsText.split('\n');
+      let currentPos = 0;
+      lines.forEach(line => {
+        if (line.includes('（採用）')) {
+          richText.setTextStyle(currentPos, currentPos + line.length, styleBlue);
+        }
+        currentPos += line.length + 1;
+      });
+      range.setRichTextValue(richText.build());
+    }
+
     if (colMap['ステータス']) sheet.getRange(targetJobRow, colMap['ステータス']).setValue(hiredData.length > 0 ? '入国準備' : '終了');
     if (colMap['内定日']) {
       if (offerDateObj && hiredData.length > 0) {
@@ -163,96 +194,48 @@ function getJobCandidatesEdit(jobId) {
     const details = getJobDetails(jobId);
     if (!details) throw new Error("該当する案件が見つかりません。");
     
-    if (!details.hireNames || details.hireNames.trim() === "") {
+    if (!details.resultDetails || details.resultDetails.trim() === "") {
         throw new Error("この案件はまだ面接結果が登録されていません。\n「面接結果登録」メニューを使用してください。");
     }
 
     const companies = details.company ? details.company.split(/\r?\n/).filter(c => c.trim()) : [];
     const defaultCompany = companies.length > 0 ? companies[0] : "";
     const ids = details.candidates ? details.candidates.split(/\r?\n/).filter(id => id.trim()) : [];
-
-    const mSheet = getMasterSheet('登録者マスタ');
-    const mData = mSheet.getDataRange().getValues();
-    const mCol = getMasterColumnMap(mSheet);
-
-    let dateStr1 = "", dateStr2 = "";
-    if (details.interviewDate) {
-      const d = new Date(details.interviewDate.replace(/-/g, '/'));
-      if (!isNaN(d)) {
-        const yyyy = d.getFullYear();
-        const mm = String(d.getMonth() + 1).padStart(2, '0');
-        const m = String(d.getMonth() + 1);
-        const dd = String(d.getDate()).padStart(2, '0');
-        const d_day = String(d.getDate());
-        dateStr1 = `${yyyy}/${mm}/${dd}`;
-        dateStr2 = `${yyyy}/${m}/${d_day}`;
-      } else {
-        dateStr1 = String(details.interviewDate).replace(/-/g, '/');
-      }
-    }
-
-    // 案件管理シートの「採用者名」列から現在の採用者を直接抽出する（絶対的な正）
-    const hiredSet = new Set();
-    const hiredCompanyMap = new Map();
-    let currentCompForHired = defaultCompany;
-    
-    const hLines = details.hireNames.split(/\r?\n/).filter(l => l.trim() !== "");
-    for (const hl of hLines) {
-      if (hl.startsWith('【') && hl.endsWith('】')) {
-        currentCompForHired = hl.slice(1, -1).trim();
-      } else {
-        const match = hl.match(/^(SD-\d+)/);
-        if (match) {
-          hiredSet.add(match[1]);
-          hiredCompanyMap.set(match[1], currentCompForHired);
-        }
-      }
-    }
-
     const candDict = getCandidateDict(); 
+
+    // 面接結果詳細から現在のステータスを抽出
+    const detailLines = details.resultDetails.split(/\r?\n/).filter(l => l.trim() !== "");
+    const detailsMap = new Map();
+    let currentCompDetail = defaultCompany;
+    const knownStatuses = ['採用', '不採用', '内定辞退（候補者都合）', '内定取消（事業者都合）', '面接結果の取消'];
+
+    for (const line of detailLines) {
+        if (line.startsWith('【') && line.endsWith('】')) {
+            currentCompDetail = line.slice(1, -1).trim();
+        } else {
+            const idMatch = line.match(/^(SD-\d+)/);
+            if (idMatch) {
+                const cid = idMatch[1];
+                let parsedResult = '不採用';
+                for (const status of knownStatuses) {
+                    if (line.endsWith(`（${status}）`)) {
+                        parsedResult = status;
+                        break;
+                    }
+                }
+                detailsMap.set(cid, { result: parsedResult, company: currentCompDetail });
+            }
+        }
+    }
+
     const candidates = ids.map(id => {
       const cleanId = id.split('-').slice(0, 2).join('-').trim();
-      
-      const isHired = hiredSet.has(cleanId);
-      
-      // 案件管理で採用されていれば問答無用で「採用」にする
-      let pastResult = isHired ? "採用" : "不採用"; 
-      let pastCompany = isHired ? (hiredCompanyMap.get(cleanId) || defaultCompany) : defaultCompany;
+      let pastResult = '不採用';
+      let pastCompany = defaultCompany;
 
-      // 案件管理で「採用」になっていない場合のみ、マスタから辞退や取消などの詳細なステータスを探す
-      if (!isHired) {
-        for (let j = 1; j < mData.length; j++) {
-          if (String(mData[j][0]).trim() === cleanId) {
-            if (mCol['面接履歴']) {
-              const history = String(mData[j][mCol['面接履歴']-1] || "");
-              const lines = history.split(/\r?\n/);
-              for (let k = lines.length - 1; k >= 0; k--) {
-                const line = lines[k];
-                let isMatch = false;
-                if (dateStr1 && line.startsWith(dateStr1 + "：")) isMatch = true;
-                else if (dateStr2 && line.startsWith(dateStr2 + "：")) isMatch = true;
-                
-                if (isMatch) {
-                  const match = line.match(/：(.*?)(?:（(.*?)）)?$/);
-                  if (match) {
-                    const parsedComp = match[1].trim();
-                    // ▼ 企業名が案件の対象企業と一致するかチェック（同日の別案件データを除外）
-                    if (companies.includes(parsedComp) || parsedComp === "") {
-                      if (parsedComp) pastCompany = parsedComp;
-                      const resultText = match[2] ? match[2].trim() : "";
-                      if (resultText.includes("内定辞退")) pastResult = "内定辞退（候補者都合）";
-                      else if (resultText.includes("取消")) pastResult = "内定取消（事業者都合）";
-                      else if (resultText.includes("不採用")) pastResult = "不採用";
-                      
-                      break; // 自社案件の履歴を1つ見つけたら終了
-                    }
-                  }
-                }
-              }
-            }
-            break;
-          }
-        }
+      if (detailsMap.has(cleanId)) {
+          pastResult = detailsMap.get(cleanId).result;
+          pastCompany = detailsMap.get(cleanId).company;
       }
 
       return { 
@@ -377,7 +360,6 @@ function updateHire(jobId, resultData, offerDateStr) {
             let existingIdx = lines.findIndex(l => {
                if (formattedDate === "日付不明") return false;
                if (l.startsWith(formattedDate + "：") || l.startsWith(formattedDate.replace('/0', '/').replace(/\/0(\d)$/, '/$1') + "：")) {
-                  // ▼ 更新時も企業名を判定して上書き対象行を特定
                   const match = l.match(/：(.*?)(?:（(.*?)）)?$/);
                   if (match && companyNames.includes(match[1].trim())) {
                      return true;
@@ -403,31 +385,60 @@ function updateHire(jobId, resultData, offerDateStr) {
         }
       }
     });
-    
-    let hiredNamesText = "採用者なし";
-    if (hiredList.length > 0) {
-        if (companyNames.length <= 1) {
-            hiredNamesText = hiredList.map(item => {
-                const name = candDict[item.id] ? candDict[item.id].name : "";
-                return name ? `${item.id}-${name}` : `${item.id}`;
-            }).join('\n');
-        } else {
-            const grouped = {};
-            hiredList.forEach(item => {
-                if (!grouped[item.company]) grouped[item.company] = [];
-                const name = candDict[item.id] ? candDict[item.id].name : "";
-                grouped[item.company].push(name ? `${item.id}-${name}` : `${item.id}`);
-            });
-            let lines = [];
-            for (const [comp, cands] of Object.entries(grouped)) {
-                lines.push(`【${comp}】`);
-                lines.push(...cands);
-            }
-            hiredNamesText = lines.join('\n');
+
+    // ▼ 採用者を上に、それ以外を下に並び替える
+    resultData.sort((a, b) => {
+      if (a.result === '採用' && b.result !== '採用') return -1;
+      if (a.result !== '採用' && b.result === '採用') return 1;
+      return 0;
+    });
+
+    // ▼ 面接結果詳細列用のテキスト作成と色付け
+    let resultDetailsText = "";
+    if (companyNames.length <= 1) {
+        resultDetailsText = resultData.map(item => {
+            const name = candDict[item.id] ? candDict[item.id].name : "";
+            const prefix = name ? `${item.id}-${name}` : `${item.id}`;
+            return `${prefix}（${item.result}）`;
+        }).join('\n');
+    } else {
+        const grouped = {};
+        resultData.forEach(item => {
+            const comp = item.company || defaultCompany;
+            if (!grouped[comp]) grouped[comp] = [];
+            const name = candDict[item.id] ? candDict[item.id].name : "";
+            const prefix = name ? `${item.id}-${name}` : `${item.id}`;
+            grouped[comp].push(`${prefix}（${item.result}）`);
+        });
+        let lines = [];
+        for (const [comp, cands] of Object.entries(grouped)) {
+            lines.push(`【${comp}】`);
+            lines.push(...cands);
         }
+        resultDetailsText = lines.join('\n');
     }
     
-    if (colMap['採用者名']) sheet.getRange(targetJobRow, colMap['採用者名']).setValue(hiredNamesText);
+    if (colMap['面接結果詳細']) {
+      const range = sheet.getRange(targetJobRow, colMap['面接結果詳細']);
+      const richText = SpreadsheetApp.newRichTextValue().setText(resultDetailsText);
+      const styleBlack = SpreadsheetApp.newTextStyle().setForegroundColor('#000000').setBold(false).build();
+      const styleBlue = SpreadsheetApp.newTextStyle().setForegroundColor('#1a73e8').setBold(true).build();
+
+      if (resultDetailsText.length > 0) {
+        richText.setTextStyle(0, resultDetailsText.length, styleBlack);
+      }
+
+      const lines = resultDetailsText.split('\n');
+      let currentPos = 0;
+      lines.forEach(line => {
+        if (line.includes('（採用）')) {
+          richText.setTextStyle(currentPos, currentPos + line.length, styleBlue);
+        }
+        currentPos += line.length + 1;
+      });
+      range.setRichTextValue(richText.build());
+    }
+
     if (colMap['ステータス']) sheet.getRange(targetJobRow, colMap['ステータス']).setValue(hiredList.length > 0 ? '入国準備' : '終了');
     if (colMap['内定日']) {
       if (offerDateObj && hiredList.length > 0) {
@@ -439,4 +450,119 @@ function updateHire(jobId, resultData, offerDateStr) {
 
     return `面接結果の更新が完了しました。\n（マスタのステータスと履歴・内定日が自動更新されました）`;
   } catch(e) { throw new Error(e.message); }
+}
+
+// ---------------------------------------------------------
+// 案件削除時のマスタ履歴・ステータスロールバック処理
+// ---------------------------------------------------------
+function rollbackMasterOnJobDelete(rawInterviewDate, companiesText, resultDetails, candidatesText) {
+  try {
+    const mSheet = getMasterSheet('登録者マスタ');
+    if (!mSheet) return;
+    const mCol = getMasterColumnMap(mSheet);
+    const mData = mSheet.getDataRange().getValues();
+
+    let formattedDate = "日付不明";
+    if (rawInterviewDate instanceof Date) {
+      formattedDate = Utilities.formatDate(rawInterviewDate, "JST", "yyyy/MM/dd");
+    } else if (rawInterviewDate) {
+      formattedDate = String(rawInterviewDate).replace(/[年月]/g, '/').replace(/日/g, '');
+    }
+
+    const companies = String(companiesText).split(/\r?\n/).filter(c => c.trim());
+    const defaultCompany = companies.length > 0 ? companies[0] : "";
+
+    const targetCands = new Map();
+
+    // 削除される案件に含まれていた候補者と結果をリストアップ
+    if (resultDetails && resultDetails.trim() !== "") {
+      const detailLines = String(resultDetails).split(/\r?\n/).filter(l => l.trim() !== "");
+      let currentCompDetail = defaultCompany;
+      const knownStatuses = ['採用', '不採用', '内定辞退（候補者都合）', '内定取消（事業者都合）', '面接結果の取消'];
+
+      for (const line of detailLines) {
+        if (line.startsWith('【') && line.endsWith('】')) {
+          currentCompDetail = line.slice(1, -1).trim();
+        } else {
+          const idMatch = line.match(/^(SD-\d+)/);
+          if (idMatch) {
+            const cid = idMatch[1];
+            let parsedResult = '不採用';
+            for (const status of knownStatuses) {
+                if (line.endsWith(`（${status}）`)) {
+                    parsedResult = status;
+                    break;
+                }
+            }
+            targetCands.set(cid, { result: parsedResult, company: currentCompDetail });
+          }
+        }
+      }
+    } else if (candidatesText && candidatesText.trim() !== "") {
+      const ids = String(candidatesText).split(/\r?\n/).filter(id => id.trim());
+      ids.forEach(line => {
+         const match = line.match(/^(SD-\d+)/);
+         if (match) targetCands.set(match[1], { result: '未登録', company: defaultCompany });
+      });
+    }
+
+    if (targetCands.size === 0) return;
+
+    const idCol = mCol['登録者ID'] ? mCol['登録者ID'] - 1 : -1;
+    const statusCol = mCol['ステータス'] ? mCol['ステータス'] - 1 : -1;
+    const hiredCompCol = mCol['採用事業者'] ? mCol['採用事業者'] - 1 : -1;
+    const offerDateCol = mCol['内定日'] ? mCol['内定日'] - 1 : -1;
+    const historyCol = mCol['面接履歴'] ? mCol['面接履歴'] - 1 : -1;
+
+    if (idCol === -1) return;
+
+    for (let j = 1; j < mData.length; j++) {
+      const rowIdx = j + 1;
+      const cid = String(mData[j][idCol]).trim();
+      if (!cid) continue;
+
+      if (targetCands.has(cid)) {
+        const candInfo = targetCands.get(cid);
+
+        // ① 当該案件で「採用」になっていた場合のみステータス等をクリア
+        if (candInfo.result === '採用') {
+          if (statusCol !== -1) mSheet.getRange(rowIdx, statusCol + 1).setValue('未採用');
+          if (hiredCompCol !== -1) mSheet.getRange(rowIdx, hiredCompCol + 1).clearContent();
+          if (offerDateCol !== -1) mSheet.getRange(rowIdx, offerDateCol + 1).clearContent();
+        }
+
+        // ② 面接履歴の中から、対象の案件と同じ日付・企業名を持つ行を削除（ロールバック）
+        if (historyCol !== -1 && mData[j][historyCol]) {
+          const currentHistory = String(mData[j][historyCol]);
+          const lines = currentHistory.split(/\r?\n/).filter(l => l.trim() !== "");
+          let newLines = [];
+          let isHistoryChanged = false;
+
+          lines.forEach(l => {
+            let shouldDelete = false;
+            if (formattedDate !== "日付不明") {
+              if (l.startsWith(formattedDate + "：") || l.startsWith(formattedDate.replace('/0', '/').replace(/\/0(\d)$/, '/$1') + "：")) {
+                const match = l.match(/：(.*?)(?:（(.*?)）)?$/);
+                if (match && companies.includes(match[1].trim())) {
+                  shouldDelete = true;
+                }
+              }
+            }
+
+            if (shouldDelete) {
+              isHistoryChanged = true;
+            } else {
+              newLines.push(l);
+            }
+          });
+
+          if (isHistoryChanged) {
+            mSheet.getRange(rowIdx, historyCol + 1).setValue(newLines.join('\n'));
+          }
+        }
+      }
+    }
+  } catch(e) {
+    console.error("案件削除に伴うマスタのロールバックに失敗しました: " + e.message);
+  }
 }

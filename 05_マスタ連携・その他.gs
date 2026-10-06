@@ -63,15 +63,15 @@ function getJobDict() {
   const idIdx = colMap['案件ID'];
   const compIdx = colMap['事業者名'];
   const statusIdx = colMap['ステータス'];
-  const hireIdx = colMap['採用者名'];
+  const hireIdx = colMap['面接結果詳細']; 
 
   const dict = {};
   for (let i = 1; i < data.length; i++) {
     const row = data[i];
     if (row[idIdx]) {
       const id = String(row[idIdx]).replace(/\s/g, '').toUpperCase();
-      const hireNames = hireIdx !== undefined ? String(row[hireIdx] || "").trim() : "";
-      const isRegistered = hireNames !== "";
+      const resultDetails = hireIdx !== undefined ? String(row[hireIdx - 1] || "").trim() : "";
+      const isRegistered = resultDetails !== "";
       dict[id] = {
         text: `${row[compIdx] || ""} (${row[statusIdx] || ""})`,
         isRegistered: isRegistered
@@ -180,28 +180,31 @@ function updateCandidateLists(silent = false) {
   for (const job of jobList) {
     const jobId = job[normalize_('案件ID')] || '';
     const skillField = job[normalize_('技能分野')] || '';
-    const hiredText = String(job[normalize_('採用者名')] || '');
+    const detailsText = String(job[normalize_('面接結果詳細')] || '');
 
-    if (!hiredText || hiredText.includes("採用者なし")) continue;
+    if (!detailsText) continue;
 
     const compText = String(job[normalize_('事業者名')] || '');
     const defaultCompany = compText.split(/\r?\n/)[0].trim();
     let currentCompany = defaultCompany;
 
-    const hiredLines = hiredText.split(/\r?\n/).filter(line => line.trim() !== "");
-    for (const line of hiredLines) {
+    const dLines = detailsText.split(/\r?\n/).filter(line => line.trim() !== "");
+    for (const line of dLines) {
       if (line.startsWith('【') && line.endsWith('】')) {
         currentCompany = line.slice(1, -1).trim();
         continue;
       }
 
-      const match = line.match(/^(SD-\d+)/);
-      if (match) {
-        hiredCandidatesMap.set(match[1], {
-          jobId: jobId,
-          skillField: skillField,
-          company: currentCompany
-        });
+      // 「採用」が含まれる行のみ処理
+      if (line.includes('（採用）')) {
+        const match = line.match(/^(SD-\d+)/);
+        if (match) {
+          hiredCandidatesMap.set(match[1], {
+            jobId: jobId,
+            skillField: skillField,
+            company: currentCompany
+          });
+        }
       }
     }
   }

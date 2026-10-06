@@ -103,8 +103,8 @@ function syncToPaymentManagement() {
       const jobID = sourceMap['案件ID'] ? String(row[sourceMap['案件ID'] - 1] || "").trim() : "";
       if (!jobID) continue;
 
-      const hiredText = sourceMap['採用者名'] ? String(row[sourceMap['採用者名'] - 1] || "").trim() : "";
-      if (!hiredText) continue;
+      const detailsText = sourceMap['面接結果詳細'] ? String(row[sourceMap['面接結果詳細'] - 1] || "").trim() : "";
+      if (!detailsText) continue;
 
       const companyNameCell = sourceMap['事業者名'] ? String(row[sourceMap['事業者名'] - 1] || "") : "";
       const defaultCompany = companyNameCell.split(/\r?\n/)[0];
@@ -112,53 +112,63 @@ function syncToPaymentManagement() {
       
       const interviewDate = sourceMap['面接日'] ? formatDateStr(row[sourceMap['面接日'] - 1], sourceTZ) : "";
       
-      const hiredList = hiredText.split(/\r?\n/).filter(line => line.trim() !== "");
+      const dLines = detailsText.split(/\r?\n/).filter(line => line.trim() !== "");
       let currentCompany = defaultCompany;
+      let hasHired = false;
 
-      for (const line of hiredList) {
+      for (const line of dLines) {
         if (line.startsWith('【') && line.endsWith('】')) {
           currentCompany = line.slice(1, -1).trim();
           continue;
         }
 
-        let candidateID = "";
-        let candidateName = "";
-        
-        if (line.trim() === "採用者なし") {
-          candidateID = "採用者なし";
-          candidateName = "採用者なし";
-        } else {
-          const match = line.match(/^(SD-\d+)(?:-(.*))?$/);
-          if (match) {
-            candidateID = match[1].trim();
-            candidateName = match[2] ? match[2].trim() : "";
-          } else {
-            continue; 
+        if (line.includes('（採用）')) {
+          let candidateID = "";
+          let candidateName = "";
+          const idMatch = line.match(/^(SD-\d+)/);
+          
+          if (idMatch) {
+             candidateID = idMatch[1].trim();
+             const nMatch = line.match(/^SD-\d+-(.*?)(?:（.*?）)$/);
+             candidateName = nMatch ? nMatch[1].trim() : "";
+             hasHired = true;
+
+             let oDate = "";
+             let eDate = "";
+             let wDate = "";
+             if (candidateID !== "採用者なし" && candidateInfo[candidateID]) {
+               oDate = candidateInfo[candidateID].offerDate;
+               eDate = candidateInfo[candidateID].entryDate;
+               wDate = candidateInfo[candidateID].workDate;
+             }
+
+             syncRecords.push({
+               jobID: jobID,
+               candidateID: candidateID,
+               companyName: currentCompany,
+               fieldName: fieldName,
+               candidateName: candidateName,
+               interviewDate: interviewDate,
+               offerDate: oDate,
+               entryDate: eDate,
+               workDate: wDate
+             });
           }
         }
-
-        if(candidateID) {
-           let oDate = "";
-           let eDate = "";
-           let wDate = "";
-           if (candidateID !== "採用者なし" && candidateInfo[candidateID]) {
-             oDate = candidateInfo[candidateID].offerDate;
-             eDate = candidateInfo[candidateID].entryDate;
-             wDate = candidateInfo[candidateID].workDate;
-           }
-
-           syncRecords.push({
-             jobID: jobID,
-             candidateID: candidateID,
-             companyName: currentCompany,
-             fieldName: fieldName,
-             candidateName: candidateName,
-             interviewDate: interviewDate,
-             offerDate: oDate,
-             entryDate: eDate,
-             workDate: wDate
-           });
-        }
+      }
+      
+      if (!hasHired) {
+         syncRecords.push({
+           jobID: jobID,
+           candidateID: "採用者なし",
+           companyName: defaultCompany,
+           fieldName: fieldName,
+           candidateName: "採用者なし",
+           interviewDate: interviewDate,
+           offerDate: "",
+           entryDate: "",
+           workDate: ""
+         });
       }
     }
 

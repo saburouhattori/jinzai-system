@@ -154,6 +154,16 @@ function updateRow(formData) {
   const col = getMasterColumnMap(masterSheet);
   const row = Number(formData.row);
   if (!row) return "エラー：行が不明です。";
+
+  // ▼ 変更検知用：更新前のデータ（名前とID）を取得
+  const safeMaxCol = Math.max(masterSheet.getLastColumn(), ...Object.values(col));
+  const currentRowRange = masterSheet.getRange(row, 1, 1, safeMaxCol);
+  const currentRowData = currentRowRange.getValues()[0];
+
+  const oldName = col['名前'] ? String(currentRowData[col['名前'] - 1]).trim() : "";
+  const newName = String(formData.name).trim();
+  const adminId = col['登録者ID'] ? String(currentRowData[col['登録者ID'] - 1]).trim() : "";
+
   const mapping = {
     '名前': formData.name, 'フリガナ': formData.furigana, '呼び名': formData.nickname, '生年月日': formData.birthday,
     '性別': formData.gender, '配偶者': formData.spouse, '身長': formData.height, '体重': formData.weight,
@@ -172,9 +182,7 @@ function updateRow(formData) {
     '修正前コメント': formData.comment, 
     '日本在住の親族について': formData.relative
   };
-  const safeMaxCol = Math.max(masterSheet.getLastColumn(), ...Object.values(col));
-  const currentRowRange = masterSheet.getRange(row, 1, 1, safeMaxCol);
-  const currentRowData = currentRowRange.getValues()[0];
+  
   for (let header in mapping) {
     const h = header.replace(/\s/g, '');
     if (col[h] && mapping[header] !== undefined) {
@@ -209,6 +217,11 @@ function updateRow(formData) {
       masterSheet.getRange(row, col['顔写真']).setValue(cellImage);
       masterSheet.setRowHeight(row, 80);
     } catch (e) {}
+  }
+
+  // ▼ 名前に変更があった場合、案件管理側の名前表記（SD-XXXX-名前）を自動連動更新する
+  if (adminId && oldName && newName && oldName !== newName) {
+    updateJobCandidateName(adminId, newName);
   }
   
   return `更新が完了しました。`;
