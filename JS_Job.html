@@ -333,10 +333,14 @@ async function submitJobEdit() {
     showModal(`未登録の候補者IDが含まれています：\n「${unlistedCands.join('」「')}」\n\n正しいIDを入力してください。`);
     return;
   }
+  
+  // ▼ 変更箇所：更新時は警告ダイアログ（突破可能）にする
   if (hiredCands.length > 0) {
-    showModal(`以下の候補者は既に他の案件で「採用」となっているため、登録できません：\n\n${hiredCands.join('\n')}`);
-    return;
+    if (!confirm(`以下の候補者は現在「採用」ステータスとなっていますが、このまま案件情報を更新しますか？\n\n${hiredCands.join('\n')}`)) {
+      return;
+    }
   }
+  
   if (candidates.length === 0) { showModal('候補者を少なくとも1名入力してください。'); return; }
 
   let fileInputs = document.querySelectorAll('.edit_job-file-input');

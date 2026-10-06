@@ -191,7 +191,7 @@ function getJobCandidatesEdit(jobId) {
       }
     }
 
-    // ★最強の安全ロジック：案件管理シートの「採用者名」列から現在の採用者を直接抽出する
+    // 案件管理シートの「採用者名」列から現在の採用者を直接抽出する（絶対的な正）
     const hiredSet = new Set();
     const hiredCompanyMap = new Map();
     let currentCompForHired = defaultCompany;
@@ -213,41 +213,45 @@ function getJobCandidatesEdit(jobId) {
     const candidates = ids.map(id => {
       const cleanId = id.split('-').slice(0, 2).join('-').trim();
       
-      // デフォルト値：案件管理シートで採用されていれば問答無用で「採用」にする
-      let pastResult = hiredSet.has(cleanId) ? "採用" : "不採用"; 
-      let pastCompany = hiredCompanyMap.get(cleanId) || defaultCompany;
+      const isHired = hiredSet.has(cleanId);
+      
+      // 案件管理で採用されていれば問答無用で「採用」にする
+      let pastResult = isHired ? "採用" : "不採用"; 
+      let pastCompany = isHired ? (hiredCompanyMap.get(cleanId) || defaultCompany) : defaultCompany;
 
-      // 面接履歴から辞退や取消などの詳細なステータスを探す
-      for (let j = 1; j < mData.length; j++) {
-        if (String(mData[j][0]).trim() === cleanId) {
-          if (mCol['面接履歴']) {
-            const history = String(mData[j][mCol['面接履歴']-1] || "");
-            const lines = history.split(/\r?\n/);
-            for (let k = lines.length - 1; k >= 0; k--) {
-              const line = lines[k];
-              
-              let isMatch = false;
-              if (dateStr1 && line.startsWith(dateStr1 + "：")) isMatch = true;
-              else if (dateStr2 && line.startsWith(dateStr2 + "：")) isMatch = true;
-              
-              if (isMatch) {
-                const match = line.match(/：(.*?)(?:（(.*?)）)?$/);
-                if (match) {
-                  const parsedComp = match[1].trim();
-                  if (parsedComp) pastCompany = parsedComp;
-                  
-                  const resultText = match[2] ? match[2].trim() : "";
-                  // 履歴に明記されていれば上書き（「採用」は既にデフォルトでセット済みなので辞退などを優先拾い上げ）
-                  if (resultText.includes("採用") && !resultText.includes("不")) pastResult = "採用";
-                  else if (resultText.includes("不採用")) pastResult = "不採用";
-                  else if (resultText.includes("内定辞退")) pastResult = "内定辞退（候補者都合）";
-                  else if (resultText.includes("取消")) pastResult = "内定取消（事業者都合）";
+      // 案件管理で「採用」になっていない場合のみ、マスタから辞退や取消などの詳細なステータスを探す
+      if (!isHired) {
+        for (let j = 1; j < mData.length; j++) {
+          if (String(mData[j][0]).trim() === cleanId) {
+            if (mCol['面接履歴']) {
+              const history = String(mData[j][mCol['面接履歴']-1] || "");
+              const lines = history.split(/\r?\n/);
+              for (let k = lines.length - 1; k >= 0; k--) {
+                const line = lines[k];
+                let isMatch = false;
+                if (dateStr1 && line.startsWith(dateStr1 + "：")) isMatch = true;
+                else if (dateStr2 && line.startsWith(dateStr2 + "：")) isMatch = true;
+                
+                if (isMatch) {
+                  const match = line.match(/：(.*?)(?:（(.*?)）)?$/);
+                  if (match) {
+                    const parsedComp = match[1].trim();
+                    // ▼ 企業名が案件の対象企業と一致するかチェック（同日の別案件データを除外）
+                    if (companies.includes(parsedComp) || parsedComp === "") {
+                      if (parsedComp) pastCompany = parsedComp;
+                      const resultText = match[2] ? match[2].trim() : "";
+                      if (resultText.includes("内定辞退")) pastResult = "内定辞退（候補者都合）";
+                      else if (resultText.includes("取消")) pastResult = "内定取消（事業者都合）";
+                      else if (resultText.includes("不採用")) pastResult = "不採用";
+                      
+                      break; // 自社案件の履歴を1つ見つけたら終了
+                    }
+                  }
                 }
-                break;
               }
             }
+            break;
           }
-          break;
         }
       }
 
@@ -286,7 +290,6 @@ function updateHire(jobId, resultData, offerDateStr) {
       }
     }
     if (!companyNamesText) throw new Error("案件が見つかりません。");
-    // if (!rawInterviewDate) throw new Error("面接日が設定されていません。");
 
     let formattedDate = "日付不明";
     if (rawInterviewDate instanceof Date) {
@@ -371,10 +374,16 @@ function updateHire(jobId, resultData, offerDateStr) {
             const currentHistory = String(historyCell.getValue() || "").trim();
             let lines = currentHistory.split(/\r?\n/).filter(l => l.trim() !== "");
             
-            // 履歴の更新も揺らぎに対応
             let existingIdx = lines.findIndex(l => {
                if (formattedDate === "日付不明") return false;
-               return l.startsWith(formattedDate + "：") || l.startsWith(formattedDate.replace('/0', '/').replace(/\/0(\d)$/, '/$1') + "：");
+               if (l.startsWith(formattedDate + "：") || l.startsWith(formattedDate.replace('/0', '/').replace(/\/0(\d)$/, '/$1') + "：")) {
+                  // ▼ 更新時も企業名を判定して上書き対象行を特定
+                  const match = l.match(/：(.*?)(?:（(.*?)）)?$/);
+                  if (match && companyNames.includes(match[1].trim())) {
+                     return true;
+                  }
+               }
+               return false;
             });
             
             if (deleteHistory) {
