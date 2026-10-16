@@ -2,7 +2,13 @@
 
 <div class="section-title" >基本情報</div>
 <div class="form-row">
-  <div class="field"><label>名前</label><input type="text" id="name"></div>
+  <div class="field">
+    <label>名前</label>
+    <input type="text" id="name">
+    <div id="name_warning" class="warning-box">
+      ⚠️ 名前にカッコや数字を含めることはできません（同姓同名はIDで区別されます）。
+    </div>
+  </div>
   <div class="field"><label>フリガナ</label><input type="text" id="furigana"></div>
   <div class="field"><label>呼び名</label><input type="text" id="nickname"></div>
 </div>

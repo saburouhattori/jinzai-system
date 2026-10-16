@@ -11,6 +11,20 @@ function toHalfWidthNumber(str) {
   });
 }
 
+/**
+ * 名前の入力値にカッコや数字が含まれているかリアルタイムで判定し警告を表示する関数
+ * @param {string} val - 名前欄の入力値
+ */
+function validateNameInput(val) {
+  const warningEl = document.getElementById('name_warning');
+  if (!warningEl) return;
+  if (val && /[()（）0-9０-９]/.test(val)) {
+    warningEl.style.display = 'block';
+  } else {
+    warningEl.style.display = 'none';
+  }
+}
+
 // 画面読み込み完了時に自動変換イベントを設定
 document.addEventListener('DOMContentLoaded', function() {
   const numInputs = document.querySelectorAll('input[type="number"], input[type="text"], textarea');
@@ -21,6 +35,22 @@ document.addEventListener('DOMContentLoaded', function() {
       }
     });
   });
+
+  // ▼ 名前の入力欄を自動的に大文字へ変換し、リアルタイムで禁止文字をチェックするイベント設定
+  const nameInput = document.getElementById('name');
+  if (nameInput) {
+    nameInput.addEventListener('input', function() {
+      const start = this.selectionStart;
+      const end = this.selectionEnd;
+      this.value = this.value.toUpperCase();
+      this.setSelectionRange(start, end);
+      validateNameInput(this.value);
+    });
+    nameInput.addEventListener('blur', function() {
+      this.value = this.value.toUpperCase();
+      validateNameInput(this.value);
+    });
+  }
 });
 
 function searchData() {
@@ -59,6 +89,10 @@ function searchData() {
           el.value = val; 
         } 
       });
+
+      // 読み込み時に既存の名前データにカッコや数字が含まれているかもチェック
+      const nameEl = document.getElementById('name');
+      if (nameEl) validateNameInput(nameEl.value);
       
       // ▼▼ 職歴期間の読み込み（文字列から年月へ分割セット） ▼▼
       [1, 2, 3].forEach(i => {
@@ -148,10 +182,21 @@ function submitData() {
       if (typeof val === 'string') {
         val = toHalfWidthNumber(val);
         val = val.split('\n').map(line => line.replace(/\u3000/g, ' ').replace(/ +/g, ' ').trim()).join('\n');
+        if (f === 'name') {
+          val = val.toUpperCase();
+          el.value = val;
+        }
       }
       formData[f] = val; 
     } 
   });
+
+  // ▼ 名前の入力規則チェック（カッコや数字が含まれている場合はブロック）
+  if (formData.name && /[()（）0-9０-９]/.test(formData.name)) {
+    validateNameInput(formData.name);
+    showModal('名前にカッコや数字を含めることはできません。\n（同姓同名の候補者は登録者IDで区別されます）');
+    return;
+  }
   
   // ▼▼ 職歴期間の結合保存 ▼▼
   [1, 2, 3].forEach(i => {
@@ -208,6 +253,7 @@ function onSuccess(msg) {
     let selects = document.querySelectorAll('select'); selects.forEach(select => select.selectedIndex = 0);
     let fileInput = document.getElementById('imageFile'); if (fileInput) fileInput.value = '';
     document.getElementById('relativeDetail').style.display = 'none';
+    let nameWarn = document.getElementById('name_warning'); if (nameWarn) nameWarn.style.display = 'none';
   }
   google.script.run.syncListSheets();
 }
