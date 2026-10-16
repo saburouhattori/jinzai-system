@@ -70,10 +70,11 @@ function getJobDict() {
     const row = data[i];
     if (row[idIdx]) {
       const id = String(row[idIdx]).replace(/\s/g, '').toUpperCase();
-      const resultDetails = hireIdx !== undefined ? String(row[hireIdx - 1] || "").trim() : "";
-      const isRegistered = resultDetails !== "";
+      const status = statusIdx !== undefined ? String(row[statusIdx] || "").trim() : "";
+      const resultDetails = hireIdx !== undefined ? String(row[hireIdx] || "").trim() : "";
+      const isRegistered = resultDetails !== "" || status === "終了" || status === "入国準備";
       dict[id] = {
-        text: `${row[compIdx] || ""} (${row[statusIdx] || ""})`,
+        text: `${row[compIdx] || ""} (${status})`,
         isRegistered: isRegistered
       };
     }

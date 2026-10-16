@@ -13,7 +13,8 @@ function getJobCandidates(jobId) {
     if (!details.interviewDate) throw new Error("面接日が設定されていません。\n先に「案件更新/削除」から面接日を登録してください。");
     
     // ▼ バックエンドの強固なブロック（既に結果がある場合は弾く）
-    if (details.resultDetails && details.resultDetails.trim() !== "") {
+    const isRegistered = (details.resultDetails && details.resultDetails.trim() !== "") || details.status === "終了" || details.status === "入国準備";
+    if (isRegistered) {
         throw new Error("この案件は既に面接結果が登録されています。\n「面接結果の修正・更新」メニューを使用してください。");
     }
     
@@ -194,7 +195,8 @@ function getJobCandidatesEdit(jobId) {
     const details = getJobDetails(jobId);
     if (!details) throw new Error("該当する案件が見つかりません。");
     
-    if (!details.resultDetails || details.resultDetails.trim() === "") {
+    const isRegistered = (details.resultDetails && details.resultDetails.trim() !== "") || details.status === "終了" || details.status === "入国準備";
+    if (!isRegistered) {
         throw new Error("この案件はまだ面接結果が登録されていません。\n「面接結果登録」メニューを使用してください。");
     }
 
@@ -204,7 +206,7 @@ function getJobCandidatesEdit(jobId) {
     const candDict = getCandidateDict(); 
 
     // 面接結果詳細から現在のステータスを抽出
-    const detailLines = details.resultDetails.split(/\r?\n/).filter(l => l.trim() !== "");
+    const detailLines = (details.resultDetails || "").split(/\r?\n/).filter(l => l.trim() !== "");
     const detailsMap = new Map();
     let currentCompDetail = defaultCompany;
     const knownStatuses = ['採用', '不採用', '内定辞退（候補者都合）', '内定取消（事業者都合）', '面接結果の取消'];
