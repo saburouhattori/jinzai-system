@@ -111,14 +111,16 @@ window.addEventListener('DOMContentLoaded', () => {
     }).getAgentList();
   }
 
-  if (MODE === 'HIRE' || MODE === 'HIRE_EDIT') {
+  if (MODE === 'HIRE' || MODE === 'HIRE_EDIT' || MODE === 'ENTRY_DATE') {
     isJobDictLoading = true;
     google.script.run.withSuccessHandler(function(dict) { 
       jobDict = dict; 
       isJobDictLoading = false;
-      let inputEl = document.getElementById(MODE === 'HIRE' ? 'hire_job_id' : 'hireEdit_job_id');
+      let inputId = MODE === 'HIRE' ? 'hire_job_id' : (MODE === 'HIRE_EDIT' ? 'hireEdit_job_id' : 'entryDate_job_id');
+      let dispId = MODE === 'HIRE' ? 'hireJobDisplay' : (MODE === 'HIRE_EDIT' ? 'hireEditJobDisplay' : 'entryDateJobDisplay');
+      let inputEl = document.getElementById(inputId);
       if (inputEl && inputEl.value.trim() !== '') {
-          checkJobId(inputEl, MODE === 'HIRE' ? 'hireJobDisplay' : 'hireEditJobDisplay');
+          checkJobId(inputEl, dispId);
       }
     }).getJobDict();
   }
@@ -210,7 +212,7 @@ function checkJobId(inputElem, displayId) {
     if (MODE === 'HIRE' && jobData.isRegistered) {
       displayElem.innerText = jobData.text + ' (結果登録済)'; 
       displayElem.style.color = '#d93025';
-    } else if (MODE === 'HIRE_EDIT' && !jobData.isRegistered) {
+    } else if ((MODE === 'HIRE_EDIT' || MODE === 'ENTRY_DATE') && !jobData.isRegistered) {
       displayElem.innerText = jobData.text + ' (未登録の案件)'; 
       displayElem.style.color = '#d93025';
     } else {

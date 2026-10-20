@@ -73,6 +73,8 @@ function onOpen() {
     .addItem( '案件更新/削除' , 'showSidebarJobEdit')
     .addItem( '面接結果登録' , 'showSidebarHire')
     .addItem( '面接結果の修正・更新' , 'showSidebarHireEdit')
+    .addSeparator()
+    .addItem( '入国・入職日の一括登録' , 'showSidebarEntryDate')
     .addToUi();
 }
 
@@ -93,16 +95,17 @@ function showMainSidebar(mode, title) {
 }
 
 // 各メニューから呼び出される関数
-function showSidebarNew()     { showMainSidebar('NEW',  '候補者登録' ); }
-function showSidebarEdit()    { showMainSidebar('EDIT',  'データ更新' ); }
-function showSidebarAddInfo() { showMainSidebar('ADDINFO',  '採用者情報登録' ); }
-function showSidebarCompany() { showMainSidebar('COMPANY',  '事業者マスタ登録' ); }
-function showSidebarJobNew()  { showMainSidebar('JOB',  '案件登録' ); }
-function showSidebarJobEdit() { showMainSidebar('JOB_EDIT', '案件更新/削除' ); }
-function showSidebarDelete()  { showMainSidebar('DELETE', '登録者削除'); }
-function showSidebarHire()    { showMainSidebar('HIRE', '面接結果登録'); }
-function showSidebarHireEdit(){ showMainSidebar('HIRE_EDIT', '面接結果の修正・更新'); }
-function showSidebarList()    { showMainSidebar('LIST', '簡易リスト出力'); }
+function showSidebarNew()       { showMainSidebar('NEW',  '候補者登録' ); }
+function showSidebarEdit()      { showMainSidebar('EDIT',  'データ更新' ); }
+function showSidebarAddInfo()   { showMainSidebar('ADDINFO',  '採用者情報登録' ); }
+function showSidebarCompany()   { showMainSidebar('COMPANY',  '事業者マスタ登録' ); }
+function showSidebarJobNew()    { showMainSidebar('JOB',  '案件登録' ); }
+function showSidebarJobEdit()   { showMainSidebar('JOB_EDIT', '案件更新/削除' ); }
+function showSidebarDelete()    { showMainSidebar('DELETE', '登録者削除'); }
+function showSidebarHire()      { showMainSidebar('HIRE', '面接結果登録'); }
+function showSidebarHireEdit()  { showMainSidebar('HIRE_EDIT', '面接結果の修正・更新'); }
+function showSidebarEntryDate() { showMainSidebar('ENTRY_DATE', '入国・入職日の一括登録'); }
+function showSidebarList()      { showMainSidebar('LIST', '簡易リスト出力'); }
 
 /**
  * リスト同期の実行と結果表示

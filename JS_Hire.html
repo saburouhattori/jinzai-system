@@ -314,4 +314,127 @@ function submitHireEdit() {
     })
     .updateHire(jobId, resultData, offerDate);
 }
+
+// =========================================
+// 3. 入国・入職日の一括登録 (ENTRY_DATE)
+// =========================================
+
+function fetchEntryDateCandidates() {
+  let idEl = document.getElementById('entryDate_job_id');
+  if (!idEl) return;
+  let rawId = idEl.value.trim();
+  if (!rawId) { showModal('案件IDを入力してください。'); return; }
+  let jobId = formatJobId(rawId);
+  idEl.value = jobId;
+
+  if (isJobDictLoading) {
+    showModal('辞書データを読み込み中です。少々お待ちください。');
+    return;
+  }
+  let jobData = jobDict[jobId.toUpperCase()];
+  if (!jobData) {
+    showModal('未登録の案件IDです。');
+    return;
+  }
+
+  showModal('採用者を取得中...', true);
+
+  google.script.run
+    .withSuccessHandler(function(data) {
+      closeModal();
+      let container = document.getElementById('entryDate_cand_list');
+      let bulkBox = document.getElementById('entryDate_bulk_box');
+      if (!container) return;
+
+      let candidates = data.candidates || [];
+      if (candidates.length === 0) {
+        container.innerHTML = '<div style="color:#d93025; font-size:12px;">この案件には「採用」ステータスの候補者が見つかりません。</div>';
+        if (bulkBox) bulkBox.style.display = 'none';
+        return;
+      }
+
+      if (bulkBox) {
+        bulkBox.style.display = 'block';
+        let bEntry = document.getElementById('bulk_entryDate');
+        let bWork = document.getElementById('bulk_workDate');
+        if (bEntry) bEntry.value = '';
+        if (bWork) bWork.value = '';
+      }
+
+      let html = '';
+      candidates.forEach(c => {
+        let compBadge = c.company ? `<span style="font-size:11px; color:#555; background:#e8eaed; padding:2px 6px; border-radius:4px; margin-left:6px;">${c.company}</span>` : '';
+        html += `
+          <div class="entryDate-cand-row" data-id="${c.id}" style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px; background:#fff; padding:10px; border:1px solid #ddd; border-radius:4px; flex-wrap:wrap;">
+            <div style="font-weight:bold; color:#333; min-width:180px; flex:1;">
+              ${c.display}${compBadge}
+            </div>
+            <div style="display:flex; gap:12px; align-items:center;">
+              <div>
+                <label style="font-size:11px; color:#555; margin-bottom:2px;">入国日</label>
+                <input type="date" class="cand-entry-date" value="${c.entryDate || ''}" style="width:135px; padding:5px;">
+              </div>
+              <div>
+                <label style="font-size:11px; color:#555; margin-bottom:2px;">入職日</label>
+                <input type="date" class="cand-work-date" value="${c.workDate || ''}" style="width:135px; padding:5px;">
+              </div>
+            </div>
+          </div>
+        `;
+      });
+      container.innerHTML = html;
+    })
+    .withFailureHandler(function(err) {
+      showModal('エラー: ' + err.message);
+    })
+    .getHiredCandidatesForEntry(jobId);
+}
+
+function applyBulkDate(type, val) {
+  let selector = (type === 'entry') ? '.cand-entry-date' : '.cand-work-date';
+  document.querySelectorAll(selector).forEach(input => {
+    input.value = val;
+  });
+}
+
+function submitBatchEntryDate() {
+  let idEl = document.getElementById('entryDate_job_id');
+  let jobId = idEl ? formatJobId(idEl.value.trim()) : '';
+
+  let rows = document.querySelectorAll('.entryDate-cand-row');
+  if (rows.length === 0) {
+    showModal('先に「採用者検索」を行ってください。');
+    return;
+  }
+
+  let records = [];
+  rows.forEach(row => {
+    let cid = row.getAttribute('data-id');
+    let eInput = row.querySelector('.cand-entry-date');
+    let wInput = row.querySelector('.cand-work-date');
+    records.push({
+      id: cid,
+      entryDate: eInput ? eInput.value : '',
+      workDate: wInput ? wInput.value : ''
+    });
+  });
+
+  if (!confirm(`表示されている ${records.length} 名の入国日・入職日を登録者マスタに一括保存します。よろしいですか？`)) return;
+
+  let btnEl = document.getElementById('entryDateBtn');
+  if (btnEl) btnEl.disabled = true;
+
+  showModal('一括保存中...', true);
+  google.script.run
+    .withSuccessHandler(function(msg) {
+      if (btnEl) btnEl.disabled = false;
+      showModal(msg, false, true);
+      google.script.run.syncListSheets();
+    })
+    .withFailureHandler(function(err) {
+      if (btnEl) btnEl.disabled = false;
+      showModal('保存エラー: ' + err.message);
+    })
+    .updateBatchEntryDates(jobId, records);
+}
 </script>
