@@ -36,12 +36,16 @@ function syncToPaymentManagement() {
     const formatDateStr = (val, tz) => {
       if (!val) return "";
       if (val instanceof Date) return Utilities.formatDate(val, tz, "yyyy/MM/dd");
-      const s = String(val).trim().replace(/-/g, '/');
+      const s = String(val).trim().replace(/[年月\-]/g, '/').replace(/日/g, '');
       if (s === "NaN" || s === "undefined" || s === "Invalid Date") return "";
+      const parts = s.split('/');
+      if (parts.length === 3) {
+        return `${parts[0]}/${parts[1].padStart(2, '0')}/${parts[2].padStart(2, '0')}`;
+      }
       return s;
     };
 
-    // ▼▼ マスタから 内定日・入国日・入職日の抽出（登録者マスタがSSoT） ▼▼
+    // ▼▼ マスタから 内定日・入国日・入職日の抽出 ▼▼
     const candidateInfo = {};
     if (masterMap['登録者ID']) {
       const idIdx = masterMap['登録者ID'] - 1;
@@ -50,7 +54,7 @@ function syncToPaymentManagement() {
       const workIdx = masterMap['入職日'] ? masterMap['入職日'] - 1 : -1;
 
       for (let i = 1; i < masterData.length; i++) {
-        const cid = String(masterData[i][idIdx]).trim();
+        const cid = String(masterData[i][idIdx]).trim().toUpperCase();
         if (!cid) continue;
 
         let oDate = offerIdx !== -1 ? formatDateStr(masterData[i][offerIdx], sourceTZ) : "";
@@ -111,6 +115,7 @@ function syncToPaymentManagement() {
       const fieldName = sourceMap['技能分野'] ? row[sourceMap['技能分野'] - 1] : "";
       
       const interviewDate = sourceMap['面接日'] ? formatDateStr(row[sourceMap['面接日'] - 1], sourceTZ) : "";
+      const jobOfferDate = sourceMap['内定日'] ? formatDateStr(row[sourceMap['内定日'] - 1], sourceTZ) : "";
       
       const dLines = detailsText.split(/\r?\n/).filter(line => line.trim() !== "");
       let currentCompany = defaultCompany;
@@ -128,16 +133,17 @@ function syncToPaymentManagement() {
           const idMatch = line.match(/^(SD-\d+)/);
           
           if (idMatch) {
-             candidateID = idMatch[1].trim();
+             candidateID = idMatch[1].trim().toUpperCase();
              const nMatch = line.match(/^SD-\d+-(.*?)(?:（.*?）)$/);
              candidateName = nMatch ? nMatch[1].trim() : "";
              hasHired = true;
 
-             let oDate = "";
+             // 内定日は「案件管理」シートの値を正本として最優先で採用する
+             let oDate = jobOfferDate;
              let eDate = "";
              let wDate = "";
              if (candidateID !== "採用者なし" && candidateInfo[candidateID]) {
-               oDate = candidateInfo[candidateID].offerDate;
+               if (!oDate) oDate = candidateInfo[candidateID].offerDate;
                eDate = candidateInfo[candidateID].entryDate;
                wDate = candidateInfo[candidateID].workDate;
              }

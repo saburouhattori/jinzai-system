@@ -176,12 +176,35 @@ function updateCandidateLists(silent = false) {
     throw new Error('登録者マスタに「登録者ID」列が見つかりません。');
   }
 
+  // 日付比較・整形用のヘルパー関数
+  const toDateStr = (val) => {
+    if (!val) return '';
+    if (val instanceof Date) return Utilities.formatDate(val, "JST", "yyyy/MM/dd");
+    const s = String(val).trim().replace(/[年月\-]/g, '/').replace(/日/g, '');
+    const parts = s.split('/');
+    if (parts.length === 3) {
+      return `${parts[0]}/${parts[1].padStart(2, '0')}/${parts[2].padStart(2, '0')}`;
+    }
+    return s;
+  };
+
+  const toDateObj = (val) => {
+    if (!val) return '';
+    if (val instanceof Date) return val;
+    const str = toDateStr(val);
+    const d = new Date(str);
+    return isNaN(d.getTime()) ? val : d;
+  };
+
   const hiredCandidatesMap = new Map();
 
   for (const job of jobList) {
     const jobId = job[normalize_('案件ID')] || '';
     const skillField = job[normalize_('技能分野')] || '';
     const detailsText = String(job[normalize_('面接結果詳細')] || '');
+    const rawOfferDate = job[normalize_('内定日')];
+    const offerDateStr = toDateStr(rawOfferDate);
+    const offerDateObj = toDateObj(rawOfferDate);
 
     if (!detailsText) continue;
 
@@ -200,10 +223,12 @@ function updateCandidateLists(silent = false) {
       if (line.includes('（採用）')) {
         const match = line.match(/^(SD-\d+)/);
         if (match) {
-          hiredCandidatesMap.set(match[1], {
+          hiredCandidatesMap.set(match[1].toUpperCase(), {
             jobId: jobId,
             skillField: skillField,
-            company: currentCompany
+            company: currentCompany,
+            offerDateStr: offerDateStr,
+            offerDateObj: offerDateObj
           });
         }
       }
@@ -212,6 +237,11 @@ function updateCandidateLists(silent = false) {
 
   const hiredData = [];
   const unhiredData = [];
+
+  // 登録者マスタの「内定日」列を案件管理（正本）のデータで同期するための準備
+  const masterOfferColIdx = masterHeaders.findIndex(h => normalize_(h) === normalize_('内定日'));
+  const masterOfferUpdates = [];
+  let isMasterOfferChanged = false;
 
   for (let i = 0; i < masterData.length; i++) {
     const row = masterData[i];
@@ -222,8 +252,14 @@ function updateCandidateLists(silent = false) {
       dataMap[normalize_(masterHeaders[c])] = val;
     }
 
-    const candidateId = dataMap[normalize_('登録者ID')];
-    if (!candidateId) continue;
+    const candidateId = String(dataMap[normalize_('登録者ID')] || '').trim().toUpperCase();
+    const currentMasterOfferRaw = masterOfferColIdx !== -1 ? row[masterOfferColIdx] : '';
+    const currentMasterOfferStr = toDateStr(currentMasterOfferRaw);
+
+    if (!candidateId) {
+      if (masterOfferColIdx !== -1) masterOfferUpdates.push([currentMasterOfferRaw]);
+      continue;
+    }
 
     const jlpt = dataMap[normalize_('特定技能要件＞JLPTレベル')];
     const jft = dataMap[normalize_('特定技能要件＞JFT Basicレベル')];
@@ -254,13 +290,41 @@ function updateCandidateLists(silent = false) {
       dataMap[normalize_('採用事業者名')] = hireInfo.company;
       dataMap[normalize_('採用事業者')] = hireInfo.company; 
 
+      // 案件管理側の「内定日」を正本として採用者一覧および登録者マスタへ反映
+      dataMap[normalize_('内定日')] = hireInfo.offerDateStr;
+      if (masterOfferColIdx !== -1) {
+        if (currentMasterOfferStr !== hireInfo.offerDateStr) {
+          masterOfferUpdates.push([hireInfo.offerDateObj]);
+          isMasterOfferChanged = true;
+        } else {
+          masterOfferUpdates.push([currentMasterOfferRaw]);
+        }
+      }
+
       hiredData.push(buildRowByHeaders_(hiredHeaders, dataMap));
     } else {
+      // 採用されていない候補者に過去の内定日が残っている場合はクリア
+      if (masterOfferColIdx !== -1) {
+        if (currentMasterOfferStr !== '') {
+          masterOfferUpdates.push(['']);
+          isMasterOfferChanged = true;
+        } else {
+          masterOfferUpdates.push([currentMasterOfferRaw]);
+        }
+      }
+
       const status = dataMap[normalize_('ステータス')];
       if (status === '未採用') {
         unhiredData.push(buildRowByHeaders_(unhiredHeaders, dataMap));
       }
     }
+  }
+
+  // 登録者マスタの「内定日」列に差分があった場合、一括更新して書式を整える
+  if (masterOfferColIdx !== -1 && isMasterOfferChanged && masterOfferUpdates.length > 0) {
+    const offerRange = masterSheet.getRange(2, masterOfferColIdx + 1, masterOfferUpdates.length, 1);
+    offerRange.setValues(masterOfferUpdates);
+    offerRange.setNumberFormat('yyyy"年"m"月"d"日"');
   }
 
   if (hiredData.length > 0) {
