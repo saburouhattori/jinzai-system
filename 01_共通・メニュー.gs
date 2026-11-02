@@ -53,28 +53,35 @@ function include(filename, mode) {
 
 function onOpen() {
   const ui = SpreadsheetApp.getUi();
-  ui.createMenu( '人材事業メニュー' )
-    .addItem( '候補者登録' , 'showSidebarNew')
-    .addItem( 'データ更新' , 'showSidebarEdit')
-    .addItem( '採用者情報登録' , 'showSidebarAddInfo')
+
+  // メニュー①：登録者マスタ管理
+  ui.createMenu('1. 登録者マスタ管理')
+    .addItem('1. 候補者の新規登録', 'showSidebarNew')
+    .addItem('2. 登録者データの修正・更新', 'showSidebarEdit')
     .addSeparator()
-    .addItem( '登録者削除' , 'showSidebarDelete')
-    .addSeparator()
-    .addItem( '事業者マスタ登録' , 'showSidebarCompany')
-    .addSeparator()
-    .addItem( '履歴書出力' , 'rirekisyo') 
-    .addItem( '簡易リスト出力' , 'showSidebarList') 
-    .addSeparator()
-    .addItem('採用・未採用リストの同期', 'runSyncListSheets')
-    .addItem('支払い管理へ同期', 'runSyncPaymentManagement')
+    .addItem('3. 登録者データの削除', 'showSidebarDelete')
     .addToUi();
-  ui.createMenu( '案件・採用管理' )
-    .addItem( '案件登録' , 'showSidebarJobNew')
-    .addItem( '案件更新/削除' , 'showSidebarJobEdit')
-    .addItem( '面接結果登録' , 'showSidebarHire')
-    .addItem( '面接結果の修正・更新' , 'showSidebarHireEdit')
+
+  // メニュー②：案件・採用管理
+  ui.createMenu('2. 案件・採用管理')
+    .addItem('1. 案件の新規登録', 'showSidebarJobNew')
+    .addItem('2. 簡易リスト作成', 'showSidebarList')
+    .addItem('3. 履歴書作成', 'rirekisyo')
+    .addItem('4. 案件情報の修正・削除', 'showSidebarJobEdit')
     .addSeparator()
-    .addItem( '入国・入職日の一括登録' , 'showSidebarEntryDate')
+    .addItem('5. 面接結果の登録', 'showSidebarHire')
+    .addItem('6. 面接結果の修正・更新', 'showSidebarHireEdit')
+    .addSeparator()
+    .addItem('7. 内定後の追加情報登録', 'showSidebarAddInfo')
+    .addItem('8. 入国日・入職日の一括登録', 'showSidebarEntryDate')
+    .addToUi();
+
+  // メニュー③：管理者用（マスタ・同期）
+  ui.createMenu('3. 管理者用（マスタ・同期）')
+    .addItem('1. 事業者の新規登録', 'showSidebarCompany')
+    .addSeparator()
+    .addItem('2. 採用・未採用リストの同期', 'runSyncListSheets')
+    .addItem('3. 支払い管理シートへ同期（Funtoco）', 'runSyncPaymentManagement')
     .addToUi();
 }
 
@@ -95,17 +102,19 @@ function showMainSidebar(mode, title) {
 }
 
 // 各メニューから呼び出される関数
-function showSidebarNew()       { showMainSidebar('NEW',  '候補者登録' ); }
-function showSidebarEdit()      { showMainSidebar('EDIT',  'データ更新' ); }
-function showSidebarAddInfo()   { showMainSidebar('ADDINFO',  '採用者情報登録' ); }
-function showSidebarCompany()   { showMainSidebar('COMPANY',  '事業者マスタ登録' ); }
-function showSidebarJobNew()    { showMainSidebar('JOB',  '案件登録' ); }
-function showSidebarJobEdit()   { showMainSidebar('JOB_EDIT', '案件更新/削除' ); }
-function showSidebarDelete()    { showMainSidebar('DELETE', '登録者削除'); }
-function showSidebarHire()      { showMainSidebar('HIRE', '面接結果登録'); }
-function showSidebarHireEdit()  { showMainSidebar('HIRE_EDIT', '面接結果の修正・更新'); }
-function showSidebarEntryDate() { showMainSidebar('ENTRY_DATE', '入国・入職日の一括登録'); }
-function showSidebarList()      { showMainSidebar('LIST', '簡易リスト出力'); }
+function showSidebarNew()       { showMainSidebar('NEW',        '候補者の新規登録'); }
+function showSidebarEdit()      { showMainSidebar('EDIT',       '登録者データの修正・更新'); }
+function showSidebarDelete()    { showMainSidebar('DELETE',     '登録者データの削除'); }
+
+function showSidebarJobNew()    { showMainSidebar('JOB',        '案件の新規登録'); }
+function showSidebarList()      { showMainSidebar('LIST',       '簡易リスト作成'); }
+function showSidebarJobEdit()   { showMainSidebar('JOB_EDIT',   '案件情報の修正・削除'); }
+function showSidebarHire()      { showMainSidebar('HIRE',       '面接結果の登録'); }
+function showSidebarHireEdit()  { showMainSidebar('HIRE_EDIT',  '面接結果の修正・更新'); }
+function showSidebarAddInfo()   { showMainSidebar('ADDINFO',    '内定後の追加情報登録'); }
+function showSidebarEntryDate() { showMainSidebar('ENTRY_DATE', '入国日・入職日の一括登録'); }
+
+function showSidebarCompany()   { showMainSidebar('COMPANY',    '事業者の新規登録'); }
 
 /**
  * リスト同期の実行と結果表示
