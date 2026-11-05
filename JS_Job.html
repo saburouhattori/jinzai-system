@@ -38,7 +38,8 @@ async function submitJob() {
   let unlistedCompanies = [];
 
   compInputs.forEach(input => {
-    let val = input.value.trim();
+    let val = input.value.normalize('NFC').trim();
+    input.value = val;
     if (val) {
       companies.push(val);
       if (!companyListArray.includes(val)) {
@@ -109,7 +110,7 @@ async function submitJob() {
           reader.readAsDataURL(file);
         });
         uploadFiles.push({
-          name: file.name,
+          name: file.name.normalize('NFC'),
           mimeType: file.type,
           data: base64
         });
@@ -133,7 +134,7 @@ async function submitJob() {
     interviewDate: interviewDateEl ? interviewDateEl.value : '',
     relatedFiles: relatedFiles,
     uploadFiles: uploadFiles,
-    memo: memoEl ? memoEl.value : ''
+    memo: memoEl ? memoEl.value.normalize('NFC') : ''
   };
   
   let btnEl = document.getElementById('jobBtn');
@@ -218,7 +219,7 @@ function searchJobData() {
             if (data.company) {
               let comps = data.company.split(/\r?\n/);
               comps.forEach(c => {
-                if(c.trim()) addJobCompanyRow('edit_job_company_list', c.trim());
+                if(c.trim()) addJobCompanyRow('edit_job_company_list', c.normalize('NFC').trim());
               });
             }
             if(compContainer.innerHTML === '') addJobCompanyRow('edit_job_company_list');
@@ -289,7 +290,8 @@ async function submitJobEdit() {
   let unlistedCompanies = [];
 
   compInputs.forEach(input => {
-    let val = input.value.trim();
+    let val = input.value.normalize('NFC').trim();
+    input.value = val;
     if (val) {
       companies.push(val);
       if (!companyListArray.includes(val)) {
@@ -334,7 +336,6 @@ async function submitJobEdit() {
     return;
   }
   
-  // ▼ 変更箇所：更新時は警告ダイアログ（突破可能）にする
   if (hiredCands.length > 0) {
     if (!confirm(`以下の候補者は現在「採用」ステータスとなっていますが、このまま案件情報を更新しますか？\n\n${hiredCands.join('\n')}`)) {
       return;
@@ -364,7 +365,7 @@ async function submitJobEdit() {
           reader.readAsDataURL(file);
         });
         uploadFiles.push({
-          name: file.name,
+          name: file.name.normalize('NFC'),
           mimeType: file.type,
           data: base64
         });
@@ -387,7 +388,7 @@ async function submitJobEdit() {
     interviewDate: getVal('edit_job_interviewDate'),
     relatedFiles: relatedFiles,
     uploadFiles: uploadFiles,
-    memo: getVal('edit_job_memo')
+    memo: getVal('edit_job_memo').normalize('NFC')
   };
 
   let btnEl = document.getElementById('jobEditBtn');

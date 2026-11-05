@@ -9,8 +9,8 @@ function checkCompanyDuplicate(name) {
   const sheet = getMasterSheet('事業者マスタ');
   if (!sheet) return false;
   const data = sheet.getDataRange().getValues();
-  const searchName = String(name).trim();
-  return data.some(row => String(row[1]).trim() === searchName);
+  const searchName = String(name || "").normalize('NFC').trim();
+  return data.some(row => String(row[1] || "").normalize('NFC').trim() === searchName);
 }
 
 /**
@@ -20,8 +20,14 @@ function addCompany(formData) {
   const sheet = getMasterSheet('事業者マスタ');
   const data = sheet.getDataRange().getValues();
   
+  const cleanName = String(formData.name || "").normalize('NFC').trim();
+  const cleanYomi = String(formData.yomi || "").normalize('NFC').trim();
+  const cleanAddress = String(formData.address || "").normalize('NFC').trim();
+  const cleanUrl = String(formData.url || "").trim();
+  const cleanNote = String(formData.note || "").normalize('NFC');
+
   // 重複チェック
-  if (checkCompanyDuplicate(formData.name)) {
+  if (checkCompanyDuplicate(cleanName)) {
     return "エラー：この事業者は既に登録されています。";
   }
 
@@ -40,11 +46,11 @@ function addCompany(formData) {
   // 新しい行を追加
   const newRow = [
     nextId,
-    formData.name,
-    formData.yomi || "",
-    formData.address || "",
-    formData.url || "",
-    formData.note || ""
+    cleanName,
+    cleanYomi,
+    cleanAddress,
+    cleanUrl,
+    cleanNote
   ];
   
   sheet.appendRow(newRow);

@@ -5,19 +5,19 @@
 function getAgentList() {
   const sheet = getMasterSheet('送り出し機関マスタ');
   return sheet ?
-    [...new Set(sheet.getDataRange().getValues().slice(1).map(row => row[1]).filter(n => n))].sort() : [];
+    [...new Set(sheet.getDataRange().getValues().slice(1).map(row => String(row[1] || '').normalize('NFC').trim()).filter(n => n))].sort() : [];
 }
 
 function getSchoolList() {
   const sheet = getMasterSheet('日本語学校マスタ');
   return sheet ?
-    [...new Set(sheet.getDataRange().getValues().slice(1).map(row => row[1]).filter(n => n))].sort() : [];
+    [...new Set(sheet.getDataRange().getValues().slice(1).map(row => String(row[1] || '').normalize('NFC').trim()).filter(n => n))].sort() : [];
 }
 
 function getCompanyList() {
   const sheet = getMasterSheet('事業者マスタ');
   return sheet ?
-    [...new Set(sheet.getDataRange().getValues().slice(1).map(row => row[1]).filter(n => n))].sort() : [];
+    [...new Set(sheet.getDataRange().getValues().slice(1).map(row => String(row[1] || '').normalize('NFC').trim()).filter(n => n))].sort() : [];
 }
 
 function getCandidateDict() {
@@ -141,7 +141,7 @@ function syncListSheets() {
 
 function normalize_(str) {
   if (str === null || str === undefined) return '';
-  return String(str).replace(/[\s \n\r]+/g, '').toLowerCase();
+  return String(str).normalize('NFC').replace(/[\s \n\r]+/g, '').toLowerCase();
 }
 
 function buildRowByHeaders_(headers, dataMap) {
@@ -210,13 +210,13 @@ function updateCandidateLists(silent = false) {
     if (!detailsText) continue;
 
     const compText = String(job[normalize_('事業者名')] || '');
-    const defaultCompany = compText.split(/\r?\n/)[0].trim();
+    const defaultCompany = compText.split(/\r?\n/)[0].normalize('NFC').trim();
     let currentCompany = defaultCompany;
 
     const dLines = detailsText.split(/\r?\n/).filter(line => line.trim() !== "");
     for (const line of dLines) {
       if (line.startsWith('【') && line.endsWith('】')) {
-        currentCompany = line.slice(1, -1).trim();
+        currentCompany = line.slice(1, -1).normalize('NFC').trim();
         continue;
       }
 
@@ -264,7 +264,7 @@ function updateCandidateLists(silent = false) {
 
     const candidateId = String(dataMap[normalize_('登録者ID')] || '').trim().toUpperCase();
     const currentMasterStatus = masterStatusColIdx !== -1 ? String(row[masterStatusColIdx] || '').trim() : '';
-    const currentMasterComp = masterCompColIdx !== -1 ? String(row[masterCompColIdx] || '').trim() : '';
+    const currentMasterComp = masterCompColIdx !== -1 ? String(row[masterCompColIdx] || '').normalize('NFC').trim() : '';
     const currentMasterOfferRaw = masterOfferColIdx !== -1 ? row[masterOfferColIdx] : '';
     const currentMasterOfferStr = toDateStr(currentMasterOfferRaw);
 
@@ -515,7 +515,7 @@ function rebuildMasterFromJobSheet() {
     const detailsText = String(row[jDetailsIdx] || '').trim();
     if (!jobId || !detailsText) continue;
 
-    const compText = String(row[jCompIdx] || '').trim();
+    const compText = String(row[jCompIdx] || '').normalize('NFC').trim();
     const companies = compText.split(/\r?\n/).map(c => c.trim()).filter(c => c);
     const defaultJoinedCompany = companies.join('・');
     let currentCompany = companies.length > 0 ? companies[0] : '';
@@ -526,7 +526,7 @@ function rebuildMasterFromJobSheet() {
     const lines = detailsText.split(/\r?\n/).map(l => l.trim()).filter(l => l);
     for (const line of lines) {
       if (line.startsWith('【') && line.endsWith('】')) {
-        currentCompany = line.slice(1, -1).trim();
+        currentCompany = line.slice(1, -1).normalize('NFC').trim();
         continue;
       }
 
