@@ -250,26 +250,54 @@ function updateJobCandidateName(adminId, newName) {
 
     if (candsCol === -1 && detailsCol === -1) return;
 
-    // SD-XXXX-(旧名前) または SD-XXXX を SD-XXXX-(新名前) に置換する正規表現（カッコ等の直前まで）
-    const replaceRegex = new RegExp(`(${adminId})(?:-[^\\n\\r（]*)?`, 'g');
+    const targetId = String(adminId).trim().toUpperCase();
+    const knownStatuses = ['採用', '不採用', '内定辞退（候補者都合）', '内定取消（事業者都合）', '面接結果の取消'];
 
     for (let i = 1; i < data.length; i++) {
-      let newCands = "", newDetails = "";
-
+      // 1. 候補者名列の置換（行単位で ID-旧名前 を ID-新名前 に置換）
       if (candsCol !== -1 && data[i][candsCol]) {
         const oldVal = String(data[i][candsCol]);
-        newCands = oldVal.replace(replaceRegex, `$1-${newName}`);
-        if (oldVal !== newCands) {
-          sheet.getRange(i + 1, candsCol + 1).setValue(newCands);
+        const cLines = oldVal.split(/\r?\n/);
+        let isCandChanged = false;
+        const newCLines = cLines.map(line => {
+          const trimmed = line.trim();
+          if (trimmed.toUpperCase().startsWith(targetId + '-') || trimmed.toUpperCase() === targetId) {
+            const updated = `${targetId}-${newName}`;
+            if (line !== updated) isCandChanged = true;
+            return updated;
+          }
+          return line;
+        });
+        if (isCandChanged) {
+          sheet.getRange(i + 1, candsCol + 1).setValue(newCLines.join('\n'));
         }
       }
 
+      // 2. 面接結果詳細列の置換（結果サフィックスを維持して名前部分を置換）
       if (detailsCol !== -1 && data[i][detailsCol]) {
         const oldVal = String(data[i][detailsCol]);
-        newDetails = oldVal.replace(replaceRegex, `$1-${newName}`);
-        if (oldVal !== newDetails) {
+        const dLines = oldVal.split(/\r?\n/);
+        let isDetailChanged = false;
+        const newDLines = dLines.map(line => {
+          const trimmed = line.trim();
+          if (trimmed.toUpperCase().startsWith(targetId + '-') || trimmed.toUpperCase().startsWith(targetId + '（')) {
+            let suffix = '';
+            for (const st of knownStatuses) {
+              if (trimmed.endsWith(`（${st}）`)) {
+                suffix = `（${st}）`;
+                break;
+              }
+            }
+            const updated = `${targetId}-${newName}${suffix}`;
+            if (line !== updated) isDetailChanged = true;
+            return updated;
+          }
+          return line;
+        });
+
+        if (isDetailChanged) {
+          const newDetails = newDLines.join('\n');
           const range = sheet.getRange(i + 1, detailsCol + 1);
-          const lines = newDetails.split('\n');
           const richText = SpreadsheetApp.newRichTextValue().setText(newDetails);
           const styleBlack = SpreadsheetApp.newTextStyle().setForegroundColor('#000000').setBold(false).build();
           const styleBlue = SpreadsheetApp.newTextStyle().setForegroundColor('#1a73e8').setBold(true).build();
@@ -277,7 +305,7 @@ function updateJobCandidateName(adminId, newName) {
           if (newDetails.length > 0) richText.setTextStyle(0, newDetails.length, styleBlack);
 
           let currentPos = 0;
-          lines.forEach(line => {
+          newDLines.forEach(line => {
             if (line.includes('（採用）')) {
               richText.setTextStyle(currentPos, currentPos + line.length, styleBlue);
             }

@@ -96,6 +96,8 @@ function registerHire(jobId, hiredData, offerDateStr) {
       for (let j = 1; j < mData.length; j++) {
         if (String(mData[j][0]).trim() === candId) {
           const rowIdx = j + 1;
+          const currentStatus = mCol['ステータス'] ? String(mData[j][mCol['ステータス'] - 1] || '').trim() : '';
+
           if (isHired) {
             if (mCol['ステータス']) mSheet.getRange(rowIdx, mCol['ステータス']).setValue('採用');
             if (mCol['採用事業者']) mSheet.getRange(rowIdx, mCol['採用事業者']).setValue(hiredComp);
@@ -107,7 +109,10 @@ function registerHire(jobId, hiredData, offerDateStr) {
               }
             }
           } else {
-            if (mCol['内定日']) mSheet.getRange(rowIdx, mCol['内定日']).setValue('');
+            // 他案件で既に「採用」でない場合のみ内定日をクリア
+            if (currentStatus !== '採用' && mCol['内定日']) {
+              mSheet.getRange(rowIdx, mCol['内定日']).setValue('');
+            }
           }
 
           if (mCol['面接履歴']) {
@@ -266,12 +271,29 @@ function updateHire(jobId, resultData, offerDateStr) {
     if (!colMap['案件ID']) throw new Error("案件管理シートに案件IDが見つかりません。");
     
     let companyNamesText = "", rawInterviewDate = "", targetJobRow = -1;
+    // 他案件で「（採用）」になっている候補者を事前に把握し、巻き込みリセットを防ぐ
+    const otherJobHiredMap = new Map();
+
     for (let i = 1; i < data.length; i++) {
-      if (String(data[i][colMap['案件ID'] - 1]).trim() === String(jobId).trim()) {
+      const currentJobId = String(data[i][colMap['案件ID'] - 1]).trim();
+      if (currentJobId === String(jobId).trim()) {
         companyNamesText = String(data[i][colMap['事業者名'] - 1]).trim();
         rawInterviewDate = data[i][colMap['面接日'] - 1];
         targetJobRow = i + 1;
-        break;
+      } else {
+        const otherDetails = colMap['面接結果詳細'] ? String(data[i][colMap['面接結果詳細'] - 1] || '').trim() : '';
+        if (!otherDetails) continue;
+        const otherComps = colMap['事業者名'] ? String(data[i][colMap['事業者名'] - 1] || '').split(/\r?\n/).filter(c => c.trim()) : [];
+        let currOtherComp = otherComps.length > 0 ? otherComps[0].trim() : '';
+        const otherLines = otherDetails.split(/\r?\n/).map(l => l.trim()).filter(l => l);
+        for (const l of otherLines) {
+          if (l.startsWith('【') && l.endsWith('】')) {
+            currOtherComp = l.slice(1, -1).trim();
+          } else if (l.includes('（採用）')) {
+            const m = l.match(/^(SD-\d+)/i);
+            if (m) otherJobHiredMap.set(m[1].toUpperCase(), currOtherComp);
+          }
+        }
       }
     }
     if (!companyNamesText) throw new Error("案件が見つかりません。");
@@ -295,7 +317,7 @@ function updateHire(jobId, resultData, offerDateStr) {
     let hiredList = [];
     
     resultData.forEach(item => {
-      const candId = String(item.id).trim();
+      const candId = String(item.id).trim().toUpperCase();
       const result = item.result;
       const comp = item.company || defaultCompany;
       
@@ -327,31 +349,44 @@ function updateHire(jobId, resultData, offerDateStr) {
       }
       
       for (let j = 1; j < mData.length; j++) {
-        if (String(mData[j][0]).trim() === candId) {
+        if (String(mData[j][0]).trim().toUpperCase() === candId) {
           const rowIdx = j + 1;
-          
-          if (newStatus && mCol['ステータス']) {
-            mSheet.getRange(rowIdx, mCol['ステータス']).setValue(newStatus);
-          }
-          
-          if (mCol['採用事業者']) {
-              if (result === '採用') {
-                  mSheet.getRange(rowIdx, mCol['採用事業者']).setValue(comp);
-              } else {
-                  mSheet.getRange(rowIdx, mCol['採用事業者']).setValue(""); 
-              }
-          }
+          const currentMasterStatus = mCol['ステータス'] ? String(mData[j][mCol['ステータス'] - 1] || '').trim() : '';
+          const isHiredInOtherJob = otherJobHiredMap.has(candId);
 
-          if (mCol['内定日']) {
-              if (result === '採用') {
-                  if (offerDateObj) {
-                      mSheet.getRange(rowIdx, mCol['内定日']).setValue(offerDateObj).setNumberFormat('yyyy"年"m"月"d"日"');
-                  } else {
-                      mSheet.getRange(rowIdx, mCol['内定日']).setValue('');
-                  }
+          if (result === '採用') {
+            if (mCol['ステータス']) mSheet.getRange(rowIdx, mCol['ステータス']).setValue('採用');
+            if (mCol['採用事業者']) mSheet.getRange(rowIdx, mCol['採用事業者']).setValue(comp);
+            if (mCol['内定日']) {
+              if (offerDateObj) {
+                mSheet.getRange(rowIdx, mCol['内定日']).setValue(offerDateObj).setNumberFormat('yyyy"年"m"月"d"日"');
               } else {
-                  mSheet.getRange(rowIdx, mCol['内定日']).setValue('');
+                mSheet.getRange(rowIdx, mCol['内定日']).setValue('');
               }
+            }
+          } else if (isHiredInOtherJob) {
+            // 他案件で「採用」となっている候補者は、ステータス（採用）・採用事業者・内定日を保護する
+            if (mCol['ステータス'] && currentMasterStatus !== '採用') {
+              mSheet.getRange(rowIdx, mCol['ステータス']).setValue('採用');
+            }
+            if (mCol['採用事業者']) {
+              mSheet.getRange(rowIdx, mCol['採用事業者']).setValue(otherJobHiredMap.get(candId));
+            }
+          } else {
+            // 他案件で採用されていない場合：「辞退」「不採用」は保護し、それ以外は newStatus を反映
+            let finalStatus = newStatus;
+            if (newStatus === '未採用' && (currentMasterStatus === '辞退' || currentMasterStatus === '不採用')) {
+              finalStatus = currentMasterStatus;
+            }
+            if (finalStatus && mCol['ステータス']) {
+              mSheet.getRange(rowIdx, mCol['ステータス']).setValue(finalStatus);
+            }
+            if (mCol['採用事業者']) {
+              mSheet.getRange(rowIdx, mCol['採用事業者']).setValue("");
+            }
+            if (mCol['内定日']) {
+              mSheet.getRange(rowIdx, mCol['内定日']).setValue("");
+            }
           }
 
           if (mCol['面接履歴']) {
@@ -359,11 +394,12 @@ function updateHire(jobId, resultData, offerDateStr) {
             const currentHistory = String(historyCell.getValue() || "").trim();
             let lines = currentHistory.split(/\r?\n/).filter(l => l.trim() !== "");
             
+            const validCompNames = [...companyNames, defaultCompany];
             let existingIdx = lines.findIndex(l => {
                if (formattedDate === "日付不明") return false;
                if (l.startsWith(formattedDate + "：") || l.startsWith(formattedDate.replace('/0', '/').replace(/\/0(\d)$/, '/$1') + "：")) {
                   const match = l.match(/：(.*?)(?:（(.*?)）)?$/);
-                  if (match && companyNames.includes(match[1].trim())) {
+                  if (match && validCompNames.includes(match[1].trim())) {
                      return true;
                   }
                }
@@ -617,6 +653,8 @@ function rollbackMasterOnJobDelete(rawInterviewDate, companiesText, resultDetail
 
     const companies = String(companiesText).split(/\r?\n/).filter(c => c.trim());
     const defaultCompany = companies.length > 0 ? companies[0] : "";
+    const joinedCompany = companies.join('・');
+    const validCompNames = [...companies, joinedCompany];
 
     const targetCands = new Map();
 
@@ -689,7 +727,7 @@ function rollbackMasterOnJobDelete(rawInterviewDate, companiesText, resultDetail
             if (formattedDate !== "日付不明") {
               if (l.startsWith(formattedDate + "：") || l.startsWith(formattedDate.replace('/0', '/').replace(/\/0(\d)$/, '/$1') + "：")) {
                 const match = l.match(/：(.*?)(?:（(.*?)）)?$/);
-                if (match && companies.includes(match[1].trim())) {
+                if (match && validCompNames.includes(match[1].trim())) {
                   shouldDelete = true;
                 }
               }
