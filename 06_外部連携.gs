@@ -79,7 +79,7 @@ function syncToPaymentManagement() {
       const detailsText = sourceMap['面接結果詳細'] ? String(row[sourceMap['面接結果詳細'] - 1] || "").trim() : "";
       if (!detailsText) continue;
 
-      const companyNameCell = sourceMap['事業者名'] ? String(row[sourceMap['事業者名'] - 1] || "") : "";
+      const companyNameCell = sourceMap['事業者名'] ? String(row[sourceMap['事業者名'] - 1] || "").normalize('NFC') : "";
       const defaultCompany = companyNameCell.split(/\r?\n/)[0].trim();
       const fieldName = sourceMap['技能分野'] ? String(row[sourceMap['技能分野'] - 1] || "").trim() : "";
 
@@ -93,7 +93,7 @@ function syncToPaymentManagement() {
       for (const line of dLines) {
         const trimmedLine = line.trim();
         if (trimmedLine.startsWith('【') && trimmedLine.endsWith('】')) {
-          currentCompany = trimmedLine.slice(1, -1).trim();
+          currentCompany = trimmedLine.slice(1, -1).normalize('NFC').trim();
           continue;
         }
 
@@ -214,7 +214,7 @@ function syncToPaymentManagement() {
     // フッター行（新規挿入位置）は「データが存在する最後の行のすぐ下」
     const footerRowIndex = lastValidRowIndex + 1;
 
-    // 5. 既存行の差分チェックと一括更新（B列「ステータス」やL〜N列「金額・入金日・備考」には一切触れない）
+    // 5. 既存行の差分チェックと一括更新（手動管理するB列「ステータス」やL〜N列「金額・入金日・備考」には一切触れない）
     const updateCols = ['事業者名', '技能分野', '名前', '面接日', '内定日', '入国日', '入職日'];
     const dateCols = ['面接日', '内定日', '入国日', '入職日'];
 
@@ -238,7 +238,7 @@ function syncToPaymentManagement() {
             if (dateCols.includes(colName)) {
               colBuffers[colName].push([formatDateStr(rawVal, targetTZ)]);
             } else {
-              colBuffers[colName].push([rawVal !== null && rawVal !== undefined ? String(rawVal).trim() : ""]);
+              colBuffers[colName].push([rawVal !== null && rawVal !== undefined ? String(rawVal).normalize('NFC').trim() : ""]);
             }
           }
           colDirty[colName] = false;
@@ -256,7 +256,7 @@ function syncToPaymentManagement() {
           let rowChanged = false;
 
           const newValuesMap = {
-            '事業者名': String(record.companyName || "").trim(),
+            '事業者名': String(record.companyName || "").normalize('NFC').trim(),
             '技能分野': String(record.fieldName || "").trim(),
             '名前': String(record.candidateName || "").trim(),
             '面接日': formatDateStr(record.interviewDate, targetTZ),
@@ -292,7 +292,7 @@ function syncToPaymentManagement() {
       appendCount++;
     }
 
-    // 変更があった列のみ、1列につき1回の setValues で一括更新（B列ステータスやL〜N列は完全にノータッチ）
+    // 変更があった列のみ、1列につき1回の setValues で一括更新（手動管理するB列ステータスやL〜N列は完全にノータッチ）
     if (numDataRows > 0) {
       updateCols.forEach(colName => {
         if (colDirty[colName] && targetMap[colName]) {
@@ -306,7 +306,7 @@ function syncToPaymentManagement() {
       });
     }
 
-    // 6. 新規行の一括追加（A列チェッカー と C列〜K列のみ書き込み、B列ステータスやL〜N列はスマートテーブルの初期値を保護）
+    // 6. 新規行の一括追加（A列チェッカー と C列〜K列のみ書き込み、手動管理するB列ステータスやL〜N列は保護）
     if (newRowsToAppend.length > 0) {
       targetSheet.insertRowsBefore(footerRowIndex, newRowsToAppend.length);
 
@@ -316,7 +316,7 @@ function syncToPaymentManagement() {
         targetSheet.getRange(footerRowIndex, targetMap['チェッカー'], newRowsToAppend.length, 1).setValues(checkerVals);
       }
 
-      // C列〜K列（案件ID, 事業者名, 技能分野, 登録者ID, 名前, 面接日, 内定日, 入国日, 入職日）が連続しているか確認して一括セット
+      // C列〜K列（案件ID, 事業者名, 技能分野, 登録者ID, 名前, 面接日, 内定日, 入国日, 入職日）を一括セット
       const syncColNames = ['案件ID', '事業者名', '技能分野', '登録者ID', '名前', '面接日', '内定日', '入国日', '入職日'];
       syncColNames.forEach(colName => {
         if (targetMap[colName]) {

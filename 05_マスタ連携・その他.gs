@@ -35,6 +35,18 @@ function getCandidateDict() {
   const idIdx = col['登録者ID'];
   const nameIdx = col['名前'];
   const statusIdx = col['ステータス'];
+  const birthIdx = col['生年月日'];
+
+  const formatBirthIso = (val) => {
+    if (!val) return "";
+    if (val instanceof Date) return Utilities.formatDate(val, "JST", "yyyy-MM-dd");
+    const s = String(val).trim().replace(/[年月\/]/g, '-').replace(/日/g, '');
+    const parts = s.split('-');
+    if (parts.length === 3) {
+      return `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+    }
+    return s;
+  };
 
   const dict = {};
   for(let i = 1; i < data.length; i++) {
@@ -42,8 +54,9 @@ function getCandidateDict() {
     if (row[idIdx]) {
       const id = String(row[idIdx]).replace(/\s/g, '').toUpperCase();
       dict[id] = {
-        name: nameIdx !== undefined ? String(row[nameIdx]) : "",
-        status: statusIdx !== undefined ? String(row[statusIdx]).trim() : ""
+        name: nameIdx !== undefined ? String(row[nameIdx]).trim() : "",
+        status: statusIdx !== undefined ? String(row[statusIdx]).trim() : "",
+        birthday: birthIdx !== undefined ? formatBirthIso(row[birthIdx]) : ""
       };
     }
   }
