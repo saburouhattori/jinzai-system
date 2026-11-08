@@ -1,4 +1,8 @@
 <script>
+// =========================================
+// 候補者登録・修正・削除 (NEW / EDIT / DELETE)
+// =========================================
+
 let lastSubmittedCandidate = null;
 
 /**
@@ -200,56 +204,6 @@ function searchData() {
       showModal(data.name + ' さんのデータを読み込みました。');
     } else { showModal('該当するデータが見つかりません。'); }
   }).safeSearchByAdminId(adminId);
-}
-
-function searchDataAddInfo() {
-  let rawId = document.getElementById('searchIdAddInfo').value.trim();
-  if (!rawId) { showModal('管理番号を入力してください。'); return; }
-  rawId = toHalfWidthNumber(rawId);
-  let adminId = formatId(rawId);
-  document.getElementById('searchIdAddInfo').value = adminId;
-  showModal('検索中...', true);
-  
-  google.script.run.withSuccessHandler(function(data) {
-    closeModal();
-    if (data) {
-      document.getElementById('targetRow').value = data.row;
-      const fields = ['entryDate', 'workDate', 'agent', 'birthCity', 'addressDetail', 'passportNum', 'passportExp', 'job', 'traineeExp', 'traineeCert', 'crime', 'applyCount', 'rejectCount', 'overseasExp', 'travelCount', 'lastInDate', 'lastOutDate', 'relName2', 'relRelation2', 'relBirth2', 'relCountry2', 'relLive2', 'relWork2', 'relCard2', 'memo'];
-      fields.forEach(f => { let el = document.getElementById('add_' + f); if(el) { let val = data[f] || ""; if(typeof val === 'string' && val.startsWith("'")) val = val.substring(1); el.value = val; } });
-      showModal(data.name + ' さんのデータを読み込みました。\n採用後の追加情報を入力してください。');
-    } else { showModal('該当するデータが見つかりません。'); }
-  }).safeSearchByAdminId(adminId);
-}
-
-function submitAddInfo() {
-  let row = document.getElementById('targetRow').value;
-  if (!row) { showModal('先に管理番号で検索して、データを読み込んでください。'); return; }
-  let formData = { row: row };
-  const fields = ['entryDate', 'workDate', 'agent', 'birthCity', 'addressDetail', 'passportNum', 'passportExp', 'job', 'traineeExp', 'traineeCert', 'crime', 'applyCount', 'rejectCount', 'overseasExp', 'travelCount', 'lastInDate', 'lastOutDate', 'relName2', 'relRelation2', 'relBirth2', 'relCountry2', 'relLive2', 'relWork2', 'relCard2', 'memo'];
-  
-  fields.forEach(f => { 
-    let el = document.getElementById('add_' + f); 
-    if (el) {
-      let val = el.value;
-      if (typeof val === 'string') {
-        val = toHalfWidthNumber(val);
-        val = val.split('\n').map(line => line.replace(/\u3000/g, ' ').replace(/ +/g, ' ').trim()).join('\n');
-      }
-      if (f === 'birthCity') {
-        formData[f] = val.toUpperCase();
-      } else if (f === 'passportNum') {
-        formData[f] = val.replace(/[^a-zA-Z0-9]/g, '');
-      } else {
-        formData[f] = val; 
-      }
-    }
-  });
-  
-  showModal('保存中...', true);
-  google.script.run.withSuccessHandler(function(msg) { 
-    showModal(msg, false, true);
-    google.script.run.syncListSheets();
-  }).updateAddInfoRow(formData);
 }
 
 function submitData() {

@@ -44,7 +44,7 @@ function safeSearchByAdminId(id) {
         res.otherJapanese = getVal('その他の日本語能力試験'); res.otherJapaneseDate = getVal('取得年月');
         res.comment = getVal('修正前コメント'); 
         res.relative = getVal('日本在住の親族について');
-        // 追加情報
+        // 追加情報（ADDINFO画面の読み込みでも共通利用）
         res.entryDate = getVal('入国日'); res.workDate = getVal('入職日');
         res.agent = getVal('所属送り出し機関'); res.birthCity = getVal('出生地（都市名）');
         res.addressDetail = getVal('住所詳細'); res.passportNum = getVal('パスポート番号'); res.passportExp = getVal('パスポート有効期限');
@@ -225,61 +225,6 @@ function updateRow(formData) {
   }
   
   return `更新が完了しました。`;
-}
-
-function updateAddInfoRow(formData) {
-  try {
-    const sheet = getMasterSheet('登録者マスタ');
-    if (!sheet) return "エラー：登録者マスタが見つかりません。";
-    const col = getMasterColumnMap(sheet);
-    const row = Number(formData.row);
-    const mapping = {
-      entryDate: '入国日', workDate: '入職日',
-      agent: '所属送り出し機関', birthCity: '出生地（都市名）',
-      addressDetail: '住所詳細', passportNum: 'パスポート番号', passportExp: 'パスポート有効期限',
-      job: '職業', traineeExp: '技能実習の経験の有無', traineeCert: '技能実習修了書の有無',
-      crime: '犯罪歴の有無', applyCount: '在留資格交付申請の回数', rejectCount: '不許可となった在留資格交付申請の回数',
-      overseasExp: '海外への出入国歴の有無', travelCount: '出入国の回数', lastInDate: '直近の入国日', lastOutDate: '直近の出国日',
-      relName2: '日本在住の親族情報親族の名前', relRelation2: '日本在住の親族情報続柄',
-      relBirth2: '日本在住の親族情報親族の生年月日', relCountry2: '日本在住の親族情報親族の国籍・地域',
-      relLive2: '日本在住の親族情報親族との同居予定の有無', relWork2: '日本在住の親族情報親族の勤務先・通学先',
-      relCard2: '日本在住の親族情報親族の在留カード番号', memo: '備考・メモ'
-    };
-
-    const safeMaxCol = Math.max(sheet.getLastColumn(), ...Object.values(col));
-    const currentRowRange = sheet.getRange(row, 1, 1, safeMaxCol);
-    const currentRowData = currentRowRange.getValues()[0];
-    for (let key in mapping) {
-      const h = mapping[key].replace(/\s/g, '');
-      if (col[h] && formData[key] !== undefined) {
-        currentRowData[col[h] - 1] = formData[key];
-      }
-    }
-    
-    const skipIndices = [];
-    if (col['顔写真']) skipIndices.push(col['顔写真'] - 1);
-    if (col['満年齢']) skipIndices.push(col['満年齢'] - 1);
-    
-    skipIndices.sort((a, b) => a - b);
-    
-    let startCol = 0;
-    skipIndices.forEach(skipIdx => {
-      if (skipIdx > startCol) {
-        const length = skipIdx - startCol;
-        sheet.getRange(row, startCol + 1, 1, length).setValues([currentRowData.slice(startCol, skipIdx)]);
-      }
-      startCol = skipIdx + 1;
-    });
-    if (startCol < safeMaxCol) {
-      const length = safeMaxCol - startCol;
-      sheet.getRange(row, startCol + 1, 1, length).setValues([currentRowData.slice(startCol)]);
-    }
-
-    if (col['入国日'] && formData.entryDate) sheet.getRange(row, col['入国日']).setNumberFormat('yyyy"年"m"月"d"日"');
-    if (col['入職日'] && formData.workDate) sheet.getRange(row, col['入職日']).setNumberFormat('yyyy"年"m"月"d"日"');
-
-    return `追加情報の登録が完了しました。`;
-  } catch (e) { return "エラー: " + e.message; }
 }
 
 function deleteCandidate(id) {
