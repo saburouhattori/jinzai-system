@@ -23,11 +23,24 @@ function searchDataAddInfo() {
   
   google.script.run.withSuccessHandler(function(data) {
     closeModal();
+    const refBox = document.getElementById('add_ref_job_box');
     if (data) {
       document.getElementById('targetRow').value = data.row;
+
+      // 採用案件の参考情報（案件ID・採用事業者名・内定日）の表示
+      if (refBox) {
+        refBox.style.display = 'block';
+        const jIdEl = document.getElementById('ref_hiredJobId');
+        const compEl = document.getElementById('ref_hiredCompany');
+        const oDateEl = document.getElementById('ref_offerDate');
+        if (jIdEl) jIdEl.innerText = data.hiredJobId || '未設定 / Not set';
+        if (compEl) compEl.innerText = data.hiredCompany || '未設定 / Not set';
+        if (oDateEl) oDateEl.innerText = data.offerDate || '未設定 / Not set';
+      }
+
       const fields = [
         'name', 'nickname', 'birthday', 'gender', 'spouse',
-        'eduSchool', 'eduDept', 'eduStatus', 'eduEnd',
+        'eduSchool', 'eduDept', 'eduSchoolEn', 'eduDeptEn', 'eduStatus', 'eduEnd',
         'jlptLevel', 'jftLevel', 'kaigoSkill', 'kaigoLang', 'otherExam', 'otherJapanese',
         'agent', 'birthCity', 'addressDetail', 'passportNum', 'passportExp',
         'job', 'traineeExp', 'traineeCert', 'crime', 'applyCount', 'rejectCount',
@@ -39,6 +52,9 @@ function searchDataAddInfo() {
         if (el) {
           let val = data[f] || "";
           if (typeof val === 'string' && val.startsWith("'")) val = val.substring(1);
+          if (f === 'nickname' && typeof val === 'string') {
+            val = val.replace(/\(/g, '（').replace(/\)/g, '）');
+          }
           if (el.type === 'month' && typeof val === 'string') {
             let match = val.match(/(\d{4})[-\/年](\d{1,2})/);
             if (match) {
@@ -53,7 +69,10 @@ function searchDataAddInfo() {
       if (addNameEl) validateAddNameInput(addNameEl.value);
 
       showModal(data.name + ' さんのデータを読み込みました。\nCOE申請情報を確認・入力してください。\n\nData loaded. Please verify and enter the COE application info.');
-    } else { showModal('該当するデータが見つかりません。\nNo matching data found.'); }
+    } else {
+      if (refBox) refBox.style.display = 'none';
+      showModal('該当するデータが見つかりません。\nNo matching data found.');
+    }
   }).safeSearchByAdminId(adminId);
 }
 
@@ -63,7 +82,7 @@ function submitAddInfo() {
   let formData = { row: row };
   const fields = [
     'name', 'nickname', 'birthday', 'gender', 'spouse',
-    'eduSchool', 'eduDept', 'eduStatus', 'eduEnd',
+    'eduSchool', 'eduDept', 'eduSchoolEn', 'eduDeptEn', 'eduStatus', 'eduEnd',
     'jlptLevel', 'jftLevel', 'kaigoSkill', 'kaigoLang', 'otherExam', 'otherJapanese',
     'agent', 'birthCity', 'addressDetail', 'passportNum', 'passportExp',
     'job', 'traineeExp', 'traineeCert', 'crime', 'applyCount', 'rejectCount',
@@ -76,11 +95,16 @@ function submitAddInfo() {
     if (el) {
       let val = el.value;
       if (typeof val === 'string') {
+        val = val.normalize('NFC');
         val = toHalfWidthNumber(val);
         val = val.split('\n').map(line => line.replace(/\u3000/g, ' ').replace(/ +/g, ' ').trim()).join('\n');
       }
-      if (f === 'name' || f === 'birthCity') {
+      if (f === 'name' || f === 'birthCity' || f === 'eduSchoolEn' || f === 'eduDeptEn') {
         val = val.toUpperCase();
+        el.value = val;
+        formData[f] = val;
+      } else if (f === 'nickname') {
+        val = val.replace(/\(/g, '（').replace(/\)/g, '）').replace(/\s+（/g, '（');
         el.value = val;
         formData[f] = val;
       } else if (f === 'passportNum') {

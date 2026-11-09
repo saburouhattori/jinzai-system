@@ -14,15 +14,62 @@
       color: #5f6368;
       margin-left: 6px;
     }
+    #form-addinfo .ref-info-box {
+      display: none;
+      background: #f8f9fa;
+      border: 1px solid #dadce0;
+      border-left: 4px solid #34a853;
+      border-radius: 6px;
+      padding: 10px 14px;
+      margin-bottom: 18px;
+    }
+    #form-addinfo .ref-info-grid {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+    #form-addinfo .ref-info-item {
+      font-size: 12px;
+      color: #333;
+    }
+    #form-addinfo .ref-info-label {
+      font-size: 11px;
+      color: #5f6368;
+      display: block;
+      margin-bottom: 2px;
+    }
+    #form-addinfo .ref-info-val {
+      font-weight: bold;
+      font-size: 13px;
+      color: #1a73e8;
+    }
   </style>
 
-  <div class="search-box" style="max-width: 440px; margin-bottom: 20px;">
+  <div class="search-box" style="max-width: 440px; margin-bottom: 15px;">
     <label>管理番号で検索 <span class="label-en" style="display:inline; margin-left:4px;">/ Search by ID</span></label>
     <div style="display: flex; gap: 10px; margin-top: 4px;">
       <input type="text" id="searchIdAddInfo" placeholder="例: 1 または 0001 / e.g. 1 or 0001" oninput="checkCandId(this, 'searchNameAddInfo')" onblur="applyFormat(this)" style="flex: 2;">
       <button class="btn-secondary" onclick="searchDataAddInfo()" style="flex: 1; margin-top: 0; padding: 8px;">読み込む / Load</button>
     </div>
     <div id="searchNameAddInfo" style="font-size:11px; color:#1a73e8; margin-top:4px; height:14px;"></div>
+  </div>
+
+  <!-- 採用案件の参考情報表示バー（検索読み込み時に表示） -->
+  <div id="add_ref_job_box" class="ref-info-box">
+    <div class="ref-info-grid">
+      <div class="ref-info-item">
+        <span class="ref-info-label">案件ID / Job ID</span>
+        <span id="ref_hiredJobId" class="ref-info-val">-</span>
+      </div>
+      <div class="ref-info-item" style="flex: 1; min-width: 180px;">
+        <span class="ref-info-label">採用事業者名 / Accepting Company</span>
+        <span id="ref_hiredCompany" class="ref-info-val">-</span>
+      </div>
+      <div class="ref-info-item">
+        <span class="ref-info-label">内定日 / Offer Date</span>
+        <span id="ref_offerDate" class="ref-info-val">-</span>
+      </div>
+    </div>
   </div>
 
   <div class="section-title">基本・パスポート情報 <span class="section-en">/ Basic &amp; Passport Info</span></div>
@@ -35,8 +82,8 @@
       </div>
     </div>
     <div class="field">
-      <label>呼び名<span class="label-en">Nickname</span></label>
-      <input type="text" id="add_nickname">
+      <label>呼び名<span class="label-en">Nickname (English + Katakana)</span></label>
+      <input type="text" id="add_nickname" placeholder="例: KHIN（キン） / e.g. KHIN（キン）" oninput="this.value = this.value.replace(/\(/g, '（').replace(/\)/g, '）');">
     </div>
   </div>
   <div class="form-row">
@@ -93,12 +140,22 @@
   <div class="section-title">学歴（最終学歴） <span class="section-en">/ Education (Highest Level)</span></div>
   <div class="form-row">
     <div class="field flex-2">
-      <label>学校名<span class="label-en">School / University Name</span></label>
+      <label>学校名（日本語・履歴書用）<span class="label-en">School Name (Japanese / for CV)</span></label>
       <input type="text" id="add_eduSchool">
     </div>
     <div class="field flex-2">
-      <label>学部・学科・専攻<span class="label-en">Department / Major</span></label>
+      <label>学部・学科・専攻（日本語・履歴書用）<span class="label-en">Department / Major (Japanese / for CV)</span></label>
       <input type="text" id="add_eduDept">
+    </div>
+  </div>
+  <div class="form-row">
+    <div class="field flex-2">
+      <label>学校名（英語・COE申請用）<span class="label-en">School / University Name (English for COE)</span></label>
+      <input type="text" id="add_eduSchoolEn" placeholder="e.g. MYAING HIGH SCHOOL / PATHEIN UNIVERSITY" oninput="this.value = this.value.toUpperCase();">
+    </div>
+    <div class="field flex-2">
+      <label>学部・学科・専攻（英語・COE申請用）<span class="label-en">Department / Major (English for COE)</span></label>
+      <input type="text" id="add_eduDeptEn" placeholder="e.g. HISTORY MAJOR (Leave blank if High School)" oninput="this.value = this.value.toUpperCase();">
     </div>
   </div>
   <div class="form-row">
@@ -232,15 +289,15 @@
   </div>
   <div class="form-row">
     <div class="field">
-      <label>交付申請の回数<span class="label-en">COE Application Count</span></label>
+      <label>交付申請の回数<span class="label-en">Past COE Application Count</span></label>
       <input type="number" id="add_applyCount" placeholder="例: 0 / e.g. 0">
     </div>
     <div class="field">
-      <label>不許可の回数<span class="label-en">COE Rejection Count</span></label>
+      <label>不許可の回数<span class="label-en">COE Rejection (Non-delivery) Count</span></label>
       <input type="number" id="add_rejectCount" placeholder="例: 0 / e.g. 0">
     </div>
     <div class="field">
-      <label>海外出入国歴の有無<span class="label-en">Past Entry/Exit History</span></label>
+      <label>海外出入国歴の有無<span class="label-en">Past Entry into / Departure from Japan</span></label>
       <select id="add_overseasExp">
         <option value="">未選択 / Select...</option>
         <option value="有">有 / Yes</option>
@@ -248,17 +305,17 @@
       </select>
     </div>
     <div class="field">
-      <label>出入国の回数<span class="label-en">Entry/Exit Count</span></label>
+      <label>出入国の回数<span class="label-en">Entry / Departure Count (Japan)</span></label>
       <input type="number" id="add_travelCount" placeholder="例: 0 / e.g. 0">
     </div>
   </div>
   <div class="form-row">
     <div class="field">
-      <label>直近の入国日<span class="label-en">Latest Entry Date</span></label>
+      <label>直近の入国日<span class="label-en">Latest Entry Date to Japan</span></label>
       <input type="date" id="add_lastInDate">
     </div>
     <div class="field">
-      <label>直近の出国日<span class="label-en">Latest Departure Date</span></label>
+      <label>直近の出国日<span class="label-en">Latest Departure Date from Japan</span></label>
       <input type="date" id="add_lastOutDate">
     </div>
     <div class="field flex-2"></div>

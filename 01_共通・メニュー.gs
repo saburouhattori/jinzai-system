@@ -82,6 +82,7 @@ function onOpen() {
     .addSeparator()
     .addItem('2. 採用・未採用リストの同期', 'runSyncListSheets')
     .addItem('3. 支払い管理シートへ同期（Funtoco）', 'runSyncPaymentManagement')
+    .addItem('4. COE infoシートへ同期（Funtoco）', 'runSyncCoeInfoSheet')
     .addToUi();
 }
 
@@ -129,5 +130,13 @@ function runSyncListSheets() {
  */
 function runSyncPaymentManagement() {
   const msg = syncToPaymentManagement();
+  SpreadsheetApp.getUi().alert(msg);
+}
+
+/**
+ * COE info シートへの一括同期実行と結果表示
+ */
+function runSyncCoeInfoSheet() {
+  const msg = syncAllToCoeInfoSheet();
   SpreadsheetApp.getUi().alert(msg);
 }

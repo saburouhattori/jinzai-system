@@ -10,7 +10,10 @@
     </div>
   </div>
   <div class="field"><label>フリガナ</label><input type="text" id="furigana"></div>
-  <div class="field"><label>呼び名</label><input type="text" id="nickname"></div>
+  <div class="field">
+    <label>呼び名</label>
+    <input type="text" id="nickname" placeholder="例: KHIN（キン）" oninput="this.value = this.value.replace(/\(/g, '（').replace(/\)/g, '）');">
+  </div>
 </div>
 <div class="form-row">
   <div class="field"><label>生年月日</label><input type="date" id="birthday"></div>

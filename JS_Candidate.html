@@ -215,10 +215,15 @@ function submitData() {
     if(el) {
       let val = el.value;
       if (typeof val === 'string') {
+        val = val.normalize('NFC');
         val = toHalfWidthNumber(val);
         val = val.split('\n').map(line => line.replace(/\u3000/g, ' ').replace(/ +/g, ' ').trim()).join('\n');
         if (f === 'name') {
           val = val.toUpperCase();
+          el.value = val;
+        } else if (f === 'nickname') {
+          // 呼び名の半角カッコを全角カッコへ統一し、カッコの前のスペースを詰める
+          val = val.replace(/\(/g, '（').replace(/\)/g, '）').replace(/\s+（/g, '（');
           el.value = val;
         }
       }

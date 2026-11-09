@@ -31,6 +31,7 @@ function safeSearchByAdminId(id) {
         res.address = getVal('現住所'); 
         res.birthplace = getVal('住所（出身地）'); res.email = getVal('メールアドレス'); res.school = getVal('所属日本語学校');
         res.eduSchool = getVal('学歴＞学校名'); res.eduDept = getVal('学歴＞学部・学科・専攻');
+        res.eduSchoolEn = getVal('学歴＞学校名（英語）'); res.eduDeptEn = getVal('学歴＞学部・学科・専攻（英語）');
         res.eduStatus = getVal('学歴＞状況');
         res.eduStart = getVal('学歴＞入学年月'); res.eduEnd = getVal('学歴＞卒業/中退年月'); res.eduNote = getVal('学歴＞補足');
         res.expPeriod1 = getVal('職歴①＞期間'); res.expContent1 = getVal('職歴①＞内容');
@@ -55,6 +56,54 @@ function safeSearchByAdminId(id) {
         res.relName2 = getVal('日本在住の親族情報親族の名前'); res.relRelation2 = getVal('日本在住の親族情報続柄'); res.relBirth2 = getVal('日本在住の親族情報親族の生年月日');
         res.relCountry2 = getVal('日本在住の親族情報親族の国籍・地域'); res.relLive2 = getVal('日本在住の親族情報親族との同居予定の有無');
         res.relWork2 = getVal('日本在住の親族情報親族の勤務先・通学先'); res.relCard2 = getVal('日本在住の親族情報親族の在留カード番号'); res.memo = getVal('備考・メモ');
+
+        // 参考表示用：採用案件ID・採用事業者名・内定日の取得
+        res.hiredJobId = "";
+        res.hiredCompany = getVal('採用事業者');
+        res.offerDate = getVal('内定日');
+
+        try {
+          const jobSheet = getMasterSheet('案件管理');
+          if (jobSheet) {
+            const jCol = getMasterColumnMap(jobSheet);
+            const jData = jobSheet.getDataRange().getValues();
+            const jIdIdx = jCol['案件ID'] ? jCol['案件ID'] - 1 : -1;
+            const jCompIdx = jCol['事業者名'] ? jCol['事業者名'] - 1 : -1;
+            const jOfferIdx = jCol['内定日'] ? jCol['内定日'] - 1 : -1;
+            const jDetailsIdx = jCol['面接結果詳細'] ? jCol['面接結果詳細'] - 1 : -1;
+
+            if (jIdIdx !== -1 && jDetailsIdx !== -1) {
+              for (let j = 1; j < jData.length; j++) {
+                const dText = String(jData[j][jDetailsIdx] || "");
+                if (!dText.includes(searchId)) continue;
+
+                const compCell = jCompIdx !== -1 ? String(jData[j][jCompIdx] || "").normalize('NFC') : "";
+                let currComp = compCell.split(/\r?\n/)[0].trim();
+                const dLines = dText.split(/\r?\n/).map(l => l.trim()).filter(l => l);
+                let foundHired = false;
+
+                for (const line of dLines) {
+                  if (line.startsWith('【') && line.endsWith('】')) {
+                    currComp = line.slice(1, -1).normalize('NFC').trim();
+                  } else if (line.toUpperCase().startsWith(searchId) && line.includes('（採用）')) {
+                    foundHired = true;
+                    break;
+                  }
+                }
+
+                if (foundHired) {
+                  res.hiredJobId = String(jData[j][jIdIdx] || "").trim();
+                  if (currComp) res.hiredCompany = currComp;
+                  if (jOfferIdx !== -1 && jData[j][jOfferIdx]) {
+                    const oVal = jData[j][jOfferIdx];
+                    res.offerDate = (oVal instanceof Date) ? Utilities.formatDate(oVal, "JST", "yyyy-MM-dd") : String(oVal).trim();
+                  }
+                  break;
+                }
+              }
+            }
+          }
+        } catch (jobErr) {}
 
         return res;
       }
