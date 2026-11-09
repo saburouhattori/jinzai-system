@@ -42,24 +42,57 @@ function safeSearchByAdminId(id) {
         res.kaigoSkill = getVal('特定技能要件＞介護技能評価試験'); res.kaigoSkillDate = getVal('特定技能要件＞介護技能取得年月');
         res.kaigoLang = getVal('特定技能要件＞介護日本語評価試験'); res.kaigoLangDate = getVal('特定技能要件＞介護日本語取得年月');
         res.otherExam = getVal('特定技能要件＞その他の評価試験'); res.otherExamDate = getVal('特定技能要件＞その他の評価試験の取得年月');
+
+        // 外食業・飲食料品製造業の個別試験列（未入力時は既存の「その他の評価試験」から自動引き継ぎ）
+        res.foodServiceExam = getVal('特定技能要件＞外食業技能測定試験');
+        if (!res.foodServiceExam && res.otherExam && res.otherExam.includes('外食業')) {
+          res.foodServiceExam = '合格';
+        }
+        res.foodMfgExam = getVal('特定技能要件＞飲食料品製造業技能測定試験');
+        if (!res.foodMfgExam && res.otherExam && res.otherExam.includes('飲食料品')) {
+          res.foodMfgExam = '合格';
+        }
+
         res.otherJapanese = getVal('その他の日本語能力試験'); res.otherJapaneseDate = getVal('取得年月');
         res.comment = getVal('修正前コメント'); 
         res.relative = getVal('日本在住の親族について');
+
         // 追加情報（ADDINFO画面の読み込みでも共通利用）
         res.entryDate = getVal('入国日'); res.workDate = getVal('入職日');
         res.agent = getVal('所属送り出し機関'); res.birthCity = getVal('出生地（都市名）');
         res.addressDetail = getVal('住所詳細'); res.passportNum = getVal('パスポート番号'); res.passportExp = getVal('パスポート有効期限');
         res.job = getVal('職業'); res.traineeExp = getVal('技能実習の経験の有無'); res.traineeCert = getVal('技能実習修了書の有無');
-        res.crime = getVal('犯罪歴の有無'); res.applyCount = getVal('在留資格交付申請の回数'); res.rejectCount = getVal('不許可となった在留資格交付申請の回数');
+        res.crime = getVal('犯罪歴の有無');
+
+        res.applyExp = getVal('在留資格交付申請歴の有無');
+        res.applyCount = getVal('在留資格交付申請の回数');
+        res.rejectCount = getVal('不許可となった在留資格交付申請の回数');
+        if (!res.applyExp && res.applyCount !== "") {
+          if (res.applyCount === "0" || res.applyCount === "無" || res.applyCount === "なし") {
+            res.applyExp = "無";
+          } else if (Number(res.applyCount) > 0) {
+            res.applyExp = "有";
+          }
+        }
+
         res.overseasExp = getVal('海外への出入国歴の有無'); res.travelCount = getVal('出入国の回数'); res.lastInDate = getVal('直近の入国日');
         res.lastOutDate = getVal('直近の出国日');
+
+        res.relExp2 = getVal('日本在住の親族情報＞有無');
         res.relName2 = getVal('日本在住の親族情報親族の名前'); res.relRelation2 = getVal('日本在住の親族情報続柄'); res.relBirth2 = getVal('日本在住の親族情報親族の生年月日');
         res.relCountry2 = getVal('日本在住の親族情報親族の国籍・地域'); res.relLive2 = getVal('日本在住の親族情報親族との同居予定の有無');
-        res.relWork2 = getVal('日本在住の親族情報親族の勤務先・通学先'); res.relCard2 = getVal('日本在住の親族情報親族の在留カード番号'); res.memo = getVal('備考・メモ');
+        res.relWork2 = getVal('日本在住の親族情報親族の勤務先・通学先'); res.relCard2 = getVal('日本在住の親族情報親族の在留カード番号');
+        if (!res.relExp2) {
+          const hasRelDetails = [res.relName2, res.relRelation2, res.relBirth2, res.relCountry2, res.relLive2, res.relWork2, res.relCard2].some(v => v !== "");
+          if (hasRelDetails) res.relExp2 = "有";
+        }
 
-        // 参考表示用：採用案件ID・採用事業者名・内定日の取得
+        res.memo = getVal('備考・メモ');
+
+        // 参考表示用：採用案件ID・採用事業者名・技能分野・内定日の取得
         res.hiredJobId = "";
         res.hiredCompany = getVal('採用事業者');
+        res.hiredSkillField = "";
         res.offerDate = getVal('内定日');
 
         try {
@@ -69,6 +102,7 @@ function safeSearchByAdminId(id) {
             const jData = jobSheet.getDataRange().getValues();
             const jIdIdx = jCol['案件ID'] ? jCol['案件ID'] - 1 : -1;
             const jCompIdx = jCol['事業者名'] ? jCol['事業者名'] - 1 : -1;
+            const jSkillIdx = jCol['技能分野'] ? jCol['技能分野'] - 1 : -1;
             const jOfferIdx = jCol['内定日'] ? jCol['内定日'] - 1 : -1;
             const jDetailsIdx = jCol['面接結果詳細'] ? jCol['面接結果詳細'] - 1 : -1;
 
@@ -94,6 +128,7 @@ function safeSearchByAdminId(id) {
                 if (foundHired) {
                   res.hiredJobId = String(jData[j][jIdIdx] || "").trim();
                   if (currComp) res.hiredCompany = currComp;
+                  if (jSkillIdx !== -1) res.hiredSkillField = String(jData[j][jSkillIdx] || "").trim();
                   if (jOfferIdx !== -1 && jData[j][jOfferIdx]) {
                     const oVal = jData[j][jOfferIdx];
                     res.offerDate = (oVal instanceof Date) ? Utilities.formatDate(oVal, "JST", "yyyy-MM-dd") : String(oVal).trim();
