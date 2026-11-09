@@ -1,37 +1,351 @@
-<div id="form-entry-date" style="display: <?= mode === 'ENTRY_DATE' ? 'block' : 'none' ?>;">
-<div class="section-title" style="border-left-color: #1a73e8;">入国・入職日の一括登録</div>
-<div class="field">
-  <label>対象の案件ID</label>
-  <div style="display: flex; gap: 10px;">
-    <input type="text" id="entryDate_job_id" placeholder="例: 1 または 0001" oninput="checkJobId(this, 'entryDateJobDisplay')" onblur="applyJobFormat(this)" style="flex: 2;">
-    <button class="btn-secondary" style="flex: 1; margin-top: 0; padding: 8px;" onclick="fetchEntryDateCandidates()">採用者検索</button>
-  </div>
-  <div id="entryDateJobDisplay" style="font-size:11px; color:#34a853; margin-top:4px; height:14px;"></div>
-</div>
+<script>
+// =========================================
+// 候補者登録・修正・削除 (NEW / EDIT / DELETE)
+// =========================================
 
-<div id="entryDate_bulk_box" style="display: none; background: #e8f0fe; padding: 12px; border-radius: 6px; margin-bottom: 15px; border: 1px solid #1a73e8;">
-  <div style="font-weight: bold; font-size: 12px; color: #1a73e8; margin-bottom: 8px;">▼ 全員に同じ日付を一括セット（入力すると下の全員に反映されます）</div>
-  <div class="form-row" style="margin-bottom: 0;">
-    <div class="field">
-      <label style="font-size: 12px;">共通の入国日</label>
-      <input type="date" id="bulk_entryDate" oninput="applyBulkDate('entry', this.value)">
-    </div>
-    <div class="field">
-      <label style="font-size: 12px;">共通の入職日</label>
-      <input type="date" id="bulk_workDate" oninput="applyBulkDate('work', this.value)">
-    </div>
-  </div>
-</div>
+let lastSubmittedCandidate = null;
 
-<div class="field">
-  <label>採用者リスト（個別の微調整も可能です）</label>
-  <div id="entryDate_cand_list" style="padding: 10px; border: 1px solid #ced4da; border-radius: 4px; background: #f8f9fa;">
-    <div style="font-size: 12px; color: #888;">-- 上の検索ボタンを押してください --</div>
-  </div>
-</div>
+/**
+ * 全角数字を半角数字に変換する関数
+ * @param {string} str - 変換対象の文字列
+ * @returns {string} - 半角数字に変換された文字列
+ */
+function toHalfWidthNumber(str) {
+  if (!str || typeof str !== 'string') return str;
+  return str.replace(/[０-９]/g, function(s) {
+    return String.fromCharCode(s.charCodeAt(0) - 0xfee0);
+  });
+}
 
-<div style="text-align: center; margin-top: 25px;">
-  <button class="btn-primary" id="entryDateBtn" style="background: #1a73e8; width: 200px;" onclick="submitBatchEntryDate()">一括保存</button>
-</div>
-<p style="font-size: 11px; color: #555; margin-top: 10px; text-align: center;">※登録者マスタの「入国日」「入職日」が一括更新され、採用者一覧へ自動同期されます。</p>
-</div>
+/**
+ * 名前の入力値にカッコや数字が含まれているかリアルタイムで判定し警告を表示する関数
+ * @param {string} val - 名前欄の入力値
+ */
+function validateNameInput(val) {
+  const warningEl = document.getElementById('name_warning');
+  if (!warningEl) return;
+  if (val && /[()（）0-9０-９]/.test(val)) {
+    warningEl.style.display = 'block';
+  } else {
+    warningEl.style.display = 'none';
+  }
+}
+
+/**
+ * 名前・生年月日から既存の重複候補者（完全一致・同姓同名）を検索する関数
+ */
+function findDuplicateCandidates(rawName, rawBday) {
+  const cleanName = (rawName || '').replace(/\u3000/g, ' ').replace(/ +/g, ' ').trim().toUpperCase();
+  const cleanBday = (rawBday || '').trim();
+  if (!cleanName || !candidateDict) return { exactMatches: [], nameMatches: [] };
+
+  let currentEditId = '';
+  if (MODE === 'EDIT') {
+    const searchIdEl = document.getElementById('searchId');
+    if (searchIdEl && searchIdEl.value.trim()) {
+      currentEditId = formatId(toHalfWidthNumber(searchIdEl.value.trim())).replace(/\s/g, '').toUpperCase();
+    }
+  }
+
+  const exactMatches = [];
+  const nameMatches = [];
+
+  for (const [cid, info] of Object.entries(candidateDict)) {
+    if (MODE === 'EDIT' && cid === currentEditId) continue;
+    const cName = (info.name || '').replace(/\u3000/g, ' ').replace(/ +/g, ' ').trim().toUpperCase();
+    if (cName === cleanName) {
+      const cBday = (info.birthday || '').trim();
+      const item = { id: cid, name: info.name, birthday: cBday, status: info.status || '未設定' };
+      if (cleanBday && cBday && cleanBday === cBday) {
+        exactMatches.push(item);
+      } else {
+        nameMatches.push(item);
+      }
+    }
+  }
+  return { exactMatches, nameMatches };
+}
+
+/**
+ * 名前・生年月日の入力中にリアルタイムで重複警告を表示する関数
+ */
+function checkCandidateDuplicateLive() {
+  const warnBox = document.getElementById('dup_candidate_warning');
+  if (!warnBox) return;
+
+  const nameEl = document.getElementById('name');
+  const bdayEl = document.getElementById('birthday');
+  const rawName = nameEl ? nameEl.value : '';
+  const rawBday = bdayEl ? bdayEl.value : '';
+
+  const { exactMatches, nameMatches } = findDuplicateCandidates(rawName, rawBday);
+
+  if (exactMatches.length > 0) {
+    const listHtml = exactMatches.map(m => `・<b>${m.id}</b> ${m.name} （生年月日: ${m.birthday} / ステータス: ${m.status}）`).join('<br>');
+    warnBox.style.backgroundColor = '#feefee';
+    warnBox.style.borderColor = '#fad2cf';
+    warnBox.style.color = '#d93025';
+    warnBox.innerHTML = `⚠️ <b>同一の名前・生年月日の候補者が既にマスタに存在します：</b><br>${listHtml}<br><span style="font-size:10px;">※同一人物の二重登録でないかご確認ください（同姓同名の別人の場合は登録時に確認ダイアログから続行可能です）。</span>`;
+    warnBox.style.display = 'block';
+  } else if (nameMatches.length > 0) {
+    const listHtml = nameMatches.map(m => `・<b>${m.id}</b> ${m.name} （生年月日: ${m.birthday || '未登録'} / ステータス: ${m.status}）`).join('<br>');
+    warnBox.style.backgroundColor = '#e8f0fe';
+    warnBox.style.borderColor = '#aecbfa';
+    warnBox.style.color = '#174ea6';
+    warnBox.innerHTML = `ℹ️ <b>同姓同名の候補者がマスタに存在します（計${nameMatches.length}名）：</b><br>${listHtml}`;
+    warnBox.style.display = 'block';
+  } else {
+    warnBox.style.display = 'none';
+    warnBox.innerHTML = '';
+  }
+}
+
+// 画面読み込み完了時に自動変換イベントを設定
+document.addEventListener('DOMContentLoaded', function() {
+  const numInputs = document.querySelectorAll('input[type="number"], input[type="text"], textarea');
+  numInputs.forEach(input => {
+    input.addEventListener('blur', function() {
+      if (typeof this.value === 'string') {
+        this.value = toHalfWidthNumber(this.value);
+      }
+    });
+  });
+
+  // ▼ 名前の入力欄を自動的に大文字へ変換し、リアルタイムで禁止文字・重複候補者をチェックするイベント設定
+  const nameInput = document.getElementById('name');
+  if (nameInput) {
+    nameInput.addEventListener('input', function() {
+      const start = this.selectionStart;
+      const end = this.selectionEnd;
+      this.value = this.value.toUpperCase();
+      this.setSelectionRange(start, end);
+      validateNameInput(this.value);
+      checkCandidateDuplicateLive();
+    });
+    nameInput.addEventListener('blur', function() {
+      this.value = this.value.toUpperCase();
+      validateNameInput(this.value);
+      checkCandidateDuplicateLive();
+    });
+  }
+
+  // ▼ 生年月日の変更時にもリアルタイム重複チェックを実行
+  const bdayInput = document.getElementById('birthday');
+  if (bdayInput) {
+    bdayInput.addEventListener('input', checkCandidateDuplicateLive);
+    bdayInput.addEventListener('change', checkCandidateDuplicateLive);
+  }
+});
+
+function searchData() {
+  let rawId = document.getElementById('searchId').value.trim();
+  if (!rawId) { showModal('管理番号を入力してください。'); return; }
+  rawId = toHalfWidthNumber(rawId);
+  let adminId = formatId(rawId);
+  document.getElementById('searchId').value = adminId;
+  document.getElementById('searchBtn').disabled = true;
+  showModal('検索中...', true);
+  
+  google.script.run.withSuccessHandler(function(data) {
+    closeModal(); document.getElementById('searchBtn').disabled = false;
+    if (data) {
+      document.getElementById('targetRow').value = data.row;
+      
+      const fields = ['name','furigana','nickname','birthday','gender','spouse','height','weight',
+        'address','birthplace','email','school','eduSchool','eduDept','eduStatus',
+        'eduStart','eduEnd','eduNote',
+        'expContent1','expContent2','expContent3','jlptLevel','jlptDate','jftLevel','jftDate',
+        'kaigoSkill','kaigoSkillDate','kaigoLang','kaigoLangDate','otherExam',
+        'otherExamDate','otherJapanese','otherJapaneseDate','comment'];
+      
+      fields.forEach(f => { 
+        let el = document.getElementById(f); 
+        if(el) { 
+          let val = data[f] || ""; 
+          if(typeof val === 'string' && val.startsWith("'")) val = val.substring(1); 
+          
+          if (el.type === 'month' && typeof val === 'string') {
+            let match = val.match(/(\d{4})[-\/年](\d{1,2})/);
+            if (match) {
+              val = match[1] + '-' + match[2].padStart(2, '0');
+            }
+          }
+          el.value = val; 
+        } 
+      });
+
+      // 読み込み時に既存の名前データにカッコや数字が含まれているか＆重複チェック
+      const nameEl = document.getElementById('name');
+      if (nameEl) validateNameInput(nameEl.value);
+      checkCandidateDuplicateLive();
+      
+      // ▼▼ 職歴期間の読み込み（文字列から年月へ分割セット） ▼▼
+      [1, 2, 3].forEach(i => {
+        let pVal = data['expPeriod' + i] || "";
+        let sEl = document.getElementById('expPeriod' + i + '_start');
+        let eEl = document.getElementById('expPeriod' + i + '_end');
+        if (sEl && eEl) {
+          let matches = [...pVal.matchAll(/(\d{4})[-\/年](\d{1,2})/g)];
+          if (matches.length === 1 && pVal.trim().startsWith('〜')) {
+            sEl.value = "";
+            eEl.value = matches[0][1] + '-' + matches[0][2].padStart(2, '0');
+          } else {
+            sEl.value = matches.length >= 1 ? matches[0][1] + '-' + matches[0][2].padStart(2, '0') : "";
+            eEl.value = matches.length >= 2 ? matches[1][1] + '-' + matches[1][2].padStart(2, '0') : "";
+          }
+        }
+      });
+      
+      let relSel = document.getElementById('relativeSelect'); let relDet = document.getElementById('relativeDetail');
+      if (data.relative && data.relative !== "日本に家族や親戚はいません。" && data.relative !== "無" && data.relative !== "なし") {
+        relSel.value = "有"; relDet.value = data.relative; relDet.style.display = "block";
+      } else { relSel.value = "無"; relDet.value = ""; relDet.style.display = "none"; }
+      
+      showModal(data.name + ' さんのデータを読み込みました。');
+    } else { showModal('該当するデータが見つかりません。'); }
+  }).safeSearchByAdminId(adminId);
+}
+
+function submitData() {
+  let formData = {};
+  
+  const fields = ['name','furigana','nickname','birthday','gender','spouse','height','weight','address','birthplace','email','school','eduSchool','eduDept','eduStatus','eduStart','eduEnd','eduNote','expContent1','expContent2','expContent3','jlptLevel','jlptDate','jftLevel','jftDate','kaigoSkill','kaigoSkillDate','kaigoLang','kaigoLangDate','otherExam','otherExamDate','otherJapanese','otherJapaneseDate','comment'];
+  fields.forEach(f => { 
+    let el = document.getElementById(f); 
+    if(el) {
+      let val = el.value;
+      if (typeof val === 'string') {
+        val = val.normalize('NFC');
+        val = toHalfWidthNumber(val);
+        val = val.split('\n').map(line => line.replace(/\u3000/g, ' ').replace(/ +/g, ' ').trim()).join('\n');
+        if (f === 'name') {
+          val = val.toUpperCase();
+          el.value = val;
+        } else if (f === 'nickname') {
+          // 呼び名の半角カッコを全角カッコへ統一し、カッコの前のスペースを詰める
+          val = val.replace(/\(/g, '（').replace(/\)/g, '）').replace(/\s+（/g, '（');
+          el.value = val;
+        }
+      }
+      formData[f] = val; 
+    } 
+  });
+
+  // ▼ 名前の入力規則チェック（カッコや数字が含まれている場合はブロック）
+  if (formData.name && /[()（）0-9０-９]/.test(formData.name)) {
+    validateNameInput(formData.name);
+    showModal('名前にカッコや数字を含めることはできません。\n（同姓同名の候補者は登録者IDで区別されます）');
+    return;
+  }
+
+  // ▼ 同一の名前・生年月日の重複候補者チェック（確認ダイアログで突破可能）
+  const { exactMatches } = findDuplicateCandidates(formData.name, formData.birthday);
+  if (exactMatches.length > 0) {
+    const dupListText = exactMatches.map(m => `・${m.id} ${m.name} (生年月日: ${m.birthday} / ステータス: ${m.status})`).join('\n');
+    const actionLabel = (MODE === 'NEW') ? '新規登録' : '更新';
+    if (!confirm(`⚠️ 同一の名前・生年月日の候補者が既に登録されています：\n\n${dupListText}\n\n同姓同名の別人として、このまま${actionLabel}を続行しますか？`)) {
+      return;
+    }
+  }
+  
+  // ▼▼ 職歴期間の結合保存 ▼▼
+  [1, 2, 3].forEach(i => {
+    let sEl = document.getElementById('expPeriod' + i + '_start');
+    let eEl = document.getElementById('expPeriod' + i + '_end');
+    let sVal = sEl && sEl.value ? sEl.value.split('-')[0] + "年" + parseInt(sEl.value.split('-')[1], 10) + "月" : "";
+    let eVal = eEl && eEl.value ? eEl.value.split('-')[0] + "年" + parseInt(eEl.value.split('-')[1], 10) + "月" : "";
+    
+    let combined = "";
+    if (sVal && eVal) combined = sVal + " 〜 " + eVal;
+    else if (sVal) combined = sVal + " 〜";
+    else if (eVal) combined = "〜 " + eVal;
+    
+    formData['expPeriod' + i] = combined;
+  });
+  
+  let relSel = document.getElementById('relativeSelect'); let relDet = document.getElementById('relativeDetail');
+  if (relSel && relDet) {
+    let relVal = relDet.value;
+    if (typeof relVal === 'string') {
+      relVal = toHalfWidthNumber(relVal);
+      relVal = relVal.split('\n').map(line => line.replace(/\u3000/g, ' ').replace(/ +/g, ' ').trim()).join('\n');
+    }
+    formData.relative = (relSel.value === '有') ? relVal : "日本に家族や親戚はいません。";
+  }
+  
+  if (MODE === 'EDIT') {
+    formData.row = document.getElementById('targetRow').value;
+    if (!formData.row) { showModal('先に管理番号で検索してください。'); return; }
+  }
+
+  lastSubmittedCandidate = {
+    name: formData.name || '',
+    birthday: formData.birthday || ''
+  };
+  
+  let fileInput = document.getElementById('imageFile');
+  if (fileInput && fileInput.files.length > 0) {
+    let file = fileInput.files[0];
+    let reader = new FileReader();
+    reader.onload = function(e) { formData.imageFile = { name: file.name, mimeType: file.type, contents: e.target.result.split(',')[1] }; sendData(formData); };
+    reader.readAsDataURL(file);
+  } else { sendData(formData); }
+}
+
+function sendData(formData) {
+  document.getElementById('mainBtn').disabled = true; showModal('処理中...', true);
+  if (MODE === 'NEW') { google.script.run.withSuccessHandler(onSuccess).addNewRow(formData); } 
+  else { google.script.run.withSuccessHandler(onSuccess).updateRow(formData); }
+}
+
+function onSuccess(msg) {
+  document.getElementById('mainBtn').disabled = false; 
+  showModal(msg, false, true);
+  
+  if (MODE === 'NEW') {
+    // 連続登録時にも重複検知できるようフロントエンド辞書へ即時反映
+    const idMatch = String(msg).match(/SD-\d+/i);
+    if (idMatch && lastSubmittedCandidate && candidateDict) {
+      const newId = idMatch[0].toUpperCase();
+      candidateDict[newId] = {
+        name: lastSubmittedCandidate.name,
+        status: '未採用',
+        birthday: lastSubmittedCandidate.birthday
+      };
+    }
+
+    let inputs = document.querySelectorAll('input[type="text"], input[type="date"], input[type="number"], input[type="email"], input[type="month"], textarea');
+    inputs.forEach(input => input.value = '');
+    let selects = document.querySelectorAll('select'); selects.forEach(select => select.selectedIndex = 0);
+    let fileInput = document.getElementById('imageFile'); if (fileInput) fileInput.value = '';
+    document.getElementById('relativeDetail').style.display = 'none';
+    let nameWarn = document.getElementById('name_warning'); if (nameWarn) nameWarn.style.display = 'none';
+    let dupWarn = document.getElementById('dup_candidate_warning'); if (dupWarn) { dupWarn.style.display = 'none'; dupWarn.innerHTML = ''; }
+  } else if (MODE === 'EDIT') {
+    const searchIdEl = document.getElementById('searchId');
+    if (searchIdEl && searchIdEl.value.trim() && lastSubmittedCandidate && candidateDict) {
+      const editId = formatId(toHalfWidthNumber(searchIdEl.value.trim())).replace(/\s/g, '').toUpperCase();
+      if (candidateDict[editId]) {
+        candidateDict[editId].name = lastSubmittedCandidate.name;
+        candidateDict[editId].birthday = lastSubmittedCandidate.birthday;
+      }
+    }
+  }
+  google.script.run.syncListSheets();
+}
+
+function submitDelete() {
+  let rawId = document.getElementById('delete_id').value.trim();
+  if (!rawId) { showModal('削除するIDを入力してください。'); return; }
+  rawId = toHalfWidthNumber(rawId);
+  let adminId = formatId(rawId);
+  if (!confirm(adminId + " のデータを完全に削除します。よろしいですか？")) return;
+  showModal('削除中...', true);
+  google.script.run.withSuccessHandler(function(msg) {
+    showModal(msg, false, true);
+    document.getElementById('delete_id').value = ''; 
+    document.getElementById('deleteNameDisplay').innerText = '';
+    google.script.run.syncListSheets();
+  }).deleteCandidate(adminId);
+}
+</script>

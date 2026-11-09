@@ -95,75 +95,46 @@ function identifyCoeFieldKey_(headerStr) {
 }
 
 /**
- * COE info シートの構造を確認し、旧30列から新33列への安全な列挿入およびヘッダー更新を行う関数
- */
-function ensureCoeInfoSheetInitialized_(coeSheet) {
-  const headers = getCoeInfoHeaders_();
-  const targetColCount = headers.length; // 33列
-  let lastCol = coeSheet.getLastColumn();
-
-  if (lastCol === 0 || coeSheet.getLastRow() === 0) {
-    coeSheet.getRange(1, 1, 1, targetColCount).setValues([headers]);
-    return;
-  }
-
-  let currentHeaders = coeSheet.getRange(1, 1, 1, lastCol).getValues()[0];
-  let currentKeys = currentHeaders.map(h => identifyCoeFieldKey_(h));
-
-  // 1. 「技能分野 (skillField)」列がまだ存在しない場合、採用事業者名 (company) の右隣に1列挿入
-  if (!currentKeys.includes('skillField')) {
-    const compIdx = currentKeys.indexOf('company'); // 0-based
-    const insertAfterCol = compIdx !== -1 ? compIdx + 1 : 3;
-    coeSheet.insertColumnAfter(insertAfterCol);
-    SpreadsheetApp.flush();
-    lastCol = coeSheet.getLastColumn();
-    currentHeaders = coeSheet.getRange(1, 1, 1, lastCol).getValues()[0];
-    currentKeys = currentHeaders.map(h => identifyCoeFieldKey_(h));
-  }
-
-  // 2. 「外食業 (foodServiceExam)」「飲食料品製造業 (foodMfgExam)」列がまだ存在しない場合、介護日本語 (kaigoLang) の右隣に2列挿入
-  if (!currentKeys.includes('foodServiceExam') && !currentKeys.includes('foodMfgExam')) {
-    const kLangIdx = currentKeys.indexOf('kaigoLang'); // 0-based
-    const insertAfterCol = kLangIdx !== -1 ? kLangIdx + 1 : 16;
-    coeSheet.insertColumnsAfter(insertAfterCol, 2);
-    SpreadsheetApp.flush();
-    lastCol = coeSheet.getLastColumn();
-    currentHeaders = coeSheet.getRange(1, 1, 1, lastCol).getValues()[0];
-    currentKeys = currentHeaders.map(h => identifyCoeFieldKey_(h));
-  }
-
-  // 3. 33列のヘッダー文言に差分があれば1行目だけを一括更新
-  if (lastCol >= targetColCount) {
-    let headerDiff = false;
-    for (let i = 0; i < targetColCount; i++) {
-      if (String(currentHeaders[i] || "").trim() !== headers[i]) {
-        headerDiff = true;
-        break;
-      }
-    }
-    if (headerDiff) {
-      coeSheet.getRange(1, 1, 1, targetColCount).setValues([headers]);
-      SpreadsheetApp.flush();
-    }
-  }
-}
-
-/**
  * COE info シートの1行目ヘッダーを読み取り、各列とフィールドキーの対応マップを返す関数
+ * ※ スマートテーブルのヘッダー重複エラーを避けるため、既存シートのヘッダーは上書きせず動的に読み取ります。
  */
 function getCoeSheetLayout_(coeSheet) {
-  ensureCoeInfoSheetInitialized_(coeSheet);
-  const lastCol = coeSheet.getLastColumn();
+  let lastCol = coeSheet.getLastColumn();
+  if (lastCol === 0 || coeSheet.getLastRow() === 0) {
+    const defaultHeaders = getCoeInfoHeaders_();
+    coeSheet.getRange(1, 1, 1, defaultHeaders.length).setValues([defaultHeaders]);
+    lastCol = defaultHeaders.length;
+  }
+
   const headers = coeSheet.getRange(1, 1, 1, lastCol).getValues()[0];
   const colKeys = headers.map(h => identifyCoeFieldKey_(h));
+  const colLabels = headers.map(h => String(h || "").split(/\r?\n/)[0].trim());
   const candIdColIdx = colKeys.indexOf('candId'); // 0-based
   const jobIdColIdx = colKeys.indexOf('jobId');   // 0-based
   return {
     lastCol: lastCol,
     colKeys: colKeys,
+    colLabels: colLabels,
     candIdColIdx: candIdColIdx !== -1 ? candIdColIdx : 4,
     jobIdColIdx: jobIdColIdx !== -1 ? jobIdColIdx : 1
   };
+}
+
+/**
+ * 差分比較用の正規化ヘルパー関数
+ * ※ スプレッドシート側で Date 型やゼロ埋めなし日付（例: 2026/11/6）に変換されていても同一値と判定させます。
+ */
+function normalizeCoeCompareVal_(val, tz) {
+  if (val === null || val === undefined || val === "") return "";
+  if (val instanceof Date) {
+    return Utilities.formatDate(val, tz || "JST", "yyyy/MM/dd");
+  }
+  const s = String(val).normalize('NFC').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+  const dateMatch = s.match(/^(\d{4})[\/\-年](\d{1,2})[\/\-月](\d{1,2})日?$/);
+  if (dateMatch) {
+    return `${dateMatch[1]}/${dateMatch[2].padStart(2, '0')}/${dateMatch[3].padStart(2, '0')}`;
+  }
+  return s;
 }
 
 /**
@@ -198,7 +169,7 @@ function buildCoeInfoRowByLayout_(mRow, mCol, jobInfo, sourceTZ, colKeys) {
     const val = mRow[cIdx - 1];
     if (val === null || val === undefined) return "";
     if (val instanceof Date) return Utilities.formatDate(val, sourceTZ, "yyyy/MM/dd");
-    const s = String(val).trim();
+    const s = String(val).normalize('NFC').trim();
     return s.startsWith("'") ? s.substring(1).trim() : s;
   };
 
@@ -644,6 +615,7 @@ function syncCandidatesToCoeInfo(candidateIds, removeCandidateIds = []) {
 
 /**
  * 管理者メニュー用：全採用者のCOE情報を外部シート「COE info」へ一括同期する関数
+ * ・日付フォーマット揺れを吸収する正規化比較と、更新・追加された対象行の詳細表示を搭載
  */
 function syncAllToCoeInfoSheet() {
   try {
@@ -651,14 +623,15 @@ function syncAllToCoeInfoSheet() {
     const sourceTZ = ss.getSpreadsheetTimeZone();
     const masterSheet = ss.getSheetByName('登録者マスタ');
     const jobSheet = ss.getSheetByName('案件管理');
-    if (!masterSheet || !jobSheet) throw new Error("「登録者マスタ」または「案件管理」シートが見つかりません。");
+    if (!masterSheet || !jobSheet) return "エラー：「登録者マスタ」または「案件管理」シートが見つかりません。";
 
     const targetSS = SpreadsheetApp.openById(EXTERNAL_SS_ID_FUNTOCO);
     const coeSheet = targetSS.getSheetByName(EXTERNAL_SHEET_COE_INFO);
-    if (!coeSheet) throw new Error(`外部シートに「${EXTERNAL_SHEET_COE_INFO}」シートが見つかりません。`);
+    if (!coeSheet) return `エラー：外部シートに「${EXTERNAL_SHEET_COE_INFO}」シートが見つかりません。`;
 
     const layout = getCoeSheetLayout_(coeSheet);
-    const { lastCol, colKeys, candIdColIdx, jobIdColIdx } = layout;
+    const { lastCol, colKeys, colLabels, candIdColIdx, jobIdColIdx } = layout;
+    const nameColIdx = colKeys.indexOf('name');
 
     const hiredJobMap = getHiredJobInfoMapFromJobSheet_(jobSheet, sourceTZ);
     const masterData = masterSheet.getDataRange().getValues();
@@ -681,7 +654,9 @@ function syncAllToCoeInfoSheet() {
 
     // 1. 既存シートの行を取得し、採用取り消し・辞退となった行を先に削除（降順）
     let coeData = coeSheet.getDataRange().getValues();
+    const targetTZ = targetSS.getSpreadsheetTimeZone();
     const rowsToDelete = [];
+
     for (let r = 1; r < coeData.length; r++) {
       const existingJid = String(coeData[r][jobIdColIdx] || "").trim();
       const existingCid = String(coeData[r][candIdColIdx] || "").trim().toUpperCase();
@@ -697,8 +672,8 @@ function syncAllToCoeInfoSheet() {
       coeData = coeSheet.getDataRange().getValues();
     }
 
-    // 2. 削除後の最新データで既存行マップと最終データ行（フッター直前）を特定
-    const existingRowMap = new Map();
+    // 2. 削除後の最新データで既存行マップ（coeData上のインデックス）と最終データ行を特定
+    const existingIdxMap = new Map(); // cid -> r (1 〜 numDataRows)
     let lastValidRowIndex = 1;
     for (let r = 1; r < coeData.length; r++) {
       const jId = String(coeData[r][jobIdColIdx] || "").trim();
@@ -706,51 +681,74 @@ function syncAllToCoeInfoSheet() {
       if (jId || cId) {
         lastValidRowIndex = r + 1;
       }
-      if (cId && !existingRowMap.has(cId)) {
-        existingRowMap.set(cId, r + 1);
+      if (cId && !existingIdxMap.has(cId)) {
+        existingIdxMap.set(cId, r);
+      }
+    }
+
+    const numDataRows = lastValidRowIndex - 1;
+    const colBuffers = [];
+    const colDirty = new Array(lastCol).fill(false);
+
+    if (numDataRows > 0) {
+      for (let c = 0; c < lastCol; c++) {
+        const buf = [];
+        for (let r = 1; r <= numDataRows; r++) {
+          buf.push([normalizeCoeCompareVal_(coeData[r][c], targetTZ)]);
+        }
+        colBuffers.push(buf);
       }
     }
 
     let updateCount = 0;
     let appendCount = 0;
     const rowsToAppend = [];
-
-    // 既存行の一括更新用バッファ
-    const numExistingDataRows = lastValidRowIndex - 1;
-    const updatedMatrix = numExistingDataRows > 0 ? coeData.slice(1, lastValidRowIndex).map(row => {
-      const padded = row.slice(0, lastCol);
-      while (padded.length < lastCol) padded.push("");
-      return padded;
-    }) : [];
-    let isMatrixChanged = false;
+    const updatedRowDetails = [];
+    const appendedRowDetails = [];
 
     for (const [cid, jobInfo] of sortedEntries) {
       const mRow = masterRowMap.get(cid);
       if (!mRow) continue;
       const newRowArr = buildCoeInfoRowByLayout_(mRow, mCol, jobInfo, sourceTZ, colKeys);
 
-      if (existingRowMap.has(cid)) {
-        const rowNum = existingRowMap.get(cid);
-        const matrixIdx = rowNum - 2;
-        if (matrixIdx >= 0 && matrixIdx < numExistingDataRows) {
-          const oldRowArr = updatedMatrix[matrixIdx];
-          const isChanged = newRowArr.some((val, idx) => String(val || "").trim() !== String(oldRowArr[idx] || "").trim());
-          if (isChanged) {
-            updatedMatrix[matrixIdx] = newRowArr;
-            isMatrixChanged = true;
+      if (existingIdxMap.has(cid)) {
+        const rIdx = existingIdxMap.get(cid); // 1 〜 numDataRows
+        if (rIdx >= 1 && rIdx <= numDataRows) {
+          const bufIdx = rIdx - 1;
+          const sheetRowNum = rIdx + 1;
+          const changedColNames = [];
+
+          for (let c = 0; c < lastCol; c++) {
+            const oldNorm = colBuffers[c][bufIdx][0];
+            const newNorm = normalizeCoeCompareVal_(newRowArr[c], sourceTZ);
+            if (oldNorm !== newNorm) {
+              colBuffers[c][bufIdx][0] = newRowArr[c] !== undefined ? newRowArr[c] : "";
+              colDirty[c] = true;
+              changedColNames.push(colLabels[c] || `列${c + 1}`);
+            }
+          }
+          if (changedColNames.length > 0) {
             updateCount++;
+            const candName = nameColIdx !== -1 ? newRowArr[nameColIdx] : "";
+            updatedRowDetails.push(`・${sheetRowNum}行目: ${cid} ${candName} [${changedColNames.join(', ')}]`);
           }
         }
       } else {
-        rowsToAppend.push(newRowArr);
+        rowsToAppend.push({ cid: cid, rowArr: newRowArr });
         appendCount++;
       }
     }
 
-    if (numExistingDataRows > 0 && isMatrixChanged) {
-      coeSheet.getRange(2, 1, numExistingDataRows, lastCol).setValues(updatedMatrix);
+    // 3. 変更があった列のみ、1列につき1回の setValues で一括更新
+    if (numDataRows > 0) {
+      for (let c = 0; c < lastCol; c++) {
+        if (colDirty[c]) {
+          coeSheet.getRange(2, c + 1, numDataRows, 1).setValues(colBuffers[c]);
+        }
+      }
     }
 
+    // 4. 新規行の一括追加
     if (rowsToAppend.length > 0) {
       const insertRowIndex = lastValidRowIndex + 1;
       if (insertRowIndex <= coeSheet.getMaxRows()) {
@@ -758,12 +756,34 @@ function syncAllToCoeInfoSheet() {
       } else {
         coeSheet.insertRowsAfter(coeSheet.getMaxRows(), rowsToAppend.length);
       }
-      coeSheet.getRange(insertRowIndex, 1, rowsToAppend.length, lastCol).setValues(rowsToAppend);
+      const appendMatrix = rowsToAppend.map(item => item.rowArr);
+      coeSheet.getRange(insertRowIndex, 1, rowsToAppend.length, lastCol).setValues(appendMatrix);
+
+      rowsToAppend.forEach((item, idx) => {
+        const candName = nameColIdx !== -1 ? item.rowArr[nameColIdx] : "";
+        appendedRowDetails.push(`・${insertRowIndex + idx}行目: ${item.cid} ${candName}`);
+      });
     }
 
     SpreadsheetApp.flush();
-    return `「COE info」シートへの同期が完了しました。\n新規追加: ${appendCount}件\n情報更新: ${updateCount}件\n削除: ${rowsToDelete.length}件`;
+
+    const unchangedCount = sortedEntries.length - appendCount - updateCount;
+    let msg = `「COE info」シートへの同期が完了しました。\n新規追加: ${appendCount}件\n情報更新: ${updateCount}件\n削除: ${rowsToDelete.length}件\n（変更なしスキップ: ${unchangedCount}件）`;
+
+    if (appendedRowDetails.length > 0) {
+      const showAppend = appendedRowDetails.slice(0, 15);
+      msg += `\n\n【新規追加の対象行】\n` + showAppend.join("\n");
+      if (appendedRowDetails.length > 15) msg += `\n...他 ${appendedRowDetails.length - 15} 件`;
+    }
+
+    if (updatedRowDetails.length > 0) {
+      const showUpdate = updatedRowDetails.slice(0, 15);
+      msg += `\n\n【情報更新の対象行・変更項目】\n` + showUpdate.join("\n");
+      if (updatedRowDetails.length > 15) msg += `\n...他 ${updatedRowDetails.length - 15} 件`;
+    }
+
+    return msg;
   } catch (e) {
-    throw new Error("COE info 同期エラー: " + e.message);
+    return "COE info 同期エラー: " + e.message;
   }
 }

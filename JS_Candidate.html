@@ -1,790 +1,351 @@
-// =========================================================
-// 外部連携（Funtoco「COE info」シートへの同期・転記）
-// =========================================================
+<script>
+// =========================================
+// 候補者登録・修正・削除 (NEW / EDIT / DELETE)
+// =========================================
 
-const EXTERNAL_SHEET_COE_INFO = "COE info";
+let lastSubmittedCandidate = null;
 
 /**
- * COE info シートの標準33列ヘッダー定義（1行目：日本語、2行目：英語）
+ * 全角数字を半角数字に変換する関数
+ * @param {string} str - 変換対象の文字列
+ * @returns {string} - 半角数字に変換された文字列
  */
-function getCoeInfoHeaders_() {
-  return [
-    "内定日\nOffer Date",                                                               // 1 (A)
-    "案件ID\nJob ID",                                                                   // 2 (B)
-    "採用事業者名\nAccepting Organization",                                             // 3 (C)
-    "技能分野\nJob Field",                                                              // 4 (D)
-    "登録者ID\nCandidate ID",                                                           // 5 (E)
-    "氏名\nName",                                                                       // 6 (F)
-    "呼び名\nNickname",                                                                 // 7 (G)
-    "性別\nSex",                                                                        // 8 (H)
-    "所属送り出し機関\nSending Organization",                                           // 9 (I)
-    "生年月日\nDate of birth",                                                          // 10 (J)
-    "出生地（都市名）\nPlace of birth",                                                 // 11 (K)
-    "旅券番号（パスポート番号）\nPassport Number",                                      // 12 (L)
-    "旅券有効期限（パスポート有効期限）\nPassport Date of expiration",                  // 13 (M)
-    "日本語能力試験（JLPT / JFT）\nCertification of JLPT or JFT-Basic",                 // 14 (N)
-    "介護技能評価試験\nNursing Care Skills Exam",                                       // 15 (O)
-    "介護日本語評価試験\nNursing Care Japanese Exam",                                   // 16 (P)
-    "外食業技能測定試験\nFood Service Skills Exam",                                     // 17 (Q)
-    "飲食料品製造業技能測定試験\nFood & Beverage Mfg. Skills Exam",                     // 18 (R)
-    "配偶者の有無\nMarital status",                                                     // 19 (S)
-    "本国における居住地（住所詳細）\nHome address in Myanmar",                          // 20 (T)
-    "職業\nOccupation",                                                                 // 21 (U)
-    "最終学歴・状況\nFinal educational background",                                     // 22 (V)
-    "最終学歴（学校名・卒業年月・専攻）\nName of school / Date of graduation / Major",  // 23 (W)
-    "過去の交付申請歴・回数\nPast COE application history & count",                     // 24 (X)
-    "うち不交付となった回数\nNumber of times of non-issuance",                          // 25 (Y)
-    "過去の出入国歴\nPast entry into / departure from Japan",                           // 26 (Z)
-    "出入国回数・直近の出入国期間\nNumber of times & Latest entry/departure period",    // 27 (AA)
-    "在日親族及び同居者の有無\nFamily in Japan or co-residents",                        // 28 (AB)
-    "在日親族・同居者の詳細\nDetails of family in Japan",                               // 29 (AC)
-    "犯罪歴の有無（日本・海外）\nCriminal record (in Japan / overseas)",                // 30 (AD)
-    "技能実習経験の有無\nExperience of Ginojissyu",                                     // 31 (AE)
-    "技能実習修了証の有無\nCertification of Ginojissyu",                                // 32 (AF)
-    "備考（その他日本語試験等）\nNote"                                                  // 33 (AG)
-  ];
+function toHalfWidthNumber(str) {
+  if (!str || typeof str !== 'string') return str;
+  return str.replace(/[０-９]/g, function(s) {
+    return String.fromCharCode(s.charCodeAt(0) - 0xfee0);
+  });
 }
 
 /**
- * ヘッダー文字列から標準フィールドキーを判定するヘルパー関数
- * ※ AG列「備考（その他日本語試験等）」が N列「日本語試験」に誤判定されないよう、「備考 / Note」を最優先で判定します。
+ * 名前の入力値にカッコや数字が含まれているかリアルタイムで判定し警告を表示する関数
+ * @param {string} val - 名前欄の入力値
  */
-function identifyCoeFieldKey_(headerStr) {
-  const h = String(headerStr || "").normalize('NFC').replace(/\s+/g, ' ').trim();
-  if (!h) return null;
-
-  // 0. 備考列の最優先判定（「その他日本語試験等」という副題が「日本語試験」に誤爆するのを防止）
-  if (h.includes('備考') || h.includes('Note')) return 'note';
-
-  // 1. 複合文・固有キーワードの優先判定（在日親族詳細や学校名が Name 等に誤判定されるのを防止）
-  if (h.includes('在日親族・同居者の詳細') || h.includes('在日親族詳細') || h.includes('Details of family in Japan') || h.includes('Residence card number')) return 'familyDetail';
-  if (h.includes('在日親族及び同居者の有無') || h.includes('日本在住の親族の有無') || h.includes('Family in Japan')) return 'hasFamily';
-  if (h.includes('学校名・卒業年月・専攻') || h.includes('最終学歴学校名') || h.includes('Name of school')) return 'eduDetail';
-  if (h.includes('最終学歴・状況') || h.includes('Final educational background')) return 'eduBgSummary';
-  if (h.includes('過去の交付申請歴') || h.includes('Past COE application') || h.includes('applied for a status of residence')) return 'applyStr';
-  if (h.includes('不交付となった回数') || h.includes('不許可回数') || h.includes('non-issuance') || h.includes('non-delivery')) return 'rejectStr';
-  if (h.includes('出入国回数・直近') || h.includes('Latest entry/departure period') || h.includes('The latest entry from')) return 'travelDetail';
-  if (h.includes('過去の出入国歴') || h.includes('Past entry into')) return 'overseasExp';
-  if (h.includes('犯罪歴の有無') || h.includes('Criminal record')) return 'crime';
-  if (h.includes('技能実習修了') || h.includes('Certification of Gino')) return 'traineeCert';
-  if (h.includes('技能実習経験') || h.includes('Experience of Gino')) return 'traineeExp';
-  if (h.includes('日本語能力試験') || h.includes('JLPT or JFT') || h.includes('Certification of JFT or JLPT')) return 'certLang';
-  if (h.includes('介護技能評価試験') || h.includes('Nursing Care Skills') || h.includes('Nurse Skill')) return 'kaigoSkill';
-  if (h.includes('介護日本語評価試験') || h.includes('Nursing Care Japanese') || h.includes('Nurse Japanese')) return 'kaigoLang';
-  if (h.includes('外食業技能測定試験') || h.includes('Food Service Skills')) return 'foodServiceExam';
-  if (h.includes('飲食料品製造業技能測定試験') || h.includes('Food & Beverage Mfg')) return 'foodMfgExam';
-  if (h.includes('旅券番号') || h.includes('パスポート番号') || h.includes('Passport Number')) return 'passportNum';
-  if (h.includes('旅券有効期限') || h.includes('パスポート有効期限') || h.includes('Passport Date of expiration') || h.includes('Passport Exp')) return 'passportExp';
-  if (h.includes('本国における居住地') || h.includes('住所詳細') || h.includes('Home address in Myanmar') || h.includes('Address of Myanmar')) return 'addressDetail';
-  if (h.includes('出生地') || h.includes('Place of birth')) return 'birthCity';
-  if (h.includes('生年月日') || h.includes('Date of birth')) return 'birthday';
-  if (h.includes('配偶者') || h.includes('Marital status') || h.includes('Married or Single')) return 'spouse';
-  if (h.includes('職業') || h.includes('Occupation')) return 'job';
-  if (h.includes('送り出し機関') || h.includes('Sending Organization') || h.includes('Assignment')) return 'agent';
-  if (h.includes('性別') || h.includes('Sex')) return 'sex';
-  if (h.includes('呼び名') || h.includes('Nickname') || h.includes('Nick Name')) return 'nickname';
-
-  // 2. 管理キー・基本項目の判定
-  if (h.includes('内定日') || h.includes('Offer Date')) return 'offerDate';
-  if (h.includes('案件ID') || h.includes('Job ID')) return 'jobId';
-  if (h.includes('採用事業者') || h.includes('Accepting Organization') || h.includes('Company')) return 'company';
-  if (h.includes('技能分野') || h.includes('Job Field')) return 'skillField';
-  if (h.includes('登録者ID') || h.includes('Candidate ID')) return 'candId';
-  if (h.includes('氏名') || h.includes('名前') || h.includes('Name')) return 'name';
-  return null;
+function validateNameInput(val) {
+  const warningEl = document.getElementById('name_warning');
+  if (!warningEl) return;
+  if (val && /[()（）0-9０-９]/.test(val)) {
+    warningEl.style.display = 'block';
+  } else {
+    warningEl.style.display = 'none';
+  }
 }
 
 /**
- * COE info シートの1行目ヘッダーを読み取り、各列とフィールドキーの対応マップを返す関数
- * ※ スマートテーブルのヘッダー重複エラーを避けるため、既存シートのヘッダーは上書きせず動的に読み取ります。
+ * 名前・生年月日から既存の重複候補者（完全一致・同姓同名）を検索する関数
  */
-function getCoeSheetLayout_(coeSheet) {
-  let lastCol = coeSheet.getLastColumn();
-  if (lastCol === 0 || coeSheet.getLastRow() === 0) {
-    const defaultHeaders = getCoeInfoHeaders_();
-    coeSheet.getRange(1, 1, 1, defaultHeaders.length).setValues([defaultHeaders]);
-    lastCol = defaultHeaders.length;
-  }
+function findDuplicateCandidates(rawName, rawBday) {
+  const cleanName = (rawName || '').replace(/\u3000/g, ' ').replace(/ +/g, ' ').trim().toUpperCase();
+  const cleanBday = (rawBday || '').trim();
+  if (!cleanName || !candidateDict) return { exactMatches: [], nameMatches: [] };
 
-  const headers = coeSheet.getRange(1, 1, 1, lastCol).getValues()[0];
-  const colKeys = headers.map(h => identifyCoeFieldKey_(h));
-  const colLabels = headers.map(h => String(h || "").split(/\r?\n/)[0].trim());
-  const candIdColIdx = colKeys.indexOf('candId'); // 0-based
-  const jobIdColIdx = colKeys.indexOf('jobId');   // 0-based
-  return {
-    lastCol: lastCol,
-    colKeys: colKeys,
-    colLabels: colLabels,
-    candIdColIdx: candIdColIdx !== -1 ? candIdColIdx : 4,
-    jobIdColIdx: jobIdColIdx !== -1 ? jobIdColIdx : 1
-  };
-}
-
-/**
- * 差分比較用の正規化ヘルパー関数
- * ※ スプレッドシート側で Date 型やゼロ埋めなし日付（例: 2026/10/5）に変換されていても同一値と判定させます。
- */
-function normalizeCoeCompareVal_(val, tz) {
-  if (val === null || val === undefined || val === "") return "";
-  if (val instanceof Date) {
-    return Utilities.formatDate(val, tz || "JST", "yyyy/MM/dd");
-  }
-  const s = String(val).normalize('NFC').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
-  // 日付文字列（YYYY/M/D または YYYY-M-D）のゼロ埋め統一
-  const dateMatch = s.match(/^(\d{4})[\/\-年](\d{1,2})[\/\-月](\d{1,2})日?$/);
-  if (dateMatch) {
-    return `${dateMatch[1]}/${dateMatch[2].padStart(2, '0')}/${dateMatch[3].padStart(2, '0')}`;
-  }
-  return s;
-}
-
-/**
- * 年月文字列（例: "2020年3月" や "2020-03"）を英語表記（例: "2020 MARCH"）に変換するヘルパー関数
- */
-function formatYearMonthEnglish_(val) {
-  if (!val) return "";
-  const s = String(val).replace(/^'/, '').trim();
-  const m = s.match(/(\d{4})[-\/年](\d{1,2})/);
-  if (!m) return s;
-  const year = m[1];
-  const monthIdx = parseInt(m[2], 10) - 1;
-  const monthNames = [
-    "JANUARY", "FEBRUARY", "MARCH", "APRIL", "MAY", "JUNE",
-    "JULY", "AUGUST", "SEPTEMBER", "OCTOBER", "NOVEMBER", "DECEMBER"
-  ];
-  if (monthIdx >= 0 && monthIdx < 12) {
-    return `${year} ${monthNames[monthIdx]}`;
-  }
-  return s;
-}
-
-/**
- * 登録者マスタの1行データと案件情報から COE info シート用の行配列を生成する関数
- * ※ 技能分野の対象外である試験列には「-」（対象外）を出力し、未入力の列は空欄のまま出力します。
- */
-function buildCoeInfoRowByLayout_(mRow, mCol, jobInfo, sourceTZ, colKeys) {
-  const getVal = (colName) => {
-    const clean = colName.replace(/\s/g, '');
-    const cIdx = mCol[clean];
-    if (!cIdx) return "";
-    const val = mRow[cIdx - 1];
-    if (val === null || val === undefined) return "";
-    if (val instanceof Date) return Utilities.formatDate(val, sourceTZ, "yyyy/MM/dd");
-    const s = String(val).normalize('NFC').trim();
-    return s.startsWith("'") ? s.substring(1).trim() : s;
-  };
-
-  const formatSlashDate = (val) => {
-    if (!val) return "";
-    if (val instanceof Date) return Utilities.formatDate(val, sourceTZ, "yyyy/MM/dd");
-    const s = String(val).trim().replace(/[年月\-]/g, '/').replace(/日/g, '');
-    if (s === "NaN" || s === "undefined" || s === "Invalid Date") return "";
-    const parts = s.split('/');
-    if (parts.length === 3) {
-      return `${parts[0]}/${parts[1].padStart(2, '0')}/${parts[2].padStart(2, '0')}`;
-    }
-    return s;
-  };
-
-  const jobId = jobInfo ? (jobInfo.jobId || '') : '';
-  const company = jobInfo ? (jobInfo.company || getVal('採用事業者')) : getVal('採用事業者');
-  const skillField = jobInfo ? (jobInfo.skillField || '') : '';
-  const offerDate = formatSlashDate((jobInfo && jobInfo.offerDate) ? jobInfo.offerDate : getVal('内定日'));
-
-  const candId = getVal('登録者ID').toUpperCase();
-  const name = getVal('名前');
-  const nickname = getVal('呼び名');
-
-  // 性別 (Male / Female)
-  const rawGender = getVal('性別');
-  let sexStr = rawGender;
-  if (rawGender === '男性') sexStr = 'Male';
-  else if (rawGender === '女性') sexStr = 'Female';
-
-  const agent = getVal('所属送り出し機関');
-  const birthday = formatSlashDate(getVal('生年月日'));
-  const birthCity = getVal('出生地（都市名）');
-  const addressDetail = getVal('住所詳細');
-  const passportNum = getVal('パスポート番号');
-  const passportExp = formatSlashDate(getVal('パスポート有効期限'));
-
-  // 日本語資格 (Certification of JLPT or JFT-Basic：14列目 N列のみに出力)
-  const jlpt = getVal('特定技能要件＞JLPTレベル');
-  const jft = getVal('特定技能要件＞JFTBasicレベル');
-  let certLangParts = [];
-  if (jlpt && jlpt !== '-' && jlpt !== '×') certLangParts.push(`JLPT ${jlpt}`);
-  if (jft && jft !== '-' && jft !== '×') certLangParts.push(jft === 'A2' ? 'JFT A2' : `JFT ${jft}`);
-  const certLangStr = certLangParts.join(' / ');
-
-  // 特定技能評価試験（介護技能・介護日本語・外食業・飲食料品製造業）
-  const formatExam = (val) => {
-    if (!val || val === '-' || val === '×') return '';
-    if (val === '合格') return 'YES';
-    if (val.includes('予定')) return 'Scheduled (受験予定)';
-    return val;
-  };
-
-  const legacyOtherExam = getVal('特定技能要件＞その他の評価試験');
-  let rawKaigoSkill = getVal('特定技能要件＞介護技能評価試験');
-  let rawKaigoLang = getVal('特定技能要件＞介護日本語評価試験');
-  let rawFoodService = getVal('特定技能要件＞外食業技能測定試験');
-  if (!rawFoodService && legacyOtherExam && legacyOtherExam.includes('外食業')) rawFoodService = '合格';
-  let rawFoodMfg = getVal('特定技能要件＞飲食料品製造業技能測定試験');
-  if (!rawFoodMfg && legacyOtherExam && legacyOtherExam.includes('飲食料品')) rawFoodMfg = '合格';
-
-  // 技能分野に応じて関係のない試験列には「-」（対象外）を出力する
-  let kaigoSkillStr = formatExam(rawKaigoSkill);
-  let kaigoLangStr = formatExam(rawKaigoLang);
-  let foodServiceStr = formatExam(rawFoodService);
-  let foodMfgStr = formatExam(rawFoodMfg);
-
-  if (skillField === '介護') {
-    foodServiceStr = '-';
-    foodMfgStr = '-';
-  } else if (skillField === '外食業') {
-    kaigoSkillStr = '-';
-    kaigoLangStr = '-';
-    foodMfgStr = '-';
-  } else if (skillField === '飲食料品製造業') {
-    kaigoSkillStr = '-';
-    kaigoLangStr = '-';
-    foodServiceStr = '-';
-  }
-
-  // 配偶者 (Single(未婚) / Married(既婚))
-  const rawSpouse = getVal('配偶者');
-  let spouseStr = rawSpouse;
-  if (rawSpouse === '無') spouseStr = 'Single(未婚)';
-  else if (rawSpouse === '有') spouseStr = 'Married(既婚)';
-
-  // 職業 (Occupation)
-  const rawJob = getVal('職業');
-  let jobStr = rawJob;
-  if (rawJob === '会社員') jobStr = 'company employee（会社員)';
-  else if (rawJob === 'アルバイト') jobStr = 'part-time（アルバイト）';
-  else if (rawJob === '無職') jobStr = 'unemployed(無職）';
-
-  // 最終学歴・状況（COE用の英語学校名・英語専攻が入力されている場合のみ出力）
-  const eduSchoolEn = getVal('学歴＞学校名（英語）');
-  const eduDeptEn = getVal('学歴＞学部・学科・専攻（英語）');
-  const eduStatus = getVal('学歴＞状況');
-  const eduEndRaw = getVal('学歴＞卒業/中退年月');
-  const eduEndEn = formatYearMonthEnglish_(eduEndRaw);
-
-  let eduBgSummary = '';
-  let eduDetailStr = '';
-
-  if (eduSchoolEn || eduDeptEn) {
-    const upperSchool = eduSchoolEn.toUpperCase();
-    let schoolType = '';
-    if (upperSchool.includes('UNIVERSITY')) schoolType = 'UNIVERSITY';
-    else if (upperSchool.includes('HIGH')) schoolType = 'HIGH SCHOOL';
-    else if (upperSchool.includes('COLLEGE')) schoolType = 'COLLEGE';
-
-    let statusEn = eduStatus;
-    if (eduStatus === '卒業') statusEn = 'PASSED (卒業)';
-    else if (eduStatus === '中途退学') statusEn = 'NOT PASSED (中途退学)';
-    else if (eduStatus === '在学中') statusEn = 'ENROLLED (在学中)';
-    else if (eduStatus === '休学中') statusEn = 'ON LEAVE (休学中)';
-
-    eduBgSummary = schoolType ? `${schoolType} ${statusEn}`.trim() : statusEn;
-
-    const eduDetailParts = [eduSchoolEn, eduEndEn, eduDeptEn].filter(p => p !== '');
-    eduDetailStr = eduDetailParts.join(', ');
-  }
-
-  // 有 / 無 変換ヘルパー
-  const toYesNo = (val) => {
-    if (val === '有') return 'YES (有)';
-    if (val === '無') return 'No (無)';
-    return val;
-  };
-
-  // 過去の交付申請歴・回数 ＆ うち不交付回数
-  const applyExpRaw = getVal('在留資格交付申請歴の有無');
-  const applyCountRaw = getVal('在留資格交付申請の回数');
-  const rejectCountRaw = getVal('不許可となった在留資格交付申請の回数');
-
-  let applyStr = '';
-  let rejectStr = '';
-
-  if (applyExpRaw === '無') {
-    applyStr = 'No (無)';
-    rejectStr = 'No (無)';
-  } else if (applyExpRaw === '有') {
-    const num = Number(applyCountRaw);
-    if (!isNaN(num) && num > 0) {
-      applyStr = `YES (${num} TIME${num > 1 ? 'S' : ''})`;
-    } else {
-      applyStr = 'YES (有)';
-    }
-    if (rejectCountRaw !== '') {
-      const rNum = Number(rejectCountRaw);
-      rejectStr = (rNum === 0 || rejectCountRaw === '無' || rejectCountRaw === 'なし') ? 'No (無)' : rejectCountRaw;
-    }
-  } else if (applyCountRaw !== '') {
-    const num = Number(applyCountRaw);
-    if (num === 0 || applyCountRaw === '無' || applyCountRaw === 'なし') {
-      applyStr = 'No (無)';
-      rejectStr = 'No (無)';
-    } else if (!isNaN(num) && num > 0) {
-      applyStr = `YES (${num} TIME${num > 1 ? 'S' : ''})`;
-      if (rejectCountRaw !== '') {
-        const rNum = Number(rejectCountRaw);
-        rejectStr = (rNum === 0 || rejectCountRaw === '無' || rejectCountRaw === 'なし') ? 'No (無)' : rejectCountRaw;
-      }
-    } else {
-      applyStr = applyCountRaw;
+  let currentEditId = '';
+  if (MODE === 'EDIT') {
+    const searchIdEl = document.getElementById('searchId');
+    if (searchIdEl && searchIdEl.value.trim()) {
+      currentEditId = formatId(toHalfWidthNumber(searchIdEl.value.trim())).replace(/\s/g, '').toUpperCase();
     }
   }
 
-  // 海外出入国歴・期間
-  const overseasExp = getVal('海外への出入国歴の有無');
-  const overseasExpStr = toYesNo(overseasExp);
-  const travelCount = getVal('出入国の回数');
-  const lastInDate = formatSlashDate(getVal('直近の入国日'));
-  const lastOutDate = formatSlashDate(getVal('直近の出国日'));
+  const exactMatches = [];
+  const nameMatches = [];
 
-  let travelDetailParts = [];
-  if (travelCount && travelCount !== '0') travelDetailParts.push(`${travelCount} Time(s)`);
-  if (lastInDate || lastOutDate) travelDetailParts.push(`${lastInDate} 〜 ${lastOutDate}`);
-  const travelDetailStr = (overseasExp === '無') ? '' : travelDetailParts.join('\n');
-
-  // 在日親族及び同居者情報
-  const relExp = getVal('日本在住の親族情報＞有無');
-  const relName = getVal('日本在住の親族情報親族の名前');
-  const relRelation = getVal('日本在住の親族情報続柄');
-  const relBirth = formatSlashDate(getVal('日本在住の親族情報親族の生年月日'));
-  const relCountry = getVal('日本在住の親族情報親族の国籍・地域');
-  const relLive = getVal('日本在住の親族情報親族との同居予定の有無');
-  const relWork = getVal('日本在住の親族情報親族の勤務先・通学先');
-  const relCard = getVal('日本在住の親族情報親族の在留カード番号');
-
-  let hasFamilyStr = '';
-  let familyDetailStr = '';
-  const hasDetailedRel = [relName, relRelation, relBirth, relCountry, relLive, relWork, relCard].some(v => v !== '');
-
-  if (relExp === '無') {
-    hasFamilyStr = 'No (無)';
-    familyDetailStr = '';
-  } else if (relExp === '有' || hasDetailedRel) {
-    hasFamilyStr = 'YES (有)';
-    const fParts = [];
-    if (relRelation) fParts.push(`続柄: ${relRelation}`);
-    if (relName) fParts.push(`氏名: ${relName}`);
-    if (relBirth) fParts.push(`生年月日: ${relBirth}`);
-    if (relCountry) fParts.push(`国籍: ${relCountry}`);
-    if (relLive) fParts.push(`同居予定: ${relLive}`);
-    if (relWork) fParts.push(`勤務先/通学先: ${relWork}`);
-    if (relCard) fParts.push(`在留カード: ${relCard}`);
-    familyDetailStr = fParts.join(', ');
-  }
-
-  // 犯罪歴・技能実習経験・修了証
-  const crimeStr = toYesNo(getVal('犯罪歴の有無'));
-  const traineeExpStr = toYesNo(getVal('技能実習の経験の有無'));
-  const traineeCertStr = toYesNo(getVal('技能実習修了書の有無'));
-
-  // 備考（33列目 AG列：その他の日本語能力試験［NAT-TEST等］と備考・メモのみを出力し、JLPT/JFTは含めない）
-  const otherJapanese = getVal('その他の日本語能力試験');
-  const memo = getVal('備考・メモ');
-  const noteParts = [];
-  if (otherJapanese && otherJapanese !== '-' && otherJapanese !== '×') noteParts.push(otherJapanese);
-  if (memo) noteParts.push(memo);
-  const noteStr = noteParts.join(' / ');
-
-  const fieldMap = {
-    offerDate: offerDate,
-    jobId: jobId,
-    company: company,
-    skillField: skillField,
-    candId: candId,
-    name: name,
-    nickname: nickname,
-    sex: sexStr,
-    agent: agent,
-    birthday: birthday,
-    birthCity: birthCity,
-    passportNum: passportNum,
-    passportExp: passportExp,
-    certLang: certLangStr,
-    kaigoSkill: kaigoSkillStr,
-    kaigoLang: kaigoLangStr,
-    foodServiceExam: foodServiceStr,
-    foodMfgExam: foodMfgStr,
-    spouse: spouseStr,
-    addressDetail: addressDetail,
-    job: jobStr,
-    eduBgSummary: eduBgSummary,
-    eduDetail: eduDetailStr,
-    applyStr: applyStr,
-    rejectStr: rejectStr,
-    overseasExp: overseasExpStr,
-    travelDetail: travelDetailStr,
-    hasFamily: hasFamilyStr,
-    familyDetail: familyDetailStr,
-    crime: crimeStr,
-    traineeExp: traineeExpStr,
-    traineeCert: traineeCertStr,
-    note: noteStr
-  };
-
-  return colKeys.map(k => (k && fieldMap[k] !== undefined) ? fieldMap[k] : "");
-}
-
-/**
- * 案件管理シートから現在「採用」となっている全候補者の案件情報をマップで取得するヘルパー関数
- * @return {Map} key: SD-XXXX -> { jobId, company, skillField, offerDate }
- */
-function getHiredJobInfoMapFromJobSheet_(jobSheet, sourceTZ) {
-  const jobData = jobSheet.getDataRange().getValues();
-  const jCol = getMasterColumnMap(jobSheet);
-  const hiredMap = new Map();
-
-  if (jobData.length < 2 || !jCol['案件ID'] || !jCol['面接結果詳細']) return hiredMap;
-
-  const jIdIdx = jCol['案件ID'] - 1;
-  const jCompIdx = jCol['事業者名'] ? jCol['事業者名'] - 1 : -1;
-  const jSkillIdx = jCol['技能分野'] ? jCol['技能分野'] - 1 : -1;
-  const jOfferIdx = jCol['内定日'] ? jCol['内定日'] - 1 : -1;
-  const jDetailsIdx = jCol['面接結果詳細'] - 1;
-
-  const formatSlashDate = (val) => {
-    if (!val) return "";
-    if (val instanceof Date) return Utilities.formatDate(val, sourceTZ, "yyyy/MM/dd");
-    const s = String(val).trim().replace(/[年月\-]/g, '/').replace(/日/g, '');
-    const parts = s.split('/');
-    if (parts.length === 3) {
-      return `${parts[0]}/${parts[1].padStart(2, '0')}/${parts[2].padStart(2, '0')}`;
-    }
-    return s;
-  };
-
-  for (let i = 1; i < jobData.length; i++) {
-    const row = jobData[i];
-    const jobId = String(row[jIdIdx] || "").trim();
-    const detailsText = String(row[jDetailsIdx] || "").trim();
-    if (!jobId || !detailsText) continue;
-
-    const compCell = jCompIdx !== -1 ? String(row[jCompIdx] || "").normalize('NFC') : "";
-    const defaultComp = compCell.split(/\r?\n/)[0].trim();
-    let currentComp = defaultComp;
-    const skillFieldStr = jSkillIdx !== -1 ? String(row[jSkillIdx] || "").trim() : "";
-    const offerDateStr = jOfferIdx !== -1 ? formatSlashDate(row[jOfferIdx]) : "";
-
-    const lines = detailsText.split(/\r?\n/).map(l => l.trim()).filter(l => l !== "");
-    for (const line of lines) {
-      if (line.startsWith('【') && line.endsWith('】')) {
-        currentComp = line.slice(1, -1).normalize('NFC').trim();
-        continue;
-      }
-      if (line.includes('（採用）')) {
-        const m = line.match(/^(SD-\d+)/i);
-        if (m) {
-          const cid = m[1].toUpperCase();
-          hiredMap.set(cid, {
-            jobId: jobId,
-            company: currentComp,
-            skillField: skillFieldStr,
-            offerDate: offerDateStr
-          });
-        }
-      }
-    }
-  }
-  return hiredMap;
-}
-
-/**
- * 特定の候補者（複数可）を外部シート「COE info」へ即時同期（Upsert）する関数
- * @return {Array<number>} 更新または追加されたシート上の行番号の配列
- */
-function syncCandidatesToCoeInfo(candidateIds, removeCandidateIds = []) {
-  try {
-    const targetIds = (Array.isArray(candidateIds) ? candidateIds : [candidateIds])
-      .map(id => String(id || "").trim().toUpperCase())
-      .filter(id => id !== "");
-    const removeIds = (Array.isArray(removeCandidateIds) ? removeCandidateIds : [removeCandidateIds])
-      .map(id => String(id || "").trim().toUpperCase())
-      .filter(id => id !== "");
-
-    if (targetIds.length === 0 && removeIds.length === 0) return [];
-
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const sourceTZ = ss.getSpreadsheetTimeZone();
-    const masterSheet = ss.getSheetByName('登録者マスタ');
-    const jobSheet = ss.getSheetByName('案件管理');
-    if (!masterSheet || !jobSheet) return [];
-
-    const targetSS = SpreadsheetApp.openById(EXTERNAL_SS_ID_FUNTOCO);
-    const coeSheet = targetSS.getSheetByName(EXTERNAL_SHEET_COE_INFO);
-    if (!coeSheet) {
-      console.warn(`外部シートに「${EXTERNAL_SHEET_COE_INFO}」が見つかりません。`);
-      return [];
-    }
-
-    const layout = getCoeSheetLayout_(coeSheet);
-    const { lastCol, colKeys, candIdColIdx, jobIdColIdx } = layout;
-
-    const hiredJobMap = getHiredJobInfoMapFromJobSheet_(jobSheet, sourceTZ);
-    const masterData = masterSheet.getDataRange().getValues();
-    const mCol = getMasterColumnMap(masterSheet);
-    const idIdx = mCol['登録者ID'] - 1;
-
-    const masterRowMap = new Map();
-    for (let i = 1; i < masterData.length; i++) {
-      const cid = String(masterData[i][idIdx] || "").trim().toUpperCase();
-      if (cid) masterRowMap.set(cid, masterData[i]);
-    }
-
-    // 1. 取消・辞退となった候補者の行があれば先に削除（降順）
-    if (removeIds.length > 0 && coeSheet.getLastRow() >= 2) {
-      const removeSet = new Set(removeIds);
-      const coeData = coeSheet.getDataRange().getValues();
-      const rowsToDelete = [];
-      for (let r = 1; r < coeData.length; r++) {
-        const existingCid = String(coeData[r][candIdColIdx] || "").trim().toUpperCase();
-        if (existingCid && removeSet.has(existingCid) && !hiredJobMap.has(existingCid)) {
-          rowsToDelete.push(r + 1);
-        }
-      }
-      rowsToDelete.sort((a, b) => b - a);
-      rowsToDelete.forEach(rowNum => coeSheet.deleteRow(rowNum));
-      if (rowsToDelete.length > 0) SpreadsheetApp.flush();
-    }
-
-    if (targetIds.length === 0) return [];
-
-    // 2. 現在の COE info シートの既存行と最終データ行（スマートテーブルのフッター直前）を特定
-    const existingRowMap = new Map(); // cid -> 1-based row number
-    let lastValidRowIndex = 1;
-    const lastSheetRow = coeSheet.getLastRow();
-
-    if (lastSheetRow >= 2) {
-      const keyColsData = coeSheet.getRange(2, 1, lastSheetRow - 1, Math.max(candIdColIdx, jobIdColIdx) + 1).getValues();
-      for (let i = 0; i < keyColsData.length; i++) {
-        const jId = String(keyColsData[i][jobIdColIdx] || "").trim();
-        const cId = String(keyColsData[i][candIdColIdx] || "").trim().toUpperCase();
-        if (jId || cId) {
-          lastValidRowIndex = i + 2;
-        }
-        if (cId && !existingRowMap.has(cId)) {
-          existingRowMap.set(cId, i + 2);
-        }
-      }
-    }
-
-    const rowsToAppend = [];
-    const affectedRows = [];
-
-    for (const cid of targetIds) {
-      const mRow = masterRowMap.get(cid);
-      if (!mRow) continue;
-
-      const jobInfo = hiredJobMap.get(cid) || null;
-      const rowArray = buildCoeInfoRowByLayout_(mRow, mCol, jobInfo, sourceTZ, colKeys);
-
-      if (existingRowMap.has(cid)) {
-        const targetRowNum = existingRowMap.get(cid);
-        coeSheet.getRange(targetRowNum, 1, 1, lastCol).setValues([rowArray]);
-        affectedRows.push(targetRowNum);
+  for (const [cid, info] of Object.entries(candidateDict)) {
+    if (MODE === 'EDIT' && cid === currentEditId) continue;
+    const cName = (info.name || '').replace(/\u3000/g, ' ').replace(/ +/g, ' ').trim().toUpperCase();
+    if (cName === cleanName) {
+      const cBday = (info.birthday || '').trim();
+      const item = { id: cid, name: info.name, birthday: cBday, status: info.status || '未設定' };
+      if (cleanBday && cBday && cleanBday === cBday) {
+        exactMatches.push(item);
       } else {
-        rowsToAppend.push(rowArray);
+        nameMatches.push(item);
       }
     }
-
-    if (rowsToAppend.length > 0) {
-      const insertRowIndex = lastValidRowIndex + 1;
-      if (insertRowIndex <= coeSheet.getMaxRows()) {
-        coeSheet.insertRowsBefore(insertRowIndex, rowsToAppend.length);
-      } else {
-        coeSheet.insertRowsAfter(coeSheet.getMaxRows(), rowsToAppend.length);
-      }
-      coeSheet.getRange(insertRowIndex, 1, rowsToAppend.length, lastCol).setValues(rowsToAppend);
-      for (let k = 0; k < rowsToAppend.length; k++) {
-        affectedRows.push(insertRowIndex + k);
-      }
-    }
-
-    SpreadsheetApp.flush();
-    return affectedRows;
-  } catch (e) {
-    console.error("COE info シートへの自動同期エラー: " + e.message);
-    return [];
   }
+  return { exactMatches, nameMatches };
 }
 
 /**
- * 管理者メニュー用：全採用者のCOE情報を外部シート「COE info」へ一括同期する関数
- * ・日付フォーマット揺れを吸収する正規化比較と、更新・追加された対象行の詳細表示を搭載
+ * 名前・生年月日の入力中にリアルタイムで重複警告を表示する関数
  */
-function syncAllToCoeInfoSheet() {
-  try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    const sourceTZ = ss.getSpreadsheetTimeZone();
-    const masterSheet = ss.getSheetByName('登録者マスタ');
-    const jobSheet = ss.getSheetByName('案件管理');
-    if (!masterSheet || !jobSheet) return "エラー：「登録者マスタ」または「案件管理」シートが見つかりません。";
+function checkCandidateDuplicateLive() {
+  const warnBox = document.getElementById('dup_candidate_warning');
+  if (!warnBox) return;
 
-    const targetSS = SpreadsheetApp.openById(EXTERNAL_SS_ID_FUNTOCO);
-    const coeSheet = targetSS.getSheetByName(EXTERNAL_SHEET_COE_INFO);
-    if (!coeSheet) return `エラー：外部シートに「${EXTERNAL_SHEET_COE_INFO}」シートが見つかりません。`;
+  const nameEl = document.getElementById('name');
+  const bdayEl = document.getElementById('birthday');
+  const rawName = nameEl ? nameEl.value : '';
+  const rawBday = bdayEl ? bdayEl.value : '';
 
-    const layout = getCoeSheetLayout_(coeSheet);
-    const { lastCol, colKeys, colLabels, candIdColIdx, jobIdColIdx } = layout;
-    const nameColIdx = colKeys.indexOf('name');
+  const { exactMatches, nameMatches } = findDuplicateCandidates(rawName, rawBday);
 
-    const hiredJobMap = getHiredJobInfoMapFromJobSheet_(jobSheet, sourceTZ);
-    const masterData = masterSheet.getDataRange().getValues();
-    const mCol = getMasterColumnMap(masterSheet);
-    const idIdx = mCol['登録者ID'] - 1;
+  if (exactMatches.length > 0) {
+    const listHtml = exactMatches.map(m => `・<b>${m.id}</b> ${m.name} （生年月日: ${m.birthday} / ステータス: ${m.status}）`).join('<br>');
+    warnBox.style.backgroundColor = '#feefee';
+    warnBox.style.borderColor = '#fad2cf';
+    warnBox.style.color = '#d93025';
+    warnBox.innerHTML = `⚠️ <b>同一の名前・生年月日の候補者が既にマスタに存在します：</b><br>${listHtml}<br><span style="font-size:10px;">※同一人物の二重登録でないかご確認ください（同姓同名の別人の場合は登録時に確認ダイアログから続行可能です）。</span>`;
+    warnBox.style.display = 'block';
+  } else if (nameMatches.length > 0) {
+    const listHtml = nameMatches.map(m => `・<b>${m.id}</b> ${m.name} （生年月日: ${m.birthday || '未登録'} / ステータス: ${m.status}）`).join('<br>');
+    warnBox.style.backgroundColor = '#e8f0fe';
+    warnBox.style.borderColor = '#aecbfa';
+    warnBox.style.color = '#174ea6';
+    warnBox.innerHTML = `ℹ️ <b>同姓同名の候補者がマスタに存在します（計${nameMatches.length}名）：</b><br>${listHtml}`;
+    warnBox.style.display = 'block';
+  } else {
+    warnBox.style.display = 'none';
+    warnBox.innerHTML = '';
+  }
+}
 
-    const masterRowMap = new Map();
-    for (let i = 1; i < masterData.length; i++) {
-      const cid = String(masterData[i][idIdx] || "").trim().toUpperCase();
-      if (cid) masterRowMap.set(cid, masterData[i]);
-    }
-
-    // 案件ID順・登録者ID順でソートして同期対象リストを作成
-    const sortedEntries = Array.from(hiredJobMap.entries()).sort((a, b) => {
-      const jA = a[1].jobId || "";
-      const jB = b[1].jobId || "";
-      if (jA !== jB) return jA.localeCompare(jB);
-      return a[0].localeCompare(b[0]);
+// 画面読み込み完了時に自動変換イベントを設定
+document.addEventListener('DOMContentLoaded', function() {
+  const numInputs = document.querySelectorAll('input[type="number"], input[type="text"], textarea');
+  numInputs.forEach(input => {
+    input.addEventListener('blur', function() {
+      if (typeof this.value === 'string') {
+        this.value = toHalfWidthNumber(this.value);
+      }
     });
+  });
 
-    // 1. 既存シートの行を取得し、採用取り消し・辞退となった行を先に削除（降順）
-    let coeData = coeSheet.getDataRange().getValues();
-    const targetTZ = targetSS.getSpreadsheetTimeZone();
-    const rowsToDelete = [];
+  // ▼ 名前の入力欄を自動的に大文字へ変換し、リアルタイムで禁止文字・重複候補者をチェックするイベント設定
+  const nameInput = document.getElementById('name');
+  if (nameInput) {
+    nameInput.addEventListener('input', function() {
+      const start = this.selectionStart;
+      const end = this.selectionEnd;
+      this.value = this.value.toUpperCase();
+      this.setSelectionRange(start, end);
+      validateNameInput(this.value);
+      checkCandidateDuplicateLive();
+    });
+    nameInput.addEventListener('blur', function() {
+      this.value = this.value.toUpperCase();
+      validateNameInput(this.value);
+      checkCandidateDuplicateLive();
+    });
+  }
 
-    for (let r = 1; r < coeData.length; r++) {
-      const existingJid = String(coeData[r][jobIdColIdx] || "").trim();
-      const existingCid = String(coeData[r][candIdColIdx] || "").trim().toUpperCase();
-      if (!existingJid && !existingCid) continue; // フッターや空行はスキップ
-      if (existingCid && !hiredJobMap.has(existingCid)) {
-        rowsToDelete.push(r + 1);
-      }
-    }
-    rowsToDelete.sort((a, b) => b - a);
-    rowsToDelete.forEach(rowNum => coeSheet.deleteRow(rowNum));
-    if (rowsToDelete.length > 0) {
-      SpreadsheetApp.flush();
-      coeData = coeSheet.getDataRange().getValues();
-    }
+  // ▼ 生年月日の変更時にもリアルタイム重複チェックを実行
+  const bdayInput = document.getElementById('birthday');
+  if (bdayInput) {
+    bdayInput.addEventListener('input', checkCandidateDuplicateLive);
+    bdayInput.addEventListener('change', checkCandidateDuplicateLive);
+  }
+});
 
-    // 2. 削除後の最新データで既存行マップ（coeData上のインデックス）と最終データ行を特定
-    const existingIdxMap = new Map(); // cid -> r (1 〜 numDataRows)
-    let lastValidRowIndex = 1;
-    for (let r = 1; r < coeData.length; r++) {
-      const jId = String(coeData[r][jobIdColIdx] || "").trim();
-      const cId = String(coeData[r][candIdColIdx] || "").trim().toUpperCase();
-      if (jId || cId) {
-        lastValidRowIndex = r + 1;
-      }
-      if (cId && !existingIdxMap.has(cId)) {
-        existingIdxMap.set(cId, r);
-      }
-    }
-
-    const numDataRows = lastValidRowIndex - 1;
-    const colBuffers = [];
-    const colDirty = new Array(lastCol).fill(false);
-
-    if (numDataRows > 0) {
-      for (let c = 0; c < lastCol; c++) {
-        const buf = [];
-        for (let r = 1; r <= numDataRows; r++) {
-          buf.push([normalizeCoeCompareVal_(coeData[r][c], targetTZ)]);
-        }
-        colBuffers.push(buf);
-      }
-    }
-
-    let updateCount = 0;
-    let appendCount = 0;
-    const rowsToAppend = [];
-    const updatedRowDetails = [];
-    const appendedRowDetails = [];
-
-    for (const [cid, jobInfo] of sortedEntries) {
-      const mRow = masterRowMap.get(cid);
-      if (!mRow) continue;
-      const newRowArr = buildCoeInfoRowByLayout_(mRow, mCol, jobInfo, sourceTZ, colKeys);
-
-      if (existingIdxMap.has(cid)) {
-        const rIdx = existingIdxMap.get(cid); // 1 〜 numDataRows
-        if (rIdx >= 1 && rIdx <= numDataRows) {
-          const bufIdx = rIdx - 1;
-          const sheetRowNum = rIdx + 1;
-          const changedColNames = [];
-
-          for (let c = 0; c < lastCol; c++) {
-            const oldNorm = colBuffers[c][bufIdx][0];
-            const newNorm = normalizeCoeCompareVal_(newRowArr[c], sourceTZ);
-            if (oldNorm !== newNorm) {
-              colBuffers[c][bufIdx][0] = newRowArr[c] !== undefined ? newRowArr[c] : "";
-              colDirty[c] = true;
-              changedColNames.push(colLabels[c] || `列${c + 1}`);
+function searchData() {
+  let rawId = document.getElementById('searchId').value.trim();
+  if (!rawId) { showModal('管理番号を入力してください。'); return; }
+  rawId = toHalfWidthNumber(rawId);
+  let adminId = formatId(rawId);
+  document.getElementById('searchId').value = adminId;
+  document.getElementById('searchBtn').disabled = true;
+  showModal('検索中...', true);
+  
+  google.script.run.withSuccessHandler(function(data) {
+    closeModal(); document.getElementById('searchBtn').disabled = false;
+    if (data) {
+      document.getElementById('targetRow').value = data.row;
+      
+      const fields = ['name','furigana','nickname','birthday','gender','spouse','height','weight',
+        'address','birthplace','email','school','eduSchool','eduDept','eduStatus',
+        'eduStart','eduEnd','eduNote',
+        'expContent1','expContent2','expContent3','jlptLevel','jlptDate','jftLevel','jftDate',
+        'kaigoSkill','kaigoSkillDate','kaigoLang','kaigoLangDate','otherExam',
+        'otherExamDate','otherJapanese','otherJapaneseDate','comment'];
+      
+      fields.forEach(f => { 
+        let el = document.getElementById(f); 
+        if(el) { 
+          let val = data[f] || ""; 
+          if(typeof val === 'string' && val.startsWith("'")) val = val.substring(1); 
+          
+          if (el.type === 'month' && typeof val === 'string') {
+            let match = val.match(/(\d{4})[-\/年](\d{1,2})/);
+            if (match) {
+              val = match[1] + '-' + match[2].padStart(2, '0');
             }
           }
-          if (changedColNames.length > 0) {
-            updateCount++;
-            const candName = nameColIdx !== -1 ? newRowArr[nameColIdx] : "";
-            updatedRowDetails.push(`・${sheetRowNum}行目: ${cid} ${candName} [${changedColNames.join(', ')}]`);
+          el.value = val; 
+        } 
+      });
+
+      // 読み込み時に既存の名前データにカッコや数字が含まれているか＆重複チェック
+      const nameEl = document.getElementById('name');
+      if (nameEl) validateNameInput(nameEl.value);
+      checkCandidateDuplicateLive();
+      
+      // ▼▼ 職歴期間の読み込み（文字列から年月へ分割セット） ▼▼
+      [1, 2, 3].forEach(i => {
+        let pVal = data['expPeriod' + i] || "";
+        let sEl = document.getElementById('expPeriod' + i + '_start');
+        let eEl = document.getElementById('expPeriod' + i + '_end');
+        if (sEl && eEl) {
+          let matches = [...pVal.matchAll(/(\d{4})[-\/年](\d{1,2})/g)];
+          if (matches.length === 1 && pVal.trim().startsWith('〜')) {
+            sEl.value = "";
+            eEl.value = matches[0][1] + '-' + matches[0][2].padStart(2, '0');
+          } else {
+            sEl.value = matches.length >= 1 ? matches[0][1] + '-' + matches[0][2].padStart(2, '0') : "";
+            eEl.value = matches.length >= 2 ? matches[1][1] + '-' + matches[1][2].padStart(2, '0') : "";
           }
         }
-      } else {
-        rowsToAppend.push({ cid: cid, rowArr: newRowArr });
-        appendCount++;
-      }
-    }
+      });
+      
+      let relSel = document.getElementById('relativeSelect'); let relDet = document.getElementById('relativeDetail');
+      if (data.relative && data.relative !== "日本に家族や親戚はいません。" && data.relative !== "無" && data.relative !== "なし") {
+        relSel.value = "有"; relDet.value = data.relative; relDet.style.display = "block";
+      } else { relSel.value = "無"; relDet.value = ""; relDet.style.display = "none"; }
+      
+      showModal(data.name + ' さんのデータを読み込みました。');
+    } else { showModal('該当するデータが見つかりません。'); }
+  }).safeSearchByAdminId(adminId);
+}
 
-    // 3. 変更があった列のみ、1列につき1回の setValues で一括更新
-    if (numDataRows > 0) {
-      for (let c = 0; c < lastCol; c++) {
-        if (colDirty[c]) {
-          coeSheet.getRange(2, c + 1, numDataRows, 1).setValues(colBuffers[c]);
+function submitData() {
+  let formData = {};
+  
+  const fields = ['name','furigana','nickname','birthday','gender','spouse','height','weight','address','birthplace','email','school','eduSchool','eduDept','eduStatus','eduStart','eduEnd','eduNote','expContent1','expContent2','expContent3','jlptLevel','jlptDate','jftLevel','jftDate','kaigoSkill','kaigoSkillDate','kaigoLang','kaigoLangDate','otherExam','otherExamDate','otherJapanese','otherJapaneseDate','comment'];
+  fields.forEach(f => { 
+    let el = document.getElementById(f); 
+    if(el) {
+      let val = el.value;
+      if (typeof val === 'string') {
+        val = val.normalize('NFC');
+        val = toHalfWidthNumber(val);
+        val = val.split('\n').map(line => line.replace(/\u3000/g, ' ').replace(/ +/g, ' ').trim()).join('\n');
+        if (f === 'name') {
+          val = val.toUpperCase();
+          el.value = val;
+        } else if (f === 'nickname') {
+          // 呼び名の半角カッコを全角カッコへ統一し、カッコの前のスペースを詰める
+          val = val.replace(/\(/g, '（').replace(/\)/g, '）').replace(/\s+（/g, '（');
+          el.value = val;
         }
       }
-    }
+      formData[f] = val; 
+    } 
+  });
 
-    // 4. 新規行の一括追加
-    if (rowsToAppend.length > 0) {
-      const insertRowIndex = lastValidRowIndex + 1;
-      if (insertRowIndex <= coeSheet.getMaxRows()) {
-        coeSheet.insertRowsBefore(insertRowIndex, rowsToAppend.length);
-      } else {
-        coeSheet.insertRowsAfter(coeSheet.getMaxRows(), rowsToAppend.length);
-      }
-      const appendMatrix = rowsToAppend.map(item => item.rowArr);
-      coeSheet.getRange(insertRowIndex, 1, rowsToAppend.length, lastCol).setValues(appendMatrix);
-
-      rowsToAppend.forEach((item, idx) => {
-        const candName = nameColIdx !== -1 ? item.rowArr[nameColIdx] : "";
-        appendedRowDetails.push(`・${insertRowIndex + idx}行目: ${item.cid} ${candName}`);
-      });
-    }
-
-    SpreadsheetApp.flush();
-
-    const unchangedCount = sortedEntries.length - appendCount - updateCount;
-    let msg = `「COE info」シートへの同期が完了しました。\n新規追加: ${appendCount}件\n情報更新: ${updateCount}件\n削除: ${rowsToDelete.length}件\n（変更なしスキップ: ${unchangedCount}件）`;
-
-    if (appendedRowDetails.length > 0) {
-      const showAppend = appendedRowDetails.slice(0, 15);
-      msg += `\n\n【新規追加の対象行】\n` + showAppend.join("\n");
-      if (appendedRowDetails.length > 15) msg += `\n...他 ${appendedRowDetails.length - 15} 件`;
-    }
-
-    if (updatedRowDetails.length > 0) {
-      const showUpdate = updatedRowDetails.slice(0, 15);
-      msg += `\n\n【情報更新の対象行・変更項目】\n` + showUpdate.join("\n");
-      if (updatedRowDetails.length > 15) msg += `\n...他 ${updatedRowDetails.length - 15} 件`;
-    }
-
-    return msg;
-  } catch (e) {
-    return "COE info 同期エラー: " + e.message;
+  // ▼ 名前の入力規則チェック（カッコや数字が含まれている場合はブロック）
+  if (formData.name && /[()（）0-9０-９]/.test(formData.name)) {
+    validateNameInput(formData.name);
+    showModal('名前にカッコや数字を含めることはできません。\n（同姓同名の候補者は登録者IDで区別されます）');
+    return;
   }
+
+  // ▼ 同一の名前・生年月日の重複候補者チェック（確認ダイアログで突破可能）
+  const { exactMatches } = findDuplicateCandidates(formData.name, formData.birthday);
+  if (exactMatches.length > 0) {
+    const dupListText = exactMatches.map(m => `・${m.id} ${m.name} (生年月日: ${m.birthday} / ステータス: ${m.status})`).join('\n');
+    const actionLabel = (MODE === 'NEW') ? '新規登録' : '更新';
+    if (!confirm(`⚠️ 同一の名前・生年月日の候補者が既に登録されています：\n\n${dupListText}\n\n同姓同名の別人として、このまま${actionLabel}を続行しますか？`)) {
+      return;
+    }
+  }
+  
+  // ▼▼ 職歴期間の結合保存 ▼▼
+  [1, 2, 3].forEach(i => {
+    let sEl = document.getElementById('expPeriod' + i + '_start');
+    let eEl = document.getElementById('expPeriod' + i + '_end');
+    let sVal = sEl && sEl.value ? sEl.value.split('-')[0] + "年" + parseInt(sEl.value.split('-')[1], 10) + "月" : "";
+    let eVal = eEl && eEl.value ? eEl.value.split('-')[0] + "年" + parseInt(eEl.value.split('-')[1], 10) + "月" : "";
+    
+    let combined = "";
+    if (sVal && eVal) combined = sVal + " 〜 " + eVal;
+    else if (sVal) combined = sVal + " 〜";
+    else if (eVal) combined = "〜 " + eVal;
+    
+    formData['expPeriod' + i] = combined;
+  });
+  
+  let relSel = document.getElementById('relativeSelect'); let relDet = document.getElementById('relativeDetail');
+  if (relSel && relDet) {
+    let relVal = relDet.value;
+    if (typeof relVal === 'string') {
+      relVal = toHalfWidthNumber(relVal);
+      relVal = relVal.split('\n').map(line => line.replace(/\u3000/g, ' ').replace(/ +/g, ' ').trim()).join('\n');
+    }
+    formData.relative = (relSel.value === '有') ? relVal : "日本に家族や親戚はいません。";
+  }
+  
+  if (MODE === 'EDIT') {
+    formData.row = document.getElementById('targetRow').value;
+    if (!formData.row) { showModal('先に管理番号で検索してください。'); return; }
+  }
+
+  lastSubmittedCandidate = {
+    name: formData.name || '',
+    birthday: formData.birthday || ''
+  };
+  
+  let fileInput = document.getElementById('imageFile');
+  if (fileInput && fileInput.files.length > 0) {
+    let file = fileInput.files[0];
+    let reader = new FileReader();
+    reader.onload = function(e) { formData.imageFile = { name: file.name, mimeType: file.type, contents: e.target.result.split(',')[1] }; sendData(formData); };
+    reader.readAsDataURL(file);
+  } else { sendData(formData); }
 }
+
+function sendData(formData) {
+  document.getElementById('mainBtn').disabled = true; showModal('処理中...', true);
+  if (MODE === 'NEW') { google.script.run.withSuccessHandler(onSuccess).addNewRow(formData); } 
+  else { google.script.run.withSuccessHandler(onSuccess).updateRow(formData); }
+}
+
+function onSuccess(msg) {
+  document.getElementById('mainBtn').disabled = false; 
+  showModal(msg, false, true);
+  
+  if (MODE === 'NEW') {
+    // 連続登録時にも重複検知できるようフロントエンド辞書へ即時反映
+    const idMatch = String(msg).match(/SD-\d+/i);
+    if (idMatch && lastSubmittedCandidate && candidateDict) {
+      const newId = idMatch[0].toUpperCase();
+      candidateDict[newId] = {
+        name: lastSubmittedCandidate.name,
+        status: '未採用',
+        birthday: lastSubmittedCandidate.birthday
+      };
+    }
+
+    let inputs = document.querySelectorAll('input[type="text"], input[type="date"], input[type="number"], input[type="email"], input[type="month"], textarea');
+    inputs.forEach(input => input.value = '');
+    let selects = document.querySelectorAll('select'); selects.forEach(select => select.selectedIndex = 0);
+    let fileInput = document.getElementById('imageFile'); if (fileInput) fileInput.value = '';
+    document.getElementById('relativeDetail').style.display = 'none';
+    let nameWarn = document.getElementById('name_warning'); if (nameWarn) nameWarn.style.display = 'none';
+    let dupWarn = document.getElementById('dup_candidate_warning'); if (dupWarn) { dupWarn.style.display = 'none'; dupWarn.innerHTML = ''; }
+  } else if (MODE === 'EDIT') {
+    const searchIdEl = document.getElementById('searchId');
+    if (searchIdEl && searchIdEl.value.trim() && lastSubmittedCandidate && candidateDict) {
+      const editId = formatId(toHalfWidthNumber(searchIdEl.value.trim())).replace(/\s/g, '').toUpperCase();
+      if (candidateDict[editId]) {
+        candidateDict[editId].name = lastSubmittedCandidate.name;
+        candidateDict[editId].birthday = lastSubmittedCandidate.birthday;
+      }
+    }
+  }
+  google.script.run.syncListSheets();
+}
+
+function submitDelete() {
+  let rawId = document.getElementById('delete_id').value.trim();
+  if (!rawId) { showModal('削除するIDを入力してください。'); return; }
+  rawId = toHalfWidthNumber(rawId);
+  let adminId = formatId(rawId);
+  if (!confirm(adminId + " のデータを完全に削除します。よろしいですか？")) return;
+  showModal('削除中...', true);
+  google.script.run.withSuccessHandler(function(msg) {
+    showModal(msg, false, true);
+    document.getElementById('delete_id').value = ''; 
+    document.getElementById('deleteNameDisplay').innerText = '';
+    google.script.run.syncListSheets();
+  }).deleteCandidate(adminId);
+}
+</script>
