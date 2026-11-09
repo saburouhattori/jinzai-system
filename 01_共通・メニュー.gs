@@ -72,7 +72,7 @@ function onOpen() {
     .addItem('5. 面接結果の登録', 'showSidebarHire')
     .addItem('6. 面接結果の修正・更新', 'showSidebarHireEdit')
     .addSeparator()
-    .addItem('7. 内定後の追加情報登録', 'showSidebarAddInfo')
+    .addItem('7. COE申請情報の登録・更新 (COE Info)', 'showSidebarAddInfo')
     .addItem('8. 入国日・入職日の一括登録', 'showSidebarEntryDate')
     .addToUi();
 
@@ -111,7 +111,7 @@ function showSidebarList()      { showMainSidebar('LIST',       '簡易リスト
 function showSidebarJobEdit()   { showMainSidebar('JOB_EDIT',   '案件情報の修正・削除'); }
 function showSidebarHire()      { showMainSidebar('HIRE',       '面接結果の登録'); }
 function showSidebarHireEdit()  { showMainSidebar('HIRE_EDIT',  '面接結果の修正・更新'); }
-function showSidebarAddInfo()   { showMainSidebar('ADDINFO',    '内定後の追加情報登録'); }
+function showSidebarAddInfo()   { showMainSidebar('ADDINFO',    'COE申請情報の登録・更新 / COE Application Info'); }
 function showSidebarEntryDate() { showMainSidebar('ENTRY_DATE', '入国日・入職日の一括登録'); }
 
 function showSidebarCompany()   { showMainSidebar('COMPANY',    '事業者の新規登録'); }
