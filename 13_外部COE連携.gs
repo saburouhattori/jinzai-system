@@ -159,7 +159,7 @@ function formatYearMonthEnglish_(val) {
 
 /**
  * 登録者マスタの1行データと案件情報から COE info シート用の行配列を生成する関数
- * ※ 技能分野の対象外である試験列には「-」（対象外）を出力し、未入力の列は空欄のまま出力します。
+ * ※ 技能分野の対象外である試験列、および親項目が「無（No）」である従属列（Y列・AA列・AC列・AF列）には「-」を出力し、未入力の列は空欄のまま出力します。
  */
 function buildCoeInfoRowByLayout_(mRow, mCol, jobInfo, sourceTZ, colKeys) {
   const getVal = (colName) => {
@@ -299,7 +299,8 @@ function buildCoeInfoRowByLayout_(mRow, mCol, jobInfo, sourceTZ, colKeys) {
     return val;
   };
 
-  // 過去の交付申請歴・回数 ＆ うち不交付回数
+  // ① X列（過去の交付申請歴・回数）＆ Y列（うち不交付となった回数）
+  // ※ X列が「No (無)」の場合は、Y列に「-」を出力する
   const applyExpRaw = getVal('在留資格交付申請歴の有無');
   const applyCountRaw = getVal('在留資格交付申請の回数');
   const rejectCountRaw = getVal('不許可となった在留資格交付申請の回数');
@@ -309,7 +310,7 @@ function buildCoeInfoRowByLayout_(mRow, mCol, jobInfo, sourceTZ, colKeys) {
 
   if (applyExpRaw === '無') {
     applyStr = 'No (無)';
-    rejectStr = 'No (無)';
+    rejectStr = '-';
   } else if (applyExpRaw === '有') {
     const num = Number(applyCountRaw);
     if (!isNaN(num) && num > 0) {
@@ -319,37 +320,44 @@ function buildCoeInfoRowByLayout_(mRow, mCol, jobInfo, sourceTZ, colKeys) {
     }
     if (rejectCountRaw !== '') {
       const rNum = Number(rejectCountRaw);
-      rejectStr = (rNum === 0 || rejectCountRaw === '無' || rejectCountRaw === 'なし') ? 'No (無)' : rejectCountRaw;
+      rejectStr = (rNum === 0 || rejectCountRaw === '無' || rejectCountRaw === 'なし') ? '0 (無)' : `${rejectCountRaw}`;
     }
   } else if (applyCountRaw !== '') {
     const num = Number(applyCountRaw);
     if (num === 0 || applyCountRaw === '無' || applyCountRaw === 'なし') {
       applyStr = 'No (無)';
-      rejectStr = 'No (無)';
+      rejectStr = '-';
     } else if (!isNaN(num) && num > 0) {
       applyStr = `YES (${num} TIME${num > 1 ? 'S' : ''})`;
       if (rejectCountRaw !== '') {
         const rNum = Number(rejectCountRaw);
-        rejectStr = (rNum === 0 || rejectCountRaw === '無' || rejectCountRaw === 'なし') ? 'No (無)' : rejectCountRaw;
+        rejectStr = (rNum === 0 || rejectCountRaw === '無' || rejectCountRaw === 'なし') ? '0 (無)' : `${rejectCountRaw}`;
       }
     } else {
       applyStr = applyCountRaw;
     }
   }
 
-  // 海外出入国歴・期間
+  // ② Z列（過去の出入国歴）＆ AA列（出入国回数・直近の出入国期間）
+  // ※ Z列が「No (無)」の場合は、AA列に「-」を出力する
   const overseasExp = getVal('海外への出入国歴の有無');
   const overseasExpStr = toYesNo(overseasExp);
   const travelCount = getVal('出入国の回数');
   const lastInDate = formatSlashDate(getVal('直近の入国日'));
   const lastOutDate = formatSlashDate(getVal('直近の出国日'));
 
-  let travelDetailParts = [];
-  if (travelCount && travelCount !== '0') travelDetailParts.push(`${travelCount} Time(s)`);
-  if (lastInDate || lastOutDate) travelDetailParts.push(`${lastInDate} 〜 ${lastOutDate}`);
-  const travelDetailStr = (overseasExp === '無') ? '' : travelDetailParts.join('\n');
+  let travelDetailStr = '';
+  if (overseasExp === '無') {
+    travelDetailStr = '-';
+  } else {
+    let travelDetailParts = [];
+    if (travelCount && travelCount !== '0') travelDetailParts.push(`${travelCount} Time(s)`);
+    if (lastInDate || lastOutDate) travelDetailParts.push(`${lastInDate} 〜 ${lastOutDate}`);
+    travelDetailStr = travelDetailParts.join('\n');
+  }
 
-  // 在日親族及び同居者情報
+  // ③ AB列（在日親族及び同居者の有無）＆ AC列（在日親族・同居者の詳細）
+  // ※ AB列が「No (無)」の場合は、AC列に「-」を出力する
   const relExp = getVal('日本在住の親族情報＞有無');
   const relName = getVal('日本在住の親族情報親族の名前');
   const relRelation = getVal('日本在住の親族情報続柄');
@@ -365,7 +373,7 @@ function buildCoeInfoRowByLayout_(mRow, mCol, jobInfo, sourceTZ, colKeys) {
 
   if (relExp === '無') {
     hasFamilyStr = 'No (無)';
-    familyDetailStr = '';
+    familyDetailStr = '-';
   } else if (relExp === '有' || hasDetailedRel) {
     hasFamilyStr = 'YES (有)';
     const fParts = [];
@@ -379,10 +387,20 @@ function buildCoeInfoRowByLayout_(mRow, mCol, jobInfo, sourceTZ, colKeys) {
     familyDetailStr = fParts.join(', ');
   }
 
-  // 犯罪歴・技能実習経験・修了証
+  // AD列：犯罪歴の有無
   const crimeStr = toYesNo(getVal('犯罪歴の有無'));
-  const traineeExpStr = toYesNo(getVal('技能実習の経験の有無'));
-  const traineeCertStr = toYesNo(getVal('技能実習修了書の有無'));
+
+  // ④ AE列（技能実習経験の有無）＆ AF列（技能実習修了証の有無）
+  // ※ AE列が「No (無)」の場合は、AF列に「-」を出力する
+  const traineeExpRaw = getVal('技能実習の経験の有無');
+  const traineeCertRaw = getVal('技能実習修了書の有無');
+  const traineeExpStr = toYesNo(traineeExpRaw);
+  let traineeCertStr = '';
+  if (traineeExpRaw === '無') {
+    traineeCertStr = '-';
+  } else {
+    traineeCertStr = toYesNo(traineeCertRaw);
+  }
 
   // 備考（33列目 AG列：その他の日本語能力試験［NAT-TEST等］と備考・メモのみを出力し、JLPT/JFTは含めない）
   const otherJapanese = getVal('その他の日本語能力試験');

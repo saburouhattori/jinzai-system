@@ -61,6 +61,16 @@ function applySkillFieldExamControl(skillField) {
 }
 
 /**
+ * 技能実習経験の有無（有 / 無）に応じた修了証欄のグレーアウト制御
+ */
+function toggleAddTraineeFields() {
+  const sel = document.getElementById('add_traineeExp');
+  const val = sel ? sel.value : '';
+  const isNo = (val === '無');
+  setAddFieldDisabled_('add_traineeCert', 'field_wrap_traineeCert', isNo, true);
+}
+
+/**
  * 過去のCOE交付申請歴の有無（有 / 無）に応じた回数欄のグレーアウト制御
  */
 function toggleAddApplyFields() {
@@ -159,6 +169,7 @@ function searchDataAddInfo() {
 
       // 技能分野に応じた試験項目のグレーアウトおよび有無プルダウン連動の適用
       applySkillFieldExamControl(data.hiredSkillField);
+      toggleAddTraineeFields();
       toggleAddApplyFields();
       toggleAddOverseasFields();
       toggleAddRelFields();
@@ -215,6 +226,9 @@ function submitAddInfo() {
   });
 
   // 「無」が選択されている場合の値クリア保証
+  if (formData.traineeExp === '無') {
+    formData.traineeCert = '';
+  }
   if (formData.applyExp === '無') {
     formData.applyCount = '0';
     formData.rejectCount = '0';

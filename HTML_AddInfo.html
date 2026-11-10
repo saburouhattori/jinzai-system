@@ -301,13 +301,13 @@
     </div>
     <div class="field">
       <label>技能実習経験の有無<span class="label-en">Experience of Ginojissyu</span></label>
-      <select id="add_traineeExp">
+      <select id="add_traineeExp" onchange="toggleAddTraineeFields()">
         <option value="">未選択 / Select...</option>
         <option value="有">有 / Yes</option>
         <option value="無">無 / No</option>
       </select>
     </div>
-    <div class="field">
+    <div class="field" id="field_wrap_traineeCert">
       <label>技能実習修了証の有無<span class="label-en">Certification of Ginojissyu</span></label>
       <select id="add_traineeCert">
         <option value="">未選択 / Select...</option>
