@@ -1,62 +1,63 @@
 // =========================================================
-// 外部連携（Funtoco「COE info」シートへの同期・転記）
+// 外部連携（Funtoco「COE info」シートへの同期・転記） (13_外部COE連携.gs)
 // =========================================================
 
 const EXTERNAL_SHEET_COE_INFO = "COE info";
 
 /**
- * COE info シートの標準33列ヘッダー定義（1行目：日本語、2行目：英語）
+ * COE info シートの標準34列ヘッダー定義（1行目：日本語、2行目：英語）
  */
 function getCoeInfoHeaders_() {
   return [
-    "内定日\nOffer Date",                                                               // 1 (A)
-    "案件ID\nJob ID",                                                                   // 2 (B)
-    "採用事業者名\nAccepting Organization",                                             // 3 (C)
-    "技能分野\nJob Field",                                                              // 4 (D)
-    "登録者ID\nCandidate ID",                                                           // 5 (E)
-    "氏名\nName",                                                                       // 6 (F)
-    "呼び名\nNickname",                                                                 // 7 (G)
-    "性別\nSex",                                                                        // 8 (H)
-    "所属送り出し機関\nSending Organization",                                           // 9 (I)
-    "生年月日\nDate of birth",                                                          // 10 (J)
-    "出生地（都市名）\nPlace of birth",                                                 // 11 (K)
-    "旅券番号（パスポート番号）\nPassport Number",                                      // 12 (L)
-    "旅券有効期限（パスポート有効期限）\nPassport Date of expiration",                  // 13 (M)
-    "日本語能力試験（JLPT / JFT）\nCertification of JLPT or JFT-Basic",                 // 14 (N)
-    "介護技能評価試験\nNursing Care Skills Exam",                                       // 15 (O)
-    "介護日本語評価試験\nNursing Care Japanese Exam",                                   // 16 (P)
-    "外食業技能測定試験\nFood Service Skills Exam",                                     // 17 (Q)
-    "飲食料品製造業技能測定試験\nFood & Beverage Mfg. Skills Exam",                     // 18 (R)
-    "配偶者の有無\nMarital status",                                                     // 19 (S)
-    "本国における居住地（住所詳細）\nHome address in Myanmar",                          // 20 (T)
-    "職業\nOccupation",                                                                 // 21 (U)
-    "最終学歴・状況\nFinal educational background",                                     // 22 (V)
-    "最終学歴（学校名・卒業年月・専攻）\nName of school / Date of graduation / Major",  // 23 (W)
-    "過去の交付申請歴・回数\nPast COE application history & count",                     // 24 (X)
-    "うち不交付となった回数\nNumber of times of non-issuance",                          // 25 (Y)
-    "過去の出入国歴\nPast entry into / departure from Japan",                           // 26 (Z)
-    "出入国回数・直近の出入国期間\nNumber of times & Latest entry/departure period",    // 27 (AA)
-    "在日親族及び同居者の有無\nFamily in Japan or co-residents",                        // 28 (AB)
-    "在日親族・同居者の詳細\nDetails of family in Japan",                               // 29 (AC)
-    "犯罪歴の有無（日本・海外）\nCriminal record (in Japan / overseas)",                // 30 (AD)
-    "技能実習経験の有無\nExperience of Ginojissyu",                                     // 31 (AE)
-    "技能実習修了証の有無\nCertification of Ginojissyu",                                // 32 (AF)
-    "備考（その他日本語試験等）\nNote"                                                  // 33 (AG)
+    "状況\nStatus",                                                                     // 1 (A)
+    "内定日\nOffer Date",                                                               // 2 (B)
+    "案件ID\nJob ID",                                                                   // 3 (C)
+    "採用事業者名\nAccepting Organization",                                             // 4 (D)
+    "技能分野\nJob Field",                                                              // 5 (E)
+    "登録者ID\nCandidate ID",                                                           // 6 (F)
+    "氏名\nName",                                                                       // 7 (G)
+    "呼び名\nNickname",                                                                 // 8 (H)
+    "性別\nSex",                                                                        // 9 (I)
+    "所属送り出し機関\nSending Organization",                                           // 10 (J)
+    "生年月日\nDate of birth",                                                          // 11 (K)
+    "出生地（都市名）\nPlace of birth",                                                 // 12 (L)
+    "旅券番号（パスポート番号）\nPassport Number",                                      // 13 (M)
+    "旅券有効期限（パスポート有効期限）\nPassport Date of expiration",                  // 14 (N)
+    "日本語能力試験（JLPT / JFT）\nCertification of JLPT or JFT-Basic",                 // 15 (O)
+    "介護技能評価試験\nNursing Care Skills Exam",                                       // 16 (P)
+    "介護日本語評価試験\nNursing Care Japanese Exam",                                   // 17 (Q)
+    "外食業技能測定試験\nFood Service Skills Exam",                                     // 18 (R)
+    "飲食料品製造業技能測定試験\nFood & Beverage Mfg. Skills Exam",                     // 19 (S)
+    "配偶者の有無\nMarital status",                                                     // 20 (T)
+    "本国における居住地（住所詳細）\nHome address in Myanmar",                          // 21 (U)
+    "職業\nOccupation",                                                                 // 22 (V)
+    "最終学歴・状況\nFinal educational background",                                     // 23 (W)
+    "最終学歴（学校名・卒業年月・専攻）\nName of school / Date of graduation / Major",  // 24 (X)
+    "過去の交付申請歴・回数\nPast COE application history & count",                     // 25 (Y)
+    "うち不交付となった回数\nNumber of times of non-issuance",                          // 26 (Z)
+    "過去の出入国歴\nPast entry into / departure from Japan",                           // 27 (AA)
+    "出入国回数・直近の出入国期間\nNumber of times & Latest entry/departure period",    // 28 (AB)
+    "在日親族及び同居者の有無\nFamily in Japan or co-residents",                        // 29 (AC)
+    "在日親族・同居者の詳細\nDetails of family in Japan",                               // 30 (AD)
+    "犯罪歴の有無（日本・海外）\nCriminal record (in Japan / overseas)",                // 31 (AE)
+    "技能実習経験の有無\nExperience of Ginojissyu",                                     // 32 (AF)
+    "技能実習修了証の有無\nCertification of Ginojissyu",                                // 33 (AG)
+    "備考（その他日本語試験等）\nNote"                                                  // 34 (AH)
   ];
 }
 
 /**
  * ヘッダー文字列から標準フィールドキーを判定するヘルパー関数
- * ※ AG列「備考（その他日本語試験等）」が N列「日本語試験」に誤判定されないよう、「備考 / Note」を最優先で判定します。
+ * ※ AH列「備考（その他日本語試験等）」が O列「日本語試験」に誤判定されないよう、「備考 / Note」を最優先で判定します。
  */
 function identifyCoeFieldKey_(headerStr) {
   const h = String(headerStr || "").normalize('NFC').replace(/\s+/g, ' ').trim();
   if (!h) return null;
 
-  // 0. 備考列の最優先判定（「その他日本語試験等」という副題が「日本語試験」に誤爆するのを防止）
+  // 0. 備考列の最優先判定
   if (h.includes('備考') || h.includes('Note')) return 'note';
 
-  // 1. 複合文・固有キーワードの優先判定（在日親族詳細や学校名が Name 等に誤判定されるのを防止）
+  // 1. 複合文・固有キーワードの優先判定（W列「最終学歴・状況」やT列「Marital status」とA列「状況 / Status」を明確に区別）
   if (h.includes('在日親族・同居者の詳細') || h.includes('在日親族詳細') || h.includes('Details of family in Japan') || h.includes('Residence card number')) return 'familyDetail';
   if (h.includes('在日親族及び同居者の有無') || h.includes('日本在住の親族の有無') || h.includes('Family in Japan')) return 'hasFamily';
   if (h.includes('学校名・卒業年月・専攻') || h.includes('最終学歴学校名') || h.includes('Name of school')) return 'eduDetail';
@@ -84,7 +85,10 @@ function identifyCoeFieldKey_(headerStr) {
   if (h.includes('性別') || h.includes('Sex')) return 'sex';
   if (h.includes('呼び名') || h.includes('Nickname') || h.includes('Nick Name')) return 'nickname';
 
-  // 2. 管理キー・基本項目の判定
+  // 2. A列「状況 / Status」（COE情報状況）の判定
+  if (h.includes('状況') || h.includes('Status') || h.includes('ステータス')) return 'coeStatus';
+
+  // 3. 管理キー・基本項目の判定
   if (h.includes('内定日') || h.includes('Offer Date')) return 'offerDate';
   if (h.includes('案件ID') || h.includes('Job ID')) return 'jobId';
   if (h.includes('採用事業者') || h.includes('Accepting Organization') || h.includes('Company')) return 'company';
@@ -95,8 +99,60 @@ function identifyCoeFieldKey_(headerStr) {
 }
 
 /**
+ * 状況列（A列等）に「入力済（緑）」「未入力（赤）」の条件付き書式を設定するヘルパー関数
+ * ※ すでに設定済みの場合は再設定を行わずスキップします（スマートテーブルに負荷をかけません）。
+ */
+function ensureCoeStatusConditionalFormat_(coeSheet, statusColNum) {
+  try {
+    const rules = coeSheet.getConditionalFormatRules();
+    const hasCompletedRule = rules.some(r => {
+      const bc = r.getBooleanCondition();
+      if (!bc) return false;
+      const vals = bc.getCriteriaValues();
+      return vals && vals.includes("入力済");
+    });
+    if (hasCompletedRule) return;
+
+    const maxRows = Math.max(coeSheet.getMaxRows(), 1000);
+    const targetRange = coeSheet.getRange(2, statusColNum, maxRows - 1, 1);
+
+    // 既存の「状況」関連ルールがあれば除外して再構築
+    const filteredRules = rules.filter(r => {
+      const bc = r.getBooleanCondition();
+      if (!bc) return true;
+      const vals = bc.getCriteriaValues();
+      if (vals && (vals.includes("入力済") || vals.includes("未入力") || vals.includes("入力済 (Completed)") || vals.includes("未入力 (Incomplete)"))) {
+        return false;
+      }
+      return true;
+    });
+
+    const ruleCompleted = SpreadsheetApp.newConditionalFormatRule()
+      .whenTextEqualTo("入力済")
+      .setBackground("#e6f4ea")
+      .setFontColor("#137333")
+      .setBold(true)
+      .setRanges([targetRange])
+      .build();
+
+    const ruleIncomplete = SpreadsheetApp.newConditionalFormatRule()
+      .whenTextEqualTo("未入力")
+      .setBackground("#fce8e6")
+      .setFontColor("#c5221f")
+      .setBold(true)
+      .setRanges([targetRange])
+      .build();
+
+    filteredRules.push(ruleCompleted, ruleIncomplete);
+    coeSheet.setConditionalFormatRules(filteredRules);
+  } catch (e) {
+    console.warn("条件付き書式の設定をスキップしました: " + e.message);
+  }
+}
+
+/**
  * COE info シートの1行目ヘッダーを読み取り、各列とフィールドキーの対応マップを返す関数
- * ※ スマートテーブルのヘッダー重複エラーを避けるため、既存シートのヘッダーは上書きせず動的に読み取ります。
+ * ※ A列に「状況\nStatus」列がまだ存在しない場合は最左列に挿入し、旧「COE情報状況」表記であれば「状況\nStatus」に更新します。
  */
 function getCoeSheetLayout_(coeSheet) {
   let lastCol = coeSheet.getLastColumn();
@@ -106,8 +162,30 @@ function getCoeSheetLayout_(coeSheet) {
     lastCol = defaultHeaders.length;
   }
 
-  const headers = coeSheet.getRange(1, 1, 1, lastCol).getValues()[0];
-  const colKeys = headers.map(h => identifyCoeFieldKey_(h));
+  let headers = coeSheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  let colKeys = headers.map(h => identifyCoeFieldKey_(h));
+
+  // A列に「状況 (coeStatus)」がまだない場合は挿入、旧ヘッダー名（「COE情報状況」等）の場合は「状況\nStatus」へ更新
+  let statusColIdx = colKeys.indexOf('coeStatus');
+  if (statusColIdx === -1) {
+    coeSheet.insertColumnBefore(1);
+    coeSheet.getRange(1, 1).setValue("状況\nStatus");
+    coeSheet.setColumnWidth(1, 85);
+    SpreadsheetApp.flush();
+    lastCol = coeSheet.getLastColumn();
+    headers = coeSheet.getRange(1, 1, 1, lastCol).getValues()[0];
+    colKeys = headers.map(h => identifyCoeFieldKey_(h));
+    statusColIdx = colKeys.indexOf('coeStatus');
+  } else if (String(headers[statusColIdx] || "").trim() !== "状況\nStatus") {
+    coeSheet.getRange(1, statusColIdx + 1).setValue("状況\nStatus");
+    coeSheet.setColumnWidth(statusColIdx + 1, 85);
+    headers[statusColIdx] = "状況\nStatus";
+  }
+
+  if (statusColIdx !== -1) {
+    ensureCoeStatusConditionalFormat_(coeSheet, statusColIdx + 1);
+  }
+
   const colLabels = headers.map(h => String(h || "").split(/\r?\n/)[0].trim());
   const candIdColIdx = colKeys.indexOf('candId'); // 0-based
   const jobIdColIdx = colKeys.indexOf('jobId');   // 0-based
@@ -115,8 +193,8 @@ function getCoeSheetLayout_(coeSheet) {
     lastCol: lastCol,
     colKeys: colKeys,
     colLabels: colLabels,
-    candIdColIdx: candIdColIdx !== -1 ? candIdColIdx : 4,
-    jobIdColIdx: jobIdColIdx !== -1 ? jobIdColIdx : 1
+    candIdColIdx: candIdColIdx !== -1 ? candIdColIdx : 5,
+    jobIdColIdx: jobIdColIdx !== -1 ? jobIdColIdx : 2
   };
 }
 
@@ -159,7 +237,8 @@ function formatYearMonthEnglish_(val) {
 
 /**
  * 登録者マスタの1行データと案件情報から COE info シート用の行配列を生成する関数
- * ※ 技能分野の対象外である試験列、および親項目が「無（No）」である従属列（Y列・AA列・AC列・AF列）には「-」を出力し、未入力の列は空欄のまま出力します。
+ * ※ 備考を除くすべての対象項目が埋まっている場合のみ、A列（coeStatus）を「入力済」とし、
+ *   1つでも空欄がある場合は「未入力」とします。
  */
 function buildCoeInfoRowByLayout_(mRow, mCol, jobInfo, sourceTZ, colKeys) {
   const getVal = (colName) => {
@@ -207,7 +286,7 @@ function buildCoeInfoRowByLayout_(mRow, mCol, jobInfo, sourceTZ, colKeys) {
   const passportNum = getVal('パスポート番号');
   const passportExp = formatSlashDate(getVal('パスポート有効期限'));
 
-  // 日本語資格 (Certification of JLPT or JFT-Basic：14列目 N列のみに出力)
+  // 日本語資格 (Certification of JLPT or JFT-Basic)
   const jlpt = getVal('特定技能要件＞JLPTレベル');
   const jft = getVal('特定技能要件＞JFTBasicレベル');
   let certLangParts = [];
@@ -299,8 +378,7 @@ function buildCoeInfoRowByLayout_(mRow, mCol, jobInfo, sourceTZ, colKeys) {
     return val;
   };
 
-  // ① X列（過去の交付申請歴・回数）＆ Y列（うち不交付となった回数）
-  // ※ X列が「No (無)」の場合は、Y列に「-」を出力する
+  // ① Y列（過去の交付申請歴・回数）＆ Z列（うち不交付となった回数）
   const applyExpRaw = getVal('在留資格交付申請歴の有無');
   const applyCountRaw = getVal('在留資格交付申請の回数');
   const rejectCountRaw = getVal('不許可となった在留資格交付申請の回数');
@@ -338,8 +416,7 @@ function buildCoeInfoRowByLayout_(mRow, mCol, jobInfo, sourceTZ, colKeys) {
     }
   }
 
-  // ② Z列（過去の出入国歴）＆ AA列（出入国回数・直近の出入国期間）
-  // ※ Z列が「No (無)」の場合は、AA列に「-」を出力する
+  // ② AA列（過去の出入国歴）＆ AB列（出入国回数・直近の出入国期間）
   const overseasExp = getVal('海外への出入国歴の有無');
   const overseasExpStr = toYesNo(overseasExp);
   const travelCount = getVal('出入国の回数');
@@ -356,8 +433,7 @@ function buildCoeInfoRowByLayout_(mRow, mCol, jobInfo, sourceTZ, colKeys) {
     travelDetailStr = travelDetailParts.join('\n');
   }
 
-  // ③ AB列（在日親族及び同居者の有無）＆ AC列（在日親族・同居者の詳細）
-  // ※ AB列が「No (無)」の場合は、AC列に「-」を出力する
+  // ③ AC列（在日親族及び同居者の有無）＆ AD列（在日親族・同居者の詳細）
   const relExp = getVal('日本在住の親族情報＞有無');
   const relName = getVal('日本在住の親族情報親族の名前');
   const relRelation = getVal('日本在住の親族情報続柄');
@@ -387,11 +463,10 @@ function buildCoeInfoRowByLayout_(mRow, mCol, jobInfo, sourceTZ, colKeys) {
     familyDetailStr = fParts.join(', ');
   }
 
-  // AD列：犯罪歴の有無
+  // AE列：犯罪歴の有無
   const crimeStr = toYesNo(getVal('犯罪歴の有無'));
 
-  // ④ AE列（技能実習経験の有無）＆ AF列（技能実習修了証の有無）
-  // ※ AE列が「No (無)」の場合は、AF列に「-」を出力する
+  // ④ AF列（技能実習経験の有無）＆ AG列（技能実習修了証の有無）
   const traineeExpRaw = getVal('技能実習の経験の有無');
   const traineeCertRaw = getVal('技能実習修了書の有無');
   const traineeExpStr = toYesNo(traineeExpRaw);
@@ -402,7 +477,7 @@ function buildCoeInfoRowByLayout_(mRow, mCol, jobInfo, sourceTZ, colKeys) {
     traineeCertStr = toYesNo(traineeCertRaw);
   }
 
-  // 備考（33列目 AG列：その他の日本語能力試験［NAT-TEST等］と備考・メモのみを出力し、JLPT/JFTは含めない）
+  // 備考（34列目 AH列：その他の日本語能力試験［NAT-TEST等］と備考・メモのみを出力し、JLPT/JFTは含めない）
   const otherJapanese = getVal('その他の日本語能力試験');
   const memo = getVal('備考・メモ');
   const noteParts = [];
@@ -445,6 +520,22 @@ function buildCoeInfoRowByLayout_(mRow, mCol, jobInfo, sourceTZ, colKeys) {
     traineeCert: traineeCertStr,
     note: noteStr
   };
+
+  // ▼ A列「状況 (coeStatus)」の全項目完了判定
+  // 備考 (note) を除くすべての必須項目が1つも欠けずに埋まっているかをチェック
+  const requiredKeys = [
+    'offerDate', 'jobId', 'company', 'skillField', 'candId',
+    'name', 'nickname', 'sex', 'agent', 'birthday',
+    'birthCity', 'passportNum', 'passportExp', 'certLang',
+    'kaigoSkill', 'kaigoLang', 'foodServiceExam', 'foodMfgExam',
+    'spouse', 'addressDetail', 'job', 'eduBgSummary', 'eduDetail',
+    'applyStr', 'rejectStr', 'overseasExp', 'travelDetail',
+    'hasFamily', 'familyDetail', 'crime', 'traineeExp', 'traineeCert'
+  ];
+
+  // さらに英語学歴の卒業年月（eduEndEn）が抜けていないかも厳密チェック
+  const isAllFilled = requiredKeys.every(k => String(fieldMap[k] || "").trim() !== "") && (eduSchoolEn !== "" && eduEndEn !== "");
+  fieldMap.coeStatus = isAllFilled ? "入力済" : "未入力";
 
   return colKeys.map(k => (k && fieldMap[k] !== undefined) ? fieldMap[k] : "");
 }
