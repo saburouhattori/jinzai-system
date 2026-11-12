@@ -1,0 +1,66 @@
+<script>
+// --- 事業者登録 ---
+function submitCompany() {
+  let nameEl = document.getElementById('comp_name');
+  let name = nameEl ? nameEl.value.normalize('NFC') : '';
+  if (nameEl) nameEl.value = name;
+
+  // ▼ 事業者名称の必須チェックとスペース禁止チェック
+  if (!name.trim()) { 
+    showModal('事業者名称は必須です。'); 
+    return; 
+  }
+  if (/[\s\u3000]/.test(name)) {
+    showModal('事業者名称にスペース（空白）を含めることはできません。');
+    return;
+  }
+
+  // ▼ ヨミガナ・所在地用の空白補正関数（改行維持 ＆ 全角スペース確実対応 ＆ NFC正規化）
+  let cleanVal = (id) => {
+    let el = document.getElementById(id);
+    if (!el) return '';
+    let val = el.value;
+    if (typeof val === 'string') {
+      return val.normalize('NFC').split('\n').map(line => line.replace(/\u3000/g, ' ').replace(/ +/g, ' ').trim()).join('\n');
+    }
+    return val;
+  };
+
+  let formData = { 
+    name: name, // スペースなし・NFC正規化済み
+    yomi: cleanVal('comp_yomi'), 
+    address: cleanVal('comp_address'), 
+    url: document.getElementById('comp_url') ? document.getElementById('comp_url').value.trim() : '', 
+    note: document.getElementById('comp_note') ? document.getElementById('comp_note').value.normalize('NFC') : ''
+  };
+  
+  document.getElementById('compBtn').disabled = true; 
+  showModal('登録中...', true);
+  
+  google.script.run
+    .withSuccessHandler(function(msg) {
+      try {
+        document.getElementById('compBtn').disabled = false; 
+        showModal(msg, false, true);
+        document.querySelectorAll('#form-company input, #form-company textarea').forEach(el => el.value = '');
+        let warningEl = document.getElementById('comp_warning');
+        if(warningEl) warningEl.style.display = 'none';
+      } catch(e) {
+        showModal('登録は完了しましたが、画面のクリアに失敗しました: ' + e.message);
+      }
+    })
+    .withFailureHandler(function(err) {
+      document.getElementById('compBtn').disabled = false; 
+      showModal('サーバーエラー: ' + err.message);
+    })
+    .addCompany(formData);
+}
+
+function liveCheckDuplicate(name) {
+  let warningBox = document.getElementById('comp_warning');
+  if (!warningBox) return;
+  let normName = typeof name === 'string' ? name.normalize('NFC').trim() : '';
+  if (!normName) { warningBox.style.display = 'none'; return; }
+  google.script.run.withSuccessHandler(function(isDup) { warningBox.style.display = isDup ? 'block' : 'none'; }).checkCompanyDuplicate(normName);
+}
+</script>

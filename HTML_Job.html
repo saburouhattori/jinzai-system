@@ -1,0 +1,63 @@
+<div id="form-job" style="display: <?= mode === 'JOB' ? 'block' : 'none' ?>;">
+<div class="section-title" >案件登録</div>
+
+<div class="field">
+  <label>ステータス</label>
+  <select id="job_status">
+    <option value="未着手">未着手</option>
+    <option value="面接準備">面接準備</option>
+  </select>
+</div>
+
+<div class="field">
+  <label>事業者名（特定技能所属機関名を入力してください）</label>
+  <div id="job_company_list">
+  </div>
+  <button class="btn-secondary" onclick="addJobCompanyRow('job_company_list')" style="margin-top:5px; font-size:11px; padding: 6px; width: auto;">+ 事業者名を追加</button>
+</div>
+
+<div class="field">
+  <label>技能分野</label>
+  <select id="job_skill">
+    <option value="">未選択</option>
+    <option value="介護">介護</option>
+    <option value="外食業">外食業</option>
+    <option value="飲食料品製造業">飲食料品製造業</option>
+  </select>
+</div>
+
+<div class="field" >
+  <label>候補者（登録者IDを入力）</label>
+  <p style="font-size: 11px; color: #555; margin-top: -3px; margin-bottom: 8px;">※候補者を変更する場合は、枠内のIDを直接書き換えてください。名前は自動で表示されます。</p>
+  <div id="job_cand_list" class="cand-list-wrapper">
+    </div>
+  <button class="btn-secondary" onclick="addJobCandRow()" style="margin-top:5px; font-size:11px; padding: 6px; width: auto;">+ 候補者IDを追加</button>
+</div>
+
+<div class="form-row">
+  <div class="field">
+    <label>面接日</label>
+    <input type="date" id="job_interviewDate" style="max-width: 200px;">
+  </div>
+</div>
+
+<div class="field">
+  <label>関連ファイル（Googleドライブ）</label>
+  <div id="job_file_list">
+    </div>
+  <button class="btn-secondary" onclick="addJobFileRow('job')" style="margin-top:5px; font-size:11px; padding: 6px; width: auto;">+ 関連ファイルを追加</button>
+  
+  <div style="margin-top: 15px; border-top: 1px dashed #ccc; padding-top: 10px;">
+    <label style="font-weight: bold; color: #333;">PCからファイルをアップロードして自動保存する場合</label>
+    <input type="file" id="job_upload_files" multiple style="font-size: 12px; margin-top: 5px; display: block;">
+    <p style="font-size: 11px; color: #555; margin-top: 5px;">※案件登録時に「<span style="font-weight:bold;">案件ID_事業者名</span>」のフォルダが自動作成され、ファイルが保存されます。</p>
+  </div>
+</div>
+
+<div class="field">
+  <label>備考・メモ</label>
+  <textarea id="job_memo" rows="3"></textarea>
+</div>
+
+<button class="btn-primary" id="jobBtn" onclick="submitJob()" >登録</button>
+</div>

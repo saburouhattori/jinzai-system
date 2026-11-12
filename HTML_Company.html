@@ -1,0 +1,15 @@
+<div id="form-company" style="display: <?= mode === 'COMPANY' ? 'block' : 'none' ?>;">
+<div class="section-title" >事業者登録</div>
+<div class="field">
+<label>事業者名称 *</label>
+<input type="text" id="comp_name" placeholder=" 例：株式会社〇〇 " oninput="liveCheckDuplicate(this.value)">
+<div id="comp_warning" class="warning-box">
+⚠️ 同名の事業者が既にマスタに存在します。別法人の場合はそのまま登録可能です。
+</div>
+</div>
+<div class="field" ><label>ヨミガナ</label><input type= "text" id="comp_yomi"></div>
+<div class="field" ><label>所在地</label><input type= "text" id="comp_address"></div>
+<div class="field"><label>HP URL</label><input type="url" id="comp_url"></div>
+<div class="field" ><label>備考</label><textarea id= "comp_note" rows="4"></textarea></div>
+<button class="btn-primary" id="compBtn" onclick="submitCompany()" >事業者マスタに登録</button>
+</div>
