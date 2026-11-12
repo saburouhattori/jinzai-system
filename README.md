@@ -1,4 +1,3 @@
-あああ
 # 人材管理システム (Jinzai System)
 
 ## 概要 (Overview)
