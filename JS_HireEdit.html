@@ -1,6 +1,6 @@
 <script>
 // =========================================
-// 面接結果の修正・更新 (HIRE_EDIT)
+// 面接結果の修正・更新 (HIRE_EDIT) (JS_HireEdit.html)
 // =========================================
 
 function fetchJobCandidatesEdit(mode) {
@@ -81,6 +81,20 @@ function fetchJobCandidatesEdit(mode) {
         odContainer.style.display = 'block';
         let odInput = document.getElementById('hireEdit_offerDate');
         if(odInput) odInput.value = data.offerDate || '';
+
+        let stSelect = document.getElementById('hireEdit_jobStatus');
+        if(stSelect) {
+          let currentSt = data.jobStatus || '入国準備';
+          // シート側に選択肢以外のカスタムステータスが入っていた場合も維持できるようオプションを動的補完
+          let hasOption = Array.from(stSelect.options).some(opt => opt.value === currentSt);
+          if (!hasOption && currentSt) {
+            let newOpt = document.createElement('option');
+            newOpt.value = currentSt;
+            newOpt.text = currentSt;
+            stSelect.add(newOpt);
+          }
+          stSelect.value = currentSt;
+        }
       }
     })
     .withFailureHandler(function(err) {
@@ -115,6 +129,7 @@ function submitHireEdit() {
   if (!confirm(`表示されている面接結果をシステムに登録・更新します。よろしいですか？\n※各候補者のマスタ情報と面接履歴が自動更新されます。`)) return;
 
   let offerDate = document.getElementById('hireEdit_offerDate') ? document.getElementById('hireEdit_offerDate').value : '';
+  let jobStatus = document.getElementById('hireEdit_jobStatus') ? document.getElementById('hireEdit_jobStatus').value : '';
   
   let btnEl = document.getElementById('hireEditBtn');
   if(btnEl) btnEl.disabled = true; 
@@ -144,6 +159,6 @@ function submitHireEdit() {
       if(btnEl) btnEl.disabled = false; 
       showModal('登録・更新エラー: ' + err.message);
     })
-    .updateHire(jobId, resultData, offerDate);
+    .updateHire(jobId, resultData, offerDate, jobStatus);
 }
 </script>

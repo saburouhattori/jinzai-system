@@ -17,9 +17,23 @@
 </div>
 </div>
 
-<div class="field" id="hireEdit_offerDate_container" style="display: none; margin-top: 15px;">
-  <label>内定日 <span style="font-size:11px; color:#555; font-weight:normal;">※採用者がいる場合</span></label>
-  <input type="date" id="hireEdit_offerDate" style="max-width: 200px;">
+<div id="hireEdit_offerDate_container" style="display: none; margin-top: 15px;">
+  <div class="form-row">
+    <div class="field">
+      <label>案件ステータス</label>
+      <select id="hireEdit_jobStatus" style="max-width: 200px;">
+        <option value="未着手">未着手</option>
+        <option value="面接準備">面接準備</option>
+        <option value="入国準備">入国準備</option>
+        <option value="終了">終了</option>
+        <option value="キャンセル">キャンセル</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>内定日 <span style="font-size:11px; color:#555; font-weight:normal;">※採用者がいる場合</span></label>
+      <input type="date" id="hireEdit_offerDate" style="max-width: 200px;">
+    </div>
+  </div>
 </div>
 
 <div style="text-align: center; margin-top: 25px;">

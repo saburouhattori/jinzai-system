@@ -1,5 +1,5 @@
 // =========================================
-// 面接結果の修正・更新 (HIRE_EDIT) および案件削除時のロールバック処理
+// 面接結果の修正・更新 (HIRE_EDIT) および案件削除時のロールバック処理 (07b_面接結果修正・取消.gs)
 // =========================================
 
 // ---------------------------------------------------------
@@ -65,11 +65,16 @@ function getJobCandidatesEdit(jobId) {
       };
     }).filter(c => c.id);
 
-    return { candidates: candidates, companies: companies, offerDate: details.offerDate };
+    return {
+      candidates: candidates,
+      companies: companies,
+      offerDate: details.offerDate,
+      jobStatus: details.status || ""
+    };
   } catch(e) { throw new Error(e.message); }
 }
 
-function updateHire(jobId, resultData, offerDateStr) {
+function updateHire(jobId, resultData, offerDateStr, jobStatusStr) {
   try {
     const sheet = getMasterSheet('案件管理');
     const mSheet = getMasterSheet('登録者マスタ');
@@ -81,7 +86,7 @@ function updateHire(jobId, resultData, offerDateStr) {
     const mData = mSheet.getDataRange().getValues();
     if (!colMap['案件ID']) throw new Error("案件管理シートに案件IDが見つかりません。");
     
-    let companyNamesText = "", rawInterviewDate = "", targetJobRow = -1;
+    let companyNamesText = "", rawInterviewDate = "", currentJobStatus = "", targetJobRow = -1;
     // 他案件で「（採用）」になっている候補者を事前に把握し、巻き込みリセットを防ぐ
     const otherJobHiredMap = new Map();
 
@@ -90,6 +95,7 @@ function updateHire(jobId, resultData, offerDateStr) {
       if (currentJobId === String(jobId).trim()) {
         companyNamesText = String(data[i][colMap['事業者名'] - 1]).trim();
         rawInterviewDate = data[i][colMap['面接日'] - 1];
+        currentJobStatus = colMap['ステータス'] ? String(data[i][colMap['ステータス'] - 1] || '').trim() : '';
         targetJobRow = i + 1;
       } else {
         const otherDetails = colMap['面接結果詳細'] ? String(data[i][colMap['面接結果詳細'] - 1] || '').trim() : '';
@@ -292,7 +298,14 @@ function updateHire(jobId, resultData, offerDateStr) {
       range.setRichTextValue(richText.build());
     }
 
-    if (colMap['ステータス']) sheet.getRange(targetJobRow, colMap['ステータス']).setValue(hiredList.length > 0 ? '入国準備' : '終了');
+    // ▼ 案件ステータス：画面で指定されたステータスがあればそれを使用し、なければ現在のステータスを維持
+    if (colMap['ステータス']) {
+      const nextJobStatus = (jobStatusStr && String(jobStatusStr).trim() !== "")
+        ? String(jobStatusStr).trim()
+        : (currentJobStatus || (hiredList.length > 0 ? '入国準備' : '終了'));
+      sheet.getRange(targetJobRow, colMap['ステータス']).setValue(nextJobStatus);
+    }
+
     if (colMap['内定日']) {
       if (offerDateObj && hiredList.length > 0) {
         sheet.getRange(targetJobRow, colMap['内定日']).setValue(offerDateObj).setNumberFormat('yyyy"年"m"月"d"日"');
