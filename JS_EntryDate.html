@@ -1,6 +1,6 @@
 <script>
 // =========================================
-// 入国・入職日の一括登録 (ENTRY_DATE)
+// 入国・入職日の一括登録 (ENTRY_DATE) および一時データ移行 (TEMP_MIGRATE) (JS_EntryDate.html)
 // =========================================
 
 function fetchEntryDateCandidates() {
@@ -120,5 +120,174 @@ function submitBatchEntryDate() {
       showModal('保存エラー: ' + err.message);
     })
     .updateBatchEntryDates(jobId, records);
+}
+
+// =========================================================
+// 【一時作業用】内定日・入国日・入職日の一括登録 (TEMP_MIGRATE)
+// =========================================================
+
+let tempMigrationJobListCache = [];
+
+document.addEventListener('DOMContentLoaded', function() {
+  if (typeof MODE !== 'undefined' && MODE === 'TEMP_MIGRATE') {
+    loadTempMigrationJobList();
+  }
+});
+
+function loadTempMigrationJobList(selectedJobId = '') {
+  google.script.run
+    .withSuccessHandler(function(list) {
+      tempMigrationJobListCache = Array.isArray(list) ? list : [];
+      renderTempJobDropdown(selectedJobId);
+    })
+    .withFailureHandler(function(err) {
+      let sel = document.getElementById('tempMigrate_job_select');
+      if (sel) sel.innerHTML = `<option value="">読み込み失敗: ${err.message}</option>`;
+    })
+    .getTempMigrationJobList();
+}
+
+function renderTempJobDropdown(selectedJobId = '') {
+  let sel = document.getElementById('tempMigrate_job_select');
+  if (!sel) return;
+  let filterEl = document.getElementById('tempMigrate_filterMissing');
+  let onlyMissing = filterEl ? filterEl.checked : false;
+
+  let filtered = tempMigrationJobListCache.filter(item => !onlyMissing || item.hasMissing);
+
+  let html = `<option value="">-- 案件を選択してください（該当 ${filtered.length} 件 / 全採用案件 ${tempMigrationJobListCache.length} 件） --</option>`;
+  filtered.forEach(item => {
+    let isSel = (item.jobId === selectedJobId) ? 'selected' : '';
+    html += `<option value="${item.jobId}" ${isSel}>${item.label}</option>`;
+  });
+  sel.innerHTML = html;
+}
+
+function onSelectTempJob(jobId) {
+  if (!jobId) return;
+  let idEl = document.getElementById('tempMigrate_job_id');
+  if (idEl) {
+    idEl.value = jobId;
+    checkJobId(idEl, 'tempMigrateJobDisplay');
+  }
+  fetchTempMigrateCandidates();
+}
+
+function fetchTempMigrateCandidates() {
+  let idEl = document.getElementById('tempMigrate_job_id');
+  if (!idEl) return;
+  let rawId = idEl.value.trim();
+  if (!rawId) { showModal('案件を選択するか、案件IDを入力してください。'); return; }
+  let jobId = formatJobId(rawId);
+  idEl.value = jobId;
+
+  showModal('案件データを読み込み中...', true);
+
+  google.script.run
+    .withSuccessHandler(function(data) {
+      closeModal();
+      let editArea = document.getElementById('tempMigrate_edit_area');
+      let container = document.getElementById('tempMigrate_cand_list');
+      let dispEl = document.getElementById('tempMigrateJobDisplay');
+      if (!container || !editArea) return;
+
+      if (dispEl && data.company) {
+        dispEl.innerText = `事業者: ${data.company} （現在のステータス: ${data.status || '未設定'}）`;
+      }
+
+      let candidates = data.candidates || [];
+      if (candidates.length === 0) {
+        editArea.style.display = 'none';
+        showModal(`案件 ${jobId} には「採用」ステータスの候補者が見つかりません。`);
+        return;
+      }
+
+      editArea.style.display = 'block';
+
+      let offerInput = document.getElementById('temp_offerDate');
+      let bEntry = document.getElementById('temp_bulk_entryDate');
+      let bWork = document.getElementById('temp_bulk_workDate');
+      if (offerInput) offerInput.value = data.offerDate || '';
+      if (bEntry) bEntry.value = '';
+      if (bWork) bWork.value = '';
+
+      let html = '';
+      candidates.forEach(c => {
+        let compBadge = c.company ? `<span style="font-size:11px; color:#555; background:#e8eaed; padding:2px 6px; border-radius:4px; margin-left:6px;">${c.company}</span>` : '';
+        html += `
+          <div class="tempMigrate-cand-row" data-id="${c.id}" style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px; background:#fff; padding:10px; border:1px solid #ddd; border-radius:4px; flex-wrap:wrap;">
+            <div style="font-weight:bold; color:#333; min-width:180px; flex:1;">
+              ${c.display}${compBadge}
+            </div>
+            <div style="display:flex; gap:12px; align-items:center;">
+              <div>
+                <label style="font-size:11px; color:#555; margin-bottom:2px;">入国日</label>
+                <input type="date" class="temp-cand-entry-date" value="${c.entryDate || ''}" style="width:135px; padding:5px;">
+              </div>
+              <div>
+                <label style="font-size:11px; color:#555; margin-bottom:2px;">入職日</label>
+                <input type="date" class="temp-cand-work-date" value="${c.workDate || ''}" style="width:135px; padding:5px;">
+              </div>
+            </div>
+          </div>
+        `;
+      });
+      container.innerHTML = html;
+    })
+    .withFailureHandler(function(err) {
+      showModal('エラー: ' + err.message);
+    })
+    .getHiredCandidatesForEntry(jobId);
+}
+
+function applyTempBulkDate(type, val) {
+  let selector = (type === 'entry') ? '.temp-cand-entry-date' : '.temp-cand-work-date';
+  document.querySelectorAll(selector).forEach(input => {
+    input.value = val;
+  });
+}
+
+function submitTempMigrateDates() {
+  let idEl = document.getElementById('tempMigrate_job_id');
+  let jobId = idEl ? formatJobId(idEl.value.trim()) : '';
+  if (!jobId) { showModal('案件IDが指定されていません。'); return; }
+
+  let rows = document.querySelectorAll('.tempMigrate-cand-row');
+  if (rows.length === 0) {
+    showModal('先に案件を読み込んでください。');
+    return;
+  }
+
+  let offerInput = document.getElementById('temp_offerDate');
+  let offerDateStr = offerInput ? offerInput.value : '';
+
+  let records = [];
+  rows.forEach(row => {
+    let cid = row.getAttribute('data-id');
+    let eInput = row.querySelector('.temp-cand-entry-date');
+    let wInput = row.querySelector('.temp-cand-work-date');
+    records.push({
+      id: cid,
+      entryDate: eInput ? eInput.value : '',
+      workDate: wInput ? wInput.value : ''
+    });
+  });
+
+  let btnEl = document.getElementById('tempMigrateBtn');
+  if (btnEl) btnEl.disabled = true;
+
+  showModal('内定日・入国日・入職日を一括保存中...', true);
+  google.script.run
+    .withSuccessHandler(function(msg) {
+      if (btnEl) btnEl.disabled = false;
+      showModal(msg, false, true);
+      loadTempMigrationJobList(jobId);
+      google.script.run.syncListSheets();
+    })
+    .withFailureHandler(function(err) {
+      if (btnEl) btnEl.disabled = false;
+      showModal('保存エラー: ' + err.message);
+    })
+    .updateTempMigrationDates(jobId, offerDateStr, records);
 }
 </script>

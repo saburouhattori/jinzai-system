@@ -1,3 +1,4 @@
+<!-- 通常業務メニュー用：入国・入職日の一括登録 (ENTRY_DATE) -->
 <div id="form-entry-date" style="display: <?= mode === 'ENTRY_DATE' ? 'block' : 'none' ?>;">
 <div class="section-title" style="border-left-color: #1a73e8;">入国・入職日の一括登録</div>
 <div class="field">
@@ -34,4 +35,61 @@
   <button class="btn-primary" id="entryDateBtn" style="background: #1a73e8; width: 200px;" onclick="submitBatchEntryDate()">一括保存</button>
 </div>
 <p style="font-size: 11px; color: #555; margin-top: 10px; text-align: center;">※登録者マスタの「入国日」「入職日」が一括更新され、採用者一覧へ自動同期されます。</p>
+</div>
+
+<!-- 管理者用一時メニュー：【一時作業用】内定日・入国日・入職日の一括登録 (TEMP_MIGRATE) -->
+<div id="form-temp-migrate" style="display: <?= mode === 'TEMP_MIGRATE' ? 'block' : 'none' ?>;">
+<div class="section-title" style="border-left-color: #f29900;">【一時作業用】内定日・入国日・入職日の一括登録</div>
+
+<div class="field" style="background: #fef7e0; padding: 12px; border-radius: 6px; border: 1px solid #f29900; margin-bottom: 15px;">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+    <label style="margin: 0; color: #b06000;">① 採用者あり案件リストから選択（未入力項目がある案件を優先表示可能）</label>
+    <label style="font-weight: normal; font-size: 12px; color: #333; margin: 0; cursor: pointer;">
+      <input type="checkbox" id="tempMigrate_filterMissing" onchange="renderTempJobDropdown()" checked style="width: auto; margin-right: 4px;">未入力がある案件のみ表示
+    </label>
+  </div>
+  <select id="tempMigrate_job_select" onchange="onSelectTempJob(this.value)" style="font-size: 13px; padding: 8px;">
+    <option value="">-- 案件一覧を読み込み中... --</option>
+  </select>
+
+  <div style="margin-top: 10px; padding-top: 10px; border-top: 1px dashed #f29900;">
+    <label style="font-size: 12px; color: #555;">または 案件IDを直接入力して検索</label>
+    <div style="display: flex; gap: 10px;">
+      <input type="text" id="tempMigrate_job_id" placeholder="例: 1 または JOB-0001" oninput="checkJobId(this, 'tempMigrateJobDisplay')" onblur="applyJobFormat(this)" style="flex: 2; background: #fff;">
+      <button class="btn-secondary" style="flex: 1; margin-top: 0; padding: 8px;" onclick="fetchTempMigrateCandidates()">案件を読み込む</button>
+    </div>
+    <div id="tempMigrateJobDisplay" style="font-size:11px; color:#34a853; margin-top:4px; min-height:14px;"></div>
+  </div>
+</div>
+
+<div id="tempMigrate_edit_area" style="display: none;">
+  <div style="background: #e8f0fe; padding: 12px; border-radius: 6px; margin-bottom: 15px; border: 1px solid #1a73e8;">
+    <div style="font-weight: bold; font-size: 12px; color: #1a73e8; margin-bottom: 8px;">▼ 案件の内定日 ＆ 採用者全員への一括日付セット</div>
+    <div class="form-row" style="margin-bottom: 0;">
+      <div class="field">
+        <label style="font-size: 12px; color: #d93025;">★ 内定日（案件・採用者共通）</label>
+        <input type="date" id="temp_offerDate" style="border: 2px solid #1a73e8; background: #fff;">
+      </div>
+      <div class="field">
+        <label style="font-size: 12px;">共通の入国日（全員に反映）</label>
+        <input type="date" id="temp_bulk_entryDate" oninput="applyTempBulkDate('entry', this.value)" style="background: #fff;">
+      </div>
+      <div class="field">
+        <label style="font-size: 12px;">共通の入職日（全員に反映）</label>
+        <input type="date" id="temp_bulk_workDate" oninput="applyTempBulkDate('work', this.value)" style="background: #fff;">
+      </div>
+    </div>
+  </div>
+
+  <div class="field">
+    <label>採用者リスト（個別の入国日・入職日の微調整も可能です）</label>
+    <div id="tempMigrate_cand_list" style="padding: 10px; border: 1px solid #ced4da; border-radius: 4px; background: #f8f9fa;">
+    </div>
+  </div>
+
+  <div style="text-align: center; margin-top: 20px;">
+    <button class="btn-primary" id="tempMigrateBtn" style="background: #f29900; width: 240px; font-size: 15px;" onclick="submitTempMigrateDates()">内定・入国・入職日を一括保存</button>
+  </div>
+  <p style="font-size: 11px; color: #555; margin-top: 8px; text-align: center;">※案件管理の「内定日」、登録者マスタの「内定日・入国日・入職日」、採用者一覧、COE infoが同時更新されます（案件ステータスは変更されません）。</p>
+</div>
 </div>

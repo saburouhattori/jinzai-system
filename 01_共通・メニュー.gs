@@ -1,5 +1,5 @@
 // =========================================
-// システム全体の設定値・共通関数・UI
+// システム全体の設定値・共通関数・UI (01_共通・メニュー.gs)
 // =========================================
 
 
@@ -83,6 +83,8 @@ function onOpen() {
     .addItem('2. 採用・未採用リストの同期', 'runSyncListSheets')
     .addItem('3. 支払い管理シートへ同期（Funtoco）', 'runSyncPaymentManagement')
     .addItem('4. COE infoシートへ同期（Funtoco）', 'runSyncCoeInfoSheet')
+    .addSeparator()
+    .addItem('5. 【一時作業用】内定・入国・入職日の一括登録', 'showSidebarTempDateMigration')
     .addToUi();
 }
 
@@ -116,6 +118,7 @@ function showSidebarAddInfo()   { showMainSidebar('ADDINFO',    'COE申請情報
 function showSidebarEntryDate() { showMainSidebar('ENTRY_DATE', '入国日・入職日の一括登録'); }
 
 function showSidebarCompany()   { showMainSidebar('COMPANY',    '事業者の新規登録'); }
+function showSidebarTempDateMigration() { showMainSidebar('TEMP_MIGRATE', '【一時作業用】内定日・入国日・入職日の一括登録'); }
 
 /**
  * リスト同期の実行と結果表示
